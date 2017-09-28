@@ -55,8 +55,8 @@
         var rowList = [];
         var $form = $( "form[id='metadata-promote']");
         var rowCount = 0;
-        var selectedMetadataList = [];
-        var existingMetadataList = [];
+        var selectedMetadataFieldsList = [];
+        var fetchedMetadataFieldsList = [];
         $("#add-metadata-grouping").select2({
             theme: "bootstrap",
             allowClear: false,
@@ -67,14 +67,13 @@
 
         function populatePromotedMetadataFields() {
 
+            // Promise
             getPromotedMetadataFields().then(
                     function (response) {
-                        existingMetadataList = response;
-
-                        for (var i=0; i < existingMetadataList.length; i++) {
-                            addMetadataFieldRows(++rowCount, "submitted", existingMetadataList[i].json)
+                        fetchedMetadataFieldsList = response;
+                        for (var i=0; i < fetchedMetadataFieldsList.length; i++) {
+                            addMetadataFieldRows(++rowCount, "submitted", fetchedMetadataFieldsList[i].json)
                         }
-
                         // Add a new row for the user to get started with
                         addMetadataFieldRows(++rowCount, "new");
                     },
@@ -194,7 +193,7 @@
                                 // Filter out metadata field names that have already been selected in any of the other
                                 // new select HTML elements
                                 if (entry.indexOf('metadata.') > -1 && entry.indexOf('/extractors/') > -1 &&
-                                        selectedMetadataList.indexOf(entry) == -1) {
+                                        selectedMetadataFieldsList.indexOf(entry) == -1) {
                                     // Group extractor-specific fields together under extractor
                                     entryGroup = entry.substring(
                                                     entry.indexOf('/extractors/') + 12,
@@ -229,12 +228,12 @@
 
                 // Add metadata field name to selected list when selected
                 $addMetadataSelect.on('select2:select', function (event) {
-                    selectedMetadataList.push($(this).val());
+                    selectedMetadataFieldsList.push($(this).val());
                 });
 
                 // Remove metadata field name from selected list when unselected
                 $addMetadataSelect.on('select2:unselect', function (event) {
-                    selectedMetadataList.splice(selectedMetadataList.indexOf($(this).val()), 1);
+                    selectedMetadataFieldsList.splice(selectedMetadataFieldsList.indexOf($(this).val()), 1);
                 });
             }
         }
@@ -358,7 +357,7 @@
                             // Filter out metadata field names that have already been selected in any of the other
                             // new select HTML elements
                             if (entry.indexOf('metadata.') > -1 && entry.indexOf('/extractors/') > -1 &&
-                                    selectedMetadataList.indexOf(entry) == -1) {
+                                    selectedMetadataFieldsList.indexOf(entry) == -1) {
                                 // Group extractor-specific fields together under extractor
                                 entryGroup = entry.substring(
                                                 entry.indexOf('/extractors/') + 12,
@@ -393,12 +392,12 @@
 
             // Add metadata field name to selected list when selected
             $addMetadataSelect.on('select2:select', function (event) {
-                selectedMetadataList.push($(this).val());
+                selectedMetadataFieldsList.push($(this).val());
             });
 
             // Remove metadata field name from selected list when unselected
             $addMetadataSelect.on('select2:unselect', function (event) {
-                selectedMetadataList.splice(selectedMetadataList.indexOf($(this).val()), 1);
+                selectedMetadataFieldsList.splice(selectedMetadataFieldsList.indexOf($(this).val()), 1);
             });
             console.log("edit");
         }
@@ -409,7 +408,7 @@
             $("#metadata-clause-" + rowType + "-" + rowStr).remove();
             rowList.splice(rowList.indexOf(rowStr), 1);
             // Remove metadata field name from selected list when the row is removed
-            selectedMetadataList.splice(selectedMetadataList.indexOf(dataId), 1);
+            selectedMetadataFieldsList.splice(selectedMetadataFieldsList.indexOf(dataId), 1);
         }
 
         // form submission
@@ -454,9 +453,13 @@
 
         function resetPage() {
             // Reset variables
-            $("#metadata-rows").empty();
             rowList.length = 0;
+            selectedMetadataFieldsList.length = 0;
+            fetchedMetadataFieldsList.length = 0;
             rowCount = 0;
+
+            // Clear div
+            $("#metadata-rows").empty();
 
             // Populate data
             populatePromotedMetadataFields();
