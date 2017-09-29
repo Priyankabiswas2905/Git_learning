@@ -1,5 +1,5 @@
 
-function addPromotedMetadata(data) {
+function addPromotedMetadataField(data) {
 
     var addApi = jsRoutes.api.Metadata.addPromotedMetadataField();
     var request = addApi.ajax({
@@ -20,11 +20,27 @@ function addPromotedMetadata(data) {
     });
 }
 
-function editPromotedMetadata() {
+function editPromotedMetadataField() {
 
 }
 
-function deletePromotedMetadata() {
+function deletePromotedMetadataField(id) {
+
+    var deleteApi = jsRoutes.api.Metadata.deletePromotedMetadataField(id);
+    var request = deleteApi.ajax({
+        type: 'DELETE'
+    });
+
+    request.done(function (response, textStatus, jqXHR) {
+        if (textStatus == "success") {
+            notify("Metadata field successfully demoted.", "success", 3000);
+        }
+
+    });
+
+    request.fail(function (jqXHR, textStatus, errorThrown) {
+        notify("ERROR: " + jqXHR.responseJSON + " Metadata field demotion failed.", "error");
+    });
 
 }
 

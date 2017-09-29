@@ -72,13 +72,15 @@
                     function (response) {
                         fetchedMetadataFieldsList = response;
                         for (var i=0; i < fetchedMetadataFieldsList.length; i++) {
-                            addMetadataFieldRows(++rowCount, "submitted", fetchedMetadataFieldsList[i].json)
+                            addMetadataFieldRows(++rowCount, "submitted", fetchedMetadataFieldsList[i])
                         }
                         // Add a new row for the user to get started with
                         addMetadataFieldRows(++rowCount, "new");
                     },
                     function(error) {
                         notify(error + ". Fetching promoted metadata fields failed.", "error");
+                        // Add a new row for the user to get started with
+                        addMetadataFieldRows(++rowCount, "new");
                     }
             );
         }
@@ -90,9 +92,10 @@
             rowList.push(rowStr);
 
             if (rowType === "saved" || rowType === "submitted") {
-                var dataId = rowData.uri;
-                var dataText = rowData.label;
-                var dataGroup = dataId.substring(dataId.indexOf('/extractors/') + 12, dataId.lastIndexOf('.'));
+                var resourceId = rowData.id;
+                var dataUri = rowData.json.uri;
+                var dataText = rowData.json.label;
+                var dataGroup = dataUri.substring(dataUri.indexOf('/extractors/') + 12, dataUri.lastIndexOf('.'));
                 var dataGroupText = dataGroup + " (Extractor)";
 
                 // Basic new row definition
@@ -102,7 +105,7 @@
                             <!-- FIELD SELECTOR DROPDOWN -->
                             "<div class='form-group col-lg-8 col-md-8'>" +
                                 "<select id='" + rowType + "-metadata-select-" + rowStr + "'>" +
-                                    "<option title='" + dataGroupText + "' selected value='" + dataId +"'>" + dataText +
+                                    "<option title='" + dataGroupText + "' selected value='" + dataUri +"'>" + dataText +
                                     "</option>" +
                                 "</select>" +
                             "</div>" +
@@ -115,7 +118,7 @@
                             "</div>" +
                                 <!-- DELETE ROW BUTTON -->
                             "<div title='Delete row' class='form-group col-lg-1 col-md-1'>" +
-                                "<button class='btn' id='remove-saved-" + rowStr + "' " +
+                                "<button type='button' class='btn' id='remove-saved-" + rowStr + "' " +
                                     "onclick='removeRow(" + rowStr + ",\"" + rowType + "\")'>" +
                                     "<span class='glyphicon glyphicon-minus'></span>" +
                                 "</button>" +
@@ -129,7 +132,7 @@
                     theme: "bootstrap",
                     width: "100%",
                     allowClear: true
-                }).prop("disabled", true);
+                }).prop("disabled", true).data("resourceId", resourceId);
 
             }
             else if (rowType === "new" ) {
@@ -211,11 +214,13 @@
 
                             var outList = [];
                             for (var group in outMap) {
-                                if (group == "") {
-                                    for (var ungrouped=0; ungrouped<outMap[group].length; ungrouped++)
-                                        outList.push(outMap[group][ungrouped])
-                                } else
-                                    outList.push({"text":group, "children": outMap[group]})
+                                if (outMap.hasOwnProperty(group)) {
+                                    if (group == "") {
+                                        for (var ungrouped=0; ungrouped<outMap[group].length; ungrouped++)
+                                            outList.push(outMap[group][ungrouped])
+                                    } else
+                                        outList.push({"text":group, "children": outMap[group]})
+                                }
                             }
 
                             console.log(outList);
@@ -375,11 +380,14 @@
 
                         var outList = [];
                         for (var group in outMap) {
-                            if (group == "") {
-                                for (var ungrouped=0; ungrouped<outMap[group].length; ungrouped++)
-                                    outList.push(outMap[group][ungrouped])
-                            } else
-                                outList.push({"text":group, "children": outMap[group]})
+                            if (outMap.hasOwnProperty(group)) {
+
+                                if (group == "") {
+                                    for (var ungrouped=0; ungrouped<outMap[group].length; ungrouped++)
+                                        outList.push(outMap[group][ungrouped])
+                                } else
+                                    outList.push({"text":group, "children": outMap[group]})
+                            }
                         }
 
                         console.log(outList);
@@ -404,8 +412,13 @@
 
         function removeRow(rowId, rowType) {
             var rowStr = String(rowId);
-            var dataId = $("#" + rowType + "-metadata-select-" + rowStr).val();
-            $("#metadata-clause-" + rowType + "-" + rowStr).remove();
+            var $rowSelect = $("#" + rowType + "-metadata-select-" + rowStr);
+            var dataId = $rowSelect.val();
+
+            // Replace ID to mark as removed
+            $("#metadata-clause-" + rowType + "-" + rowStr).attr("id", "metadata-clause-" + "removed" + "-" + rowStr).hide();
+            $rowSelect.attr("id", "removed" + "-metadata-select-" + rowStr);
+
             rowList.splice(rowList.indexOf(rowStr), 1);
             // Remove metadata field name from selected list when the row is removed
             selectedMetadataFieldsList.splice(selectedMetadataFieldsList.indexOf(dataId), 1);
@@ -415,27 +428,44 @@
         $form.submit(function( event ) {
             event.preventDefault();
             //
-            var dataMap = [];
-            var dataList = [];
+            var addedDataMap = [];
+            var addedDataList = [];
+            var removedDataMap = [];
+            var removedDataList = [];
             var i;
+            var key;
 
             // Generate data map
             for (i = 1; i <= rowCount; i++) {
                 var $newSelect = $("#add-metadata-select-" + i);
                 var $savedSelect = $("#saved-metadata-select-" + i);
+                var $removedSelect = $("#removed-metadata-select-" + i);
 
                 if ($newSelect.val() != null) {
-                    dataMap[$newSelect.val()] = $newSelect.text();
+                    addedDataMap[$newSelect.val()] = $newSelect.text();
                 }
 
                 if ($savedSelect.val() != null) {
-                    dataMap[$savedSelect.val()] = $savedSelect.text();
+                    addedDataMap[$savedSelect.val()] = $savedSelect.text();
+                }
+
+                if ($removedSelect.val() != null) {
+                    removedDataMap[$removedSelect.val()] = $removedSelect.data("resourceId");
                 }
             }
 
-            // Generate data list from map
-            for (var key in dataMap) {
-                dataList.push({uri: key, label: dataMap[key]})
+            // Generate data list from map for newly added metadata fields
+            for (key in addedDataMap) {
+                if (addedDataMap.hasOwnProperty(key)) {
+                    addedDataList.push({uri: key, label: addedDataMap[key]})
+                }
+            }
+
+            // Generate data list from map for removed metadata fields
+            for (key in removedDataMap) {
+                if (removedDataMap.hasOwnProperty(key)) {
+                    removedDataList.push({uri: key, id: removedDataMap[key]})
+                }
             }
 
             // Display the results
@@ -443,11 +473,14 @@
                 saveRow(row, "submitted");
             }
 
-            for (var index in dataList) {
-                addPromotedMetadata(dataList[index]);
-            }
+            addedDataList.forEach(function(data) {
+                addPromotedMetadataField(data);
+            });
 
-            console.log(dataList);
+            removedDataList.forEach(function(data) {
+                deletePromotedMetadataField(data.id);
+            });
+
             console.log("Submitted changes");
         });
 
