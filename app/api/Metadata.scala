@@ -293,7 +293,7 @@ class Metadata @Inject() (
               case None =>
                 val metadataField = PromotedMetadata(json = body)
                 metadataService.addPromotedMetadataField(metadataField)
-                Ok(toJson("Success"))
+                Ok(toJson(metadataField.id))
             }
           }
           else{
