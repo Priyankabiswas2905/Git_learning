@@ -298,6 +298,10 @@ class MongoDBMetadataService @Inject() (contextService: ContextLDService, datase
     }
   }
 
+  def getPromotedMetadataFieldById(id: UUID): Option[PromotedMetadata] = {
+    PromotedMetadataDAO.findOne(MongoDBObject("_id" -> new ObjectId(id.stringify)))
+  }
+
   def getPromotedMetadataFieldByUri(uri:String): Option[PromotedMetadata] = {
     PromotedMetadataDAO.findOne(MongoDBObject("json.uri" -> uri))
   }

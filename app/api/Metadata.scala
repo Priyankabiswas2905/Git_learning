@@ -273,7 +273,7 @@ class Metadata @Inject() (
         case Some(user) =>
           val promotedMetadataFields = metadataService.getPromotedMetadataFields()
           Ok(toJson(promotedMetadataFields))
-        case None => BadRequest(toJson("Invalid user"))
+        case None => BadRequest(toJson("Invalid user."))
       }
   }
 
@@ -297,11 +297,28 @@ class Metadata @Inject() (
             }
           }
           else{
-            BadRequest(toJson("Invalid request payload"))
+            BadRequest(toJson("Invalid request payload."))
           }
-        case None => BadRequest(toJson("Invalid user"))
+        case None => BadRequest(toJson("Invalid user."))
       }
   }
+
+  def deletePromotedMetadataField(id: UUID) = ServerAdminAction {
+    implicit request =>
+      request.user match {
+        case Some(user) =>
+          metadataService.getPromotedMetadataFieldById(id) match {
+            case Some(metadataField) =>
+              metadataService.deletePromotedMetadataField (id)
+              Ok(toJson("Success"))
+            case None =>
+              NotFound(toJson("Promoted metadata field not found."))
+          }
+        case None =>
+          BadRequest(toJson("Invalid user."))
+      }
+  }
+
   def addUserMetadata() = PermissionAction(Permission.AddMetadata)(parse.json) {
     implicit request =>
       request.user match {
