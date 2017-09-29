@@ -78,7 +78,6 @@
                         addMetadataFieldRows(++rowCount, "new");
                     },
                     function(error) {
-                        notify(error + ". Fetching promoted metadata fields failed.", "error");
                         // Add a new row for the user to get started with
                         addMetadataFieldRows(++rowCount, "new");
                     }
@@ -156,7 +155,7 @@
                             "</div>" +
                                 <!-- DELETE ROW BUTTON -->
                             "<div title='Delete row' class='form-group col-lg-1 col-md-1'>" +
-                                "<button class='btn' id='remove-" + rowStr + "' " +
+                                "<button type='button' class='btn' id='remove-" + rowStr + "' " +
                                     "onclick='removeRow(" + rowStr + ",\"" + rowType + "\")'>" +
                                     "<span class='glyphicon glyphicon-minus'></span>" +
                                 "</button>" +
@@ -278,7 +277,7 @@
                         "</div>" +
                             <!-- DELETE ROW BUTTON -->
                         "<div title='Delete row' class='form-group col-lg-1 col-md-1'>" +
-                            "<button class='btn' id='remove-saved-" + rowStr + "' " +
+                            "<button type='button' class='btn' id='remove-saved-" + rowStr + "' " +
                                 "onclick='removeRow(" + rowStr + ",\"" + newRowType + "\")'>" +
                                 "<span class='glyphicon glyphicon-minus'></span>" +
                             "</button>" +
@@ -449,7 +448,7 @@
                     addedDataMap[$savedSelect.val()] = $savedSelect.text();
                 }
 
-                if ($removedSelect.val() != null) {
+                if ($removedSelect.val() != null && $removedSelect.data("resourceId") != null) {
                     removedDataMap[$removedSelect.val()] = $removedSelect.data("resourceId");
                 }
             }
@@ -473,12 +472,25 @@
                 saveRow(row, "submitted");
             }
 
-            addedDataList.forEach(function(data) {
-                addPromotedMetadataField(data);
+            addedDataList.forEach(function(data, index) {
+                addPromotedMetadataField(data).then(
+                        function (response) {
+                            // Store UUID in data field resourceId for future use
+                            var selectString = "select option[value='" + addedDataList[index].uri + "']";
+                            addedDataList[index].id = response;
+                            $(selectString).parent().data("resourceId", response);
+                        }
+                );
             });
 
-            removedDataList.forEach(function(data) {
-                deletePromotedMetadataField(data.id);
+            removedDataList.forEach(function(data, index) {
+                deletePromotedMetadataField(data.id).then(
+                        function (response) {
+                            // Finally remove the row
+                            var selectString = "select option[value='" + removedDataList[index].uri + "']";
+                            $(selectString).parent().remove();
+                        }
+                );
             });
 
             console.log("Submitted changes");
