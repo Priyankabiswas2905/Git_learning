@@ -53,9 +53,9 @@
             theme: "bootstrap",
             allowClear: false,
             width: "100%"
-        })
+        });
 
-        getBasicDefinitions(1)
+        getBasicDefinitions(1);
 
         // Add a new row to the set of criteria
         function getBasicDefinitions(rowId) {
@@ -90,7 +90,7 @@
             document.getElementById("v-"+rowStr).onkeydown = function(evt) {
                 // Allow Enter key to perform search on any value box
                 if (evt.keyCode == 13) {
-                    search()
+                    search();
                     return false
                 } else return true
             };
@@ -109,25 +109,37 @@
             });
 
             // fetch metadata definitions
-            var request = jsRoutes.api.Metadata.getDefinitionsDistinctName().ajax({
+            var request = jsRoutes.api.Metadata.getDefinitionsAndPromotedMetadataFields().ajax({
                 type: 'GET',
                 contentType: "application/json"
             });
             request.done(function (response, textStatus, jqXHR) {
-                var fields = response;
+                var metadataDefinitions = response[0].data;
+                var promotedMetadataFields = response[1].data;
+                var i, elem;
+                var $addMetadataSelectRow = $("#add-metadata-select-" + rowStr);
 
-                $("#add-metadata-select-"+rowStr).empty()
-                for (var i = 0; i < fields.length; i++) {
-                    var elem = $("<option></option>");
-                    elem.attr("data-type", fields[i].json.type);
-                    elem.attr("data-id", fields[i].json.label);
-                    elem.attr("value", "metadata."+fields[i].json.label);
-                    elem.text(fields[i].json.label);
-                    $("#add-metadata-select-"+String(rowId)).append(elem);
+                $addMetadataSelectRow.empty();
+
+                for (i = 0; i < metadataDefinitions.length; i++) {
+                    elem = $("<option></option>");
+                    elem.attr("data-type", metadataDefinitions[i].json.type);
+                    elem.attr("data-id", metadataDefinitions[i].json.label);
+                    elem.attr("value", "metadata." + metadataDefinitions[i].json.label);
+                    elem.text(metadataDefinitions[i].json.label);
+                    $addMetadataSelectRow.append(elem);
+                }
+
+                for (i = 0; i < promotedMetadataFields.length; i++) {
+                    elem = $("<option></option>");
+                    elem.attr("data-id", promotedMetadataFields[i].json.uri);
+                    elem.attr("value", promotedMetadataFields[i].json.uri);
+                    elem.text(promotedMetadataFields[i].json.label);
+                    $addMetadataSelectRow.append(elem);
                 }
 
                 // Select box will populate as user types, with metadata field autocomplete suggestions
-                $("#add-metadata-select-"+rowStr).select2({
+                $addMetadataSelectRow.select2({
                     theme: "bootstrap",
                     placeholder: "Select a type or field key",
                     allowClear: true,
@@ -136,7 +148,7 @@
                         url: function(filter) {
                             // Get autocomplete results if typing; otherwise return standard set of definitions
                             if (filter.term == null || filter.term == "") {
-                                return jsRoutes.api.Metadata.getDefinitionsDistinctName().url
+                                return jsRoutes.api.Metadata.getDefinitionsAndPromotedMetadataFields().url
                             }
                             else {
                                 return jsRoutes.api.Metadata.getAutocompleteName(filter.term).url
@@ -144,52 +156,71 @@
                         },
                         // Populate autocomplete as user types
                         processResults: function(data, page) {
-                            var outMap = {}
+                            var outMap = {};
+                            var entryGroup;
+                            var entryData;
+                            var type;
 
                             for (var rez=0; rez<data.length; rez++) {
                                 var entry = data[rez];
 
-                                // Metadata Definitions
-                                if (typeof(entry) == 'object') {
-                                    var entryGroup = "Metadata Definitions";
-                                    var entryData = {text: entry.json.label, id: "metadata."+entry.json.label};
+                                // Metadata definitions and promoted metadata
+                                if (entry.hasOwnProperty("type") && entry.hasOwnProperty("data")){
+                                    var dataList = entry.data;
+                                    entryGroup = entry.type;
+
+                                    for (var i=0; i < dataList.length; i++) {
+                                        if (entryGroup === "Metadata Definitions"){
+                                            entryData = {text: dataList[i].json.label,
+                                                id: "metadata." + dataList[i].json.label};
+                                        }
+                                        else if (entryGroup === "Promoted Metadata"){
+                                            entryData = {text: dataList[i].json.label,
+                                                id: dataList[i].json.uri};
+                                        }
+                                        if (!outMap.hasOwnProperty(entryGroup))
+                                            outMap[entryGroup] = [];
+                                        outMap[entryGroup].push(entryData)
+                                    }
+                                }
                                 // suggestions from elasticsearch
-                                } else {
+                                else {
                                     if (entry.indexOf('.') > -1) {
                                         if (entry.indexOf('/extractors/') > -1) {
                                             // Group extractor-specific fields together under extractor
-                                            var entryGroup = entry.substring(entry.indexOf('/extractors/')+12, entry.lastIndexOf('.'))+" (Extractor)";
+                                            entryGroup = entry.substring(entry.indexOf('/extractors/')+12, entry.lastIndexOf('.'))+" (Extractor)";
                                         }
                                         else if (entry.split('.').length > 2 ){
                                             // Group user-submitted metadata under user's name
-                                            var entryGroup = entry.substring(entry.indexOf('.')+1, entry.lastIndexOf('.'))+" (User)";
+                                            entryGroup = entry.substring(entry.indexOf('.')+1, entry.lastIndexOf('.'))+" (User)";
                                         }
                                         else {
                                             // This should be metadata definitions otherwise
-                                            var entryGroup = "Metadata Definitions";
+                                            entryGroup = "Metadata Definitions";
                                         }
-                                        var entryData = {id: entry, text: entry.substring(entry.lastIndexOf('.')+1, entry.length)}
+                                        entryData = {id: entry,
+                                            text: entry.substring(entry.lastIndexOf('.')+1, entry.length)}
                                     } else {
                                         // Simple entry
-                                        var entryGroup = ""
-                                        var entryData = {text: entry, id: entry}
+                                        entryGroup = "";
+                                        entryData = {text: entry, id: entry}
                                     }
+                                    if (!outMap.hasOwnProperty(entryGroup))
+                                        outMap[entryGroup] = [];
+                                    outMap[entryGroup].push(entryData)
                                 }
-                                if (!outMap.hasOwnProperty(entryGroup))
-                                    outMap[entryGroup] = [];
-                                outMap[entryGroup].push(entryData)
                             }
 
-                            var outList = []
+                            var outList = [];
                             for (var group in outMap) {
-                                if (group == "") {
+                                if (group == "" && outMap.hasOwnProperty(group)) {
                                     for (var ungrouped=0; ungrouped<outMap[group].length; ungrouped++)
                                         outList.push(outMap[group][ungrouped])
                                 } else
                                     outList.push({"text":group, "children": outMap[group]})
                             }
 
-                            console.log(outList)
+                            console.log(outList);
                             return {
                                 results: outList
                             };
@@ -211,25 +242,26 @@
         function generateSearchObject() {
             var searchObj = [];
             for (var row=0; row<row_list.length; row++) {
-                var rowkey = $("#add-metadata-select-"+row_list[row]+" :selected").val();
-                var rowop = $("#add-metadata-operator-"+row_list[row]).val();
-                var rowval = $("#v-"+row_list[row]).val();
+                var rowKey = $("#add-metadata-select-"+row_list[row]+" :selected").val();
+                var rowOp = $("#add-metadata-operator-"+row_list[row]).val();
+                var rowVal = $("#v-"+row_list[row]).val();
+                var extractorKey, leafKey;
 
                 // Ignore any terms without a value
-                if (rowval != "") {
-                    if (rowkey.indexOf('.') > -1) {
-                        var keyvals = rowkey.split('.')
-                        var extractorKey = keyvals[0]
-                        var leafKey = keyvals[keyvals.length-1]
+                if (rowVal != "") {
+                    if (rowKey.indexOf('.') > -1) {
+                        var keyVals = rowKey.split('.');
+                        extractorKey = keyVals[0];
+                        leafKey = keyVals[keyVals.length-1]
                     } else {
-                        var extractorKey = null
-                        var leafKey = rowkey
+                        extractorKey = null;
+                        leafKey = rowKey
                     }
 
                     searchObj.push({
-                        "field_key": rowkey,
-                        "operator": rowop,
-                        "field_value": rowval,
+                        "field_key": rowKey,
+                        "operator": rowOp,
+                        "field_value": rowVal,
                         "extractor_key": extractorKey,
                         "field_leaf_key": leafKey
                     });
@@ -243,8 +275,8 @@
         function search(count) {
             count = count || 10;
             var query = generateSearchObject();
-            console.log(query)
-            var grouping = $("#add-metadata-grouping").val()
+            console.log(query);
+            var grouping = $("#add-metadata-grouping").val();
             if (query != []) {
                 var request = jsRoutes.api.Search.searchJson(JSON.stringify(query), grouping, count).ajax({
                     type: 'GET',
