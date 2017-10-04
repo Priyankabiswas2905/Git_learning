@@ -13,7 +13,7 @@ import play.api.Play._
 import play.api.libs.json.Json._
 import play.api.libs.json._
 import play.api.libs.ws.WS
-import play.api.mvc.Result
+import play.api.mvc.{AnyContent, Action, Result}
 import services._
 import play.api.i18n.Messages
 
@@ -49,6 +49,19 @@ class Metadata @Inject() (
       implicit val user = request.user
       val vocabularies = metadataService.getDefinitionsDistinctName(user)
       Ok(toJson(vocabularies))
+  }
+
+  /** Get a JSON array of objects containing promoted metadata and metadata definitions */
+  def getDefinitionsAndPromotedMetadataFields = PermissionAction(Permission.ViewDataset) {
+    implicit request =>
+      implicit val user = request.user
+      val metadataDefinitions = metadataService.getDefinitionsDistinctName(user)
+      val promotedMetadataFields = metadataService.getPromotedMetadataFields()
+      val jsonResult = JsArray(Seq(
+        JsObject(Seq("type" -> JsString("Metadata Definitions"), "data" -> toJson(metadataDefinitions))),
+        JsObject(Seq("type" -> JsString("Promoted Metadata"), "data" -> toJson(promotedMetadataFields))))
+      )
+      Ok(jsonResult)
   }
 
   /** Get set of metadata fields containing filter substring for autocomplete */
@@ -267,7 +280,7 @@ class Metadata @Inject() (
     }
   }
 
-  def getPromotedMetadataFields = ServerAdminAction {
+  def getPromotedMetadataFields = PermissionAction(Permission.ViewDataset) {
     implicit request =>
       request.user match {
         case Some(user) =>

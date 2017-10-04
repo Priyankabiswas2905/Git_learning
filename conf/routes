@@ -314,6 +314,8 @@ PUT            /api/metadata/definitions/:id                                    
 POST           /api/metadata/definitions                                                @api.Metadata.addDefinition()
 DELETE         /admin/metadata/definitions/:id                                          @api.Metadata.deleteDefinition(id: UUID)
 
+GET            /api/metadata/definitions_and_promoted                                   @api.Metadata.getDefinitionsAndPromotedMetadataFields()
+
 GET            /api/metadata/promoted                                                   @api.Metadata.getPromotedMetadataFields()
 POST           /api/metadata/promoted                                                   @api.Metadata.addPromotedMetadataField()
 DELETE         /api/metadata/promoted/:id                                               @api.Metadata.deletePromotedMetadataField(id: UUID)
