@@ -318,6 +318,7 @@ GET            /api/metadata/definitions_and_promoted                           
 
 GET            /api/metadata/promoted                                                   @api.Metadata.getPromotedMetadataFields()
 POST           /api/metadata/promoted                                                   @api.Metadata.addPromotedMetadataField()
+PUT            /api/metadata/promoted/:id                                               @api.Metadata.editPromotedMetadataField(id: UUID)
 DELETE         /api/metadata/promoted/:id                                               @api.Metadata.deletePromotedMetadataField(id: UUID)
 
 GET            /api/metadata/people		                                        		@api.Metadata.listPeople(term: String, limit:Int)

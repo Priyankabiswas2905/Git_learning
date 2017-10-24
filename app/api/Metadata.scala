@@ -1,26 +1,19 @@
 package api
 
-import java.net.{ URL, URLEncoder }
+import java.net.{URL, URLEncoder}
 import java.util.Date
-import javax.inject.{ Inject, Singleton }
+import javax.inject.{Inject, Singleton}
 
-import models.{ ResourceRef, UUID, UserAgent, _ }
-import org.elasticsearch.action.search.SearchResponse
+import models.{ResourceRef, UUID, UserAgent, _}
 import org.apache.commons.lang.WordUtils
-import play.api.Play.current
 import play.api.Logger
-import play.api.Play._
+import play.api.Play.current
 import play.api.libs.json.Json._
-import play.api.libs.json._
+import play.api.libs.json.{JsValue, _}
 import play.api.libs.ws.WS
-import play.api.mvc.{AnyContent, Action, Result}
+import play.api.mvc.Result
 import services._
-import play.api.i18n.Messages
 
-import play.api.libs.json.JsValue
-
-import scala.collection.JavaConversions._
-import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 
@@ -313,6 +306,38 @@ class Metadata @Inject() (
             BadRequest(toJson("Invalid request payload."))
           }
         case None => BadRequest(toJson("Invalid user."))
+      }
+  }
+
+  def editPromotedMetadataField(id: UUID) = ServerAdminAction(parse.json) {
+
+    implicit request =>
+      request.user match {
+        case Some(user) =>
+          val body = request.body
+          if ((body \ "label").asOpt[String].isDefined && (body \ "uri").asOpt[String].isDefined) {
+            metadataService.getPromotedMetadataFieldByUri((body \ "uri").as[String]) match {
+              case Some(metadataFieldName) =>
+                // Metadata field name already exist as a different record.
+                if (metadataFieldName.id != id) {
+                  BadRequest(toJson("Promoted metadata field with same uri already exists."))
+                }
+                // Edit promoted metadata field
+                else {
+                  metadataService.editPromotedMetadataField(id, body)
+                  Ok(toJson("Success"))
+                }
+              case None =>
+              // Edit promoted metadata field
+                metadataService.editPromotedMetadataField(id, body)
+                Ok(toJson("Success"))
+            }
+          }
+          else {
+            BadRequest(toJson("Invalid request payload."))
+          }
+        case None =>
+          BadRequest(toJson("Invalid user"))
       }
   }
 
