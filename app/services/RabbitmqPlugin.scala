@@ -12,7 +12,7 @@ import com.rabbitmq.client.{Channel, Connection, ConnectionFactory, DefaultConsu
 import models.{Extraction, UUID}
 import play.api.Play.current
 import play.api.libs.json.Json
-import play.api.libs.ws.{Response, WS}
+import play.api.libs.ws.{Response, WS, WSAuthScheme}
 import play.api.{Application, Logger, Plugin}
 import play.libs.Akka
 import play.api.libs.json.JsValue
@@ -200,7 +200,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
       case Some(x) => {
         val url = x + path
         Logger.trace("RESTURL: "+ url)
-        WS.url(url).withHeaders("Accept" -> "application/json").withAuth(username, password, AuthScheme.BASIC).get()
+        WS.url(url).withHeaders("Accept" -> "application/json").withAuth(username, password, WSAuthScheme.BASIC).get()
       }
       case None => {
         Logger.warn("Could not get bindings")

@@ -81,7 +81,7 @@ class Registration @Inject()(spaces: SpaceService, users: UserService) extends S
                 }
               }
 
-              val eventSession = Events.fire(new SignUpEvent(user)).getOrElse(session)
+              val eventSession = Events.fire(new SignUpEvent(user)).getOrElse(request.session)
               if ( UsernamePasswordProvider.signupSkipLogin ) {
                 ProviderController.completeAuthentication(user, eventSession).flashing(Success -> Messages(SignUpDone))
               } else {

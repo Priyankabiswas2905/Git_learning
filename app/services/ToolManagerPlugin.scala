@@ -2,16 +2,17 @@ package services
 
 import java.util.{Calendar, Date}
 import java.text.SimpleDateFormat
+
 import scala.collection.mutable.Map
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.mvc._
 import play.api.libs.json._
-import play.api.libs.ws.Response
+import play.api.libs.ws.{Response, WSResponse}
 import play.api.libs.ws.WS._
-import play.api.{Plugin, Logger, Application}
-
+import play.api.{Application, Logger, Plugin}
 import models.UUID
+import play.api.Play.current
 
 /**
   * ToolSession describes an active analysis environment. Each instance keeps a history of datasets that were
@@ -114,7 +115,7 @@ class ToolManagerPlugin(application: Application) extends Plugin {
     */
   def refreshLaunchableToolsFromServer(): Unit = {
     val apipath = play.Play.application().configuration().getString("toolmanagerURI")
-    val statusRequest: Future[Response] = url(apipath+"/tools").get()
+    val statusRequest: Future[WSResponse] = url(apipath+"/tools").get()
 
     statusRequest.map( response => {
       val jsonObj = Json.parse(response.body)
@@ -133,7 +134,7 @@ class ToolManagerPlugin(application: Application) extends Plugin {
     */
   def refreshActiveInstanceListFromServer(): Unit = {
     val apipath = play.Play.application().configuration().getString("toolmanagerURI")
-    val statusRequest: Future[Response] = url(apipath+"/instances").get()
+    val statusRequest: Future[WSResponse] = url(apipath+"/instances").get()
 
     statusRequest.map( response => {
       val jsonObj = Json.parse(response.body)
@@ -213,7 +214,7 @@ class ToolManagerPlugin(application: Application) extends Plugin {
     // TODO: Figure out something better than the key here
     val dsURL = hostURL+controllers.routes.Datasets.dataset(datasetId).url
     val apipath = play.Play.application().configuration().getString("toolmanagerURI") + "/instances/" + toolPath
-    val statusRequest: Future[Response] = url(apipath).post(Json.obj(
+    val statusRequest: Future[WSResponse] = url(apipath).post(Json.obj(
       "dataset" -> (dsURL.replace("/datasets", "/api/datasets")+"/download"),
       "key" -> play.Play.application().configuration().getString("commKey"),
       "name" -> instanceName,
@@ -309,7 +310,7 @@ class ToolManagerPlugin(application: Application) extends Plugin {
 
       val apipath = play.Play.application().configuration().getString("toolmanagerURI") + "/instances/" + instance.toolPath
 
-      val statusRequest: Future[Response] = url(apipath).put(Json.obj(
+      val statusRequest: Future[WSResponse] = url(apipath).put(Json.obj(
         "dataset" -> (dsURL.replace("/datasets", "/api/datasets")+"/download"),
         "key" -> play.Play.application().configuration().getString("commKey"),
         "id" -> instance.externalId.toString,
@@ -333,7 +334,7 @@ class ToolManagerPlugin(application: Application) extends Plugin {
 
     instanceMap.get(instanceID).map( ts => {
       val instanceApiID = ts.externalId // External identifier on NDS api
-      val statusRequest: Future[Response] = url(apipath+"?id="+instanceApiID.toString()).delete()
+      val statusRequest: Future[WSResponse] = url(apipath+"?id="+instanceApiID.toString()).delete()
     })
 
     instanceMap = instanceMap - instanceID

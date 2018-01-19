@@ -15,6 +15,7 @@ import play.api.libs.{Files, MimeTypes}
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json.Json._
 import play.api.libs.json._
+import play.api.libs.ws.ning.NingWSResponse
 import play.api.libs.ws.{Response, WS}
 import play.api.mvc.MultipartFormData
 import services._
@@ -81,7 +82,7 @@ class Extractions @Inject()(
             val futureResponse = WS.url(fileurl).get()
             val fid = for {response <- futureResponse} yield {
               if (response.status == 200) {
-                val inputStream: InputStream = response.ahcResponse.getResponseBodyAsStream()
+                val inputStream: InputStream = response.underlying[NingWSResponse].ahcResponse.getResponseBodyAsStream()
                 val file = files.save(inputStream, filename, response.header("Content-Type"), user, null)
                 file match {
                   case Some(f) => {

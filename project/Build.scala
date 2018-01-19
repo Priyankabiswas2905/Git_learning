@@ -1,9 +1,13 @@
-import com.typesafe.sbt.packager.Keys._
 import sbt._
+import com.typesafe.sbt.packager.Keys._
 import Keys._
-import play.Project._
-import com.typesafe.sbt.SbtNativePackager._
-import NativePackagerKeys._
+import play.Play.autoImport._
+import PlayKeys._
+import play.PlayImport.PlayKeys._
+import play.twirl.sbt.Import.TwirlKeys
+import play.twirl.sbt.SbtTwirl
+
+
 //import com.typesafe.sbt.SbtLicenseReport.autoImportImpl._
 //import com.typesafe.sbt.license.LicenseCategory
 //import com.typesafe.sbt.license.LicenseInfo
@@ -13,14 +17,14 @@ import NativePackagerKeys._
 object ApplicationBuild extends Build {
 
   val appName = "clowder"
-  val version = "1.x"
+  val aapVersion = "2.0-SNAPSHOT"
   val jvm = "1.7"
 
   def appVersion: String = {
     if (gitBranchName == "master") {
-      version
+      aapVersion
     } else {
-      s"${version}-SNAPSHOT"
+      s"${aapVersion}-SNAPSHOT"
     }
   }
 
@@ -64,8 +68,9 @@ object ApplicationBuild extends Build {
 
   val appDependencies = Seq(
     filters,
+    ws,
     // login
-    "ws.securesocial" %% "securesocial" % "2.1.4" exclude("org.scala-stm", "scala-stm_2.10.0"),
+    "ws.securesocial" %% "securesocial" % "master-SNAPSHOT" exclude("org.scala-stm", "scala-stm_2.10.0"),
     "com.unboundid" % "unboundid-ldapsdk" % "4.0.1",
 
     // messagebus
@@ -139,7 +144,10 @@ object ApplicationBuild extends Build {
     (base / "app" / "assets" / "stylesheets" * "*.less")
   )
 
-  val main = play.Project(appName, appVersion, appDependencies).settings(
+  val main = Project(appName, file(".")).enablePlugins(play.PlayScala).settings(
+    version := appVersion,
+    scalaVersion := "2.10.7",
+    libraryDependencies ++= appDependencies,
     scalacOptions ++= Seq(s"-target:jvm-$jvm", "-feature"),
     javacOptions ++= Seq("-source", jvm, "-target", jvm),
     initialize := {
@@ -151,8 +159,8 @@ object ApplicationBuild extends Build {
     javaOptions in Test += "-Dconfig.file=" + Option(System.getProperty("config.file")).getOrElse("conf/application.conf"),
     testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-u", "target/scalatest-reports"),
     routesImport += "models._",
-    routesImport += "Binders._",
-    templatesImport += "org.bson.types.ObjectId",
+    routesImport += "util.Binders._",
+    TwirlKeys.templateImports += "org.bson.types.ObjectId",
     resolvers += Resolver.url("sbt-plugin-releases", url("http://repo.scala-sbt.org/scalasbt/sbt-plugin-releases/"))(Resolver.ivyStylePatterns),
     resolvers += Resolver.url("sbt-plugin-snapshots", url("http://repo.scala-sbt.org/scalasbt/sbt-plugin-snapshots/"))(Resolver.ivyStylePatterns),
     resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
@@ -197,5 +205,5 @@ object ApplicationBuild extends Build {
 //      case l => l.header1(licenseReportTitle.value)
 //    }
 
-  ).settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
+  )
 }

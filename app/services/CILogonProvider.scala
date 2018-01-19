@@ -5,6 +5,7 @@ import play.api.{Application, Logger}
 import play.api.libs.json.JsObject
 import securesocial.core._
 import scala.collection.JavaConverters._
+import play.api.Play.current
 
 
 /**

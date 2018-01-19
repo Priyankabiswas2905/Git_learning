@@ -66,14 +66,14 @@ class PolyglotPlugin(application: Application) extends Plugin {
       
       if (triesLeft == 0) Future.failed(throw new RuntimeException("Converted file not found."))
       
-      else  WS.url(url).withAuth(polyglotUser.get,  polyglotPassword.get, AuthScheme.BASIC).get flatMap { res =>
+      else  WS.url(url).withAuth(polyglotUser.get,  polyglotPassword.get, WSAuthScheme.BASIC).get flatMap { res =>
         if (res.status == 200) {
           //this is the callback, runs after file exists is TRUE
           Logger.debug("File exists on polyglot. Will download now.")
           //file exists on Polyglot, begin download using iteratee
           //following example in https://www.playframework.com/documentation/2.2.x/ScalaWS  Processing large responses           
           val result = WS.url(url)
-            .withAuth(polyglotUser.get, polyglotPassword.get, AuthScheme.BASIC)
+            .withAuth(polyglotUser.get, polyglotPassword.get, WSAuthScheme.BASIC)
             .get { xx => fromStream(outputStream) }
            	.flatMap(_.run)
           //Returning result. When it is mapped in the controller, the successful future is AFTER file has been downloaded on the Clowder server.
@@ -108,7 +108,7 @@ class PolyglotPlugin(application: Application) extends Plugin {
 
     // Now just send the data to the WS API                
     val response = WS.url(polyglotConvertURL.get + outputFormat)
-      .withAuth(polyglotUser.get, polyglotPassword.get, AuthScheme.BASIC)
+      .withAuth(polyglotUser.get, polyglotPassword.get, WSAuthScheme.BASIC)
       .post(bytes)(Writeable.wBytes, ContentTypeOf(Some(reqContentType)))
 
     //get the url for the converted file on Polyglot  
@@ -152,7 +152,7 @@ class PolyglotPlugin(application: Application) extends Plugin {
     if (polyglotInputsURL.isDefined && polyglotUser.isDefined && polyglotPassword.isDefined) {
       //call polyglot server with authentication          
       WS.url(polyglotInputsURL.get + inputType)
-        .withAuth(polyglotUser.get, polyglotPassword.get, AuthScheme.BASIC)
+        .withAuth(polyglotUser.get, polyglotPassword.get, WSAuthScheme.BASIC)
         .get
         .map {
           case response =>

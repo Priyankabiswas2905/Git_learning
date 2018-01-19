@@ -2,7 +2,6 @@ import java.io.{PrintWriter, StringWriter}
 
 import play.api.{Application, GlobalSettings}
 import play.api.Logger
-import play.filters.gzip.GzipFilter
 import play.libs.Akka
 import securesocial.core.SecureSocial
 import services.{AppConfiguration, AppConfigurationService, DI, UserService, DatasetService,
@@ -20,6 +19,8 @@ import akka.actor.Cancellable
 import filters.CORSFilter
 import julienrf.play.jsonp.Jsonp
 import play.api.libs.json.Json._
+
+import play.filters.gzip.GzipFilter
 
 /**
  * Configure application. Ensure mongo indexes if mongo plugin is enabled.

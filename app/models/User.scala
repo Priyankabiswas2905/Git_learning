@@ -7,14 +7,14 @@ import java.util.Date
 import play.api.Play.configuration
 import play.api.libs.json.{JsObject, Json, Writes}
 import securesocial.core._
-import services.AppConfiguration
 
 /**
  * Simple class to capture basic User Information. This is similar to Identity in securesocial
  *
  */
-trait User extends Identity {
+trait User extends BasicProfile {
   def id: UUID
+  def identityId: IdentityId
   def active: Boolean
   def serverAdmin: Boolean
   def profile: Option[Profile]
@@ -68,7 +68,7 @@ trait User extends Identity {
   * return MiniUser constructed from the user model
   */
   def getMiniUser: MiniUser = {
-    new MiniUser(id = id, fullName = fullName, avatarURL = getAvatarUrl(), email = email)
+    new MiniUser(id = id, fullName = fullName.getOrElse(firstName + " " + lastName), avatarURL = getAvatarUrl(), email = email)
   }
 
   override def toString: String = format(false)
@@ -86,6 +86,10 @@ trait User extends Identity {
     }
   }
 }
+case class IdentityId (
+  providerId: String,
+  userId: String
+)
 
 object User {
   def anonymous = new ClowderUser(UUID("000000000000000000000000"),
@@ -112,15 +116,15 @@ case class ClowderUser(
 
   // securesocial identity
   identityId: IdentityId,
-  firstName: String,
-  lastName: String,
-  fullName: String,
-  email: Option[String],
-  authMethod: AuthenticationMethod,
-  avatarUrl: Option[String] = None,
-  oAuth1Info: Option[OAuth1Info] = None,
-  oAuth2Info: Option[OAuth2Info] = None,
-  passwordInfo: Option[PasswordInfo] = None,
+  override val firstName: String,
+  override val lastName: String,
+  override val fullName: String,
+  override val email: Option[String],
+  override val authMethod: AuthenticationMethod,
+  override val avatarUrl: Option[String] = None,
+  override val oAuth1Info: Option[OAuth1Info] = None,
+  override val oAuth2Info: Option[OAuth2Info] = None,
+  override val passwordInfo: Option[PasswordInfo] = None,
 
   // should user be active
   active: Boolean = false,

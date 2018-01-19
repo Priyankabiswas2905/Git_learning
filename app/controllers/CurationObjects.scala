@@ -2,10 +2,10 @@ package controllers
 
 import java.util.Date
 import java.net.URLDecoder
-
 import javax.inject.Inject
+
 import api.Permission._
-import api.{UserRequest, Permission}
+import api.{Permission, UserRequest}
 import com.fasterxml.jackson.annotation.JsonValue
 import models._
 import org.apache.commons.lang.StringEscapeUtils._
@@ -18,12 +18,15 @@ import play.api.libs.json.JsArray
 import services._
 import _root_.util.{Formatters, RequiredFieldsConfig}
 import play.api.Play._
+
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.{Future, Await}
-import play.api.mvc.{MultipartFormData, Request, Action, Results}
+import scala.concurrent.{Await, Future}
+import play.api.mvc.{Action, MultipartFormData, Request, Results}
 import play.api.libs.ws._
+
 import scala.concurrent.duration._
 import play.api.libs.json.Reads._
+import play.api.libs.ws.ning.NingWSResponse
 
 
 /**
@@ -612,7 +615,7 @@ class CurationObjects @Inject()(
           Logger.debug(jsonResponse.toString())
         }
         else {
-          Logger.error("Error Calling Matchmaker: " + response.getAHCResponse.getResponseBody())
+          Logger.error("Error Calling Matchmaker: " + response.underlying[NingWSResponse].ahcResponse.getResponseBody())
         }
     }
 
@@ -848,7 +851,7 @@ class CurationObjects @Inject()(
               }
               else {
 
-                Logger.error("Error Submitting to Repository: " + response.getAHCResponse.getResponseBody())
+                Logger.error("Error Submitting to Repository: " + response.underlying[NingWSResponse].ahcResponse.getResponseBody())
               }
           }
 
@@ -877,7 +880,7 @@ class CurationObjects @Inject()(
               (response.json \ "Status").asOpt[JsValue]
               Ok(response.json)
             } else {
-              Logger.error("Error Getting Status: " + response.getAHCResponse.getResponseBody)
+              Logger.error("Error Getting Status: " + response.underlying[NingWSResponse].ahcResponse.getResponseBody)
               InternalServerError(toJson("Status object not found."))
             }
         }
@@ -969,7 +972,7 @@ class CurationObjects @Inject()(
           publishDataList.sortBy(x => format.parse(x.get("date").getOrElse("Sep 14, 2016 10:59:26 AM"))).reverse.take(limit + index * limit).takeRight(limit)
 
         } else {
-          Logger.error("Error Getting published data: " + response.getAHCResponse.getResponseBody)
+          Logger.error("Error Getting published data: " + response.underlying[NingWSResponse].ahcResponse.getResponseBody)
           List.empty
         }
     }
