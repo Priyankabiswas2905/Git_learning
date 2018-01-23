@@ -122,12 +122,12 @@ trait ApiController extends Controller {
 
     // 1) secure social, this allows the web app to make calls to the API and use the secure social user
     if (true) {
-      val identity = null
-      val user = DI.injector.getInstance(classOf[services.UserService]).findByIdentity(identity) match {
-        case Some(u: ClowderUser) if Permission.checkServerAdmin(Some(u)) => Some(u.copy(superAdminMode=superAdmin))
-        case Some(u) => Some(u)
-        case None => None
-      }
+      val user = Some(User.anonymous)
+//      val user = DI.injector.getInstance(classOf[services.UserService]).findByIdentity(identity) match {
+//        case Some(u: ClowderUser) if Permission.checkServerAdmin(Some(u)) => Some(u.copy(superAdminMode=superAdmin))
+//        case Some(u) => Some(u)
+//        case None => None
+//      }
       return UserRequest(user, request)
     }
 
