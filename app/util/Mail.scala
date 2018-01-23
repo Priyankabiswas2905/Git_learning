@@ -4,7 +4,6 @@ import models.User
 import play.api.libs.concurrent.Akka
 import play.api.templates.Html
 import play.api.Logger
-import com.typesafe.plugin._
 import play.api.libs.concurrent.Execution.Implicits._
 import services.{DI, UserService}
 
@@ -12,6 +11,7 @@ import scala.collection.immutable.Iterable
 import scala.collection.mutable
 import scala.concurrent.duration._
 import play.api.Play.current
+import play.api.libs.mailer.{Email, MailerPlugin}
 
 /**
   * Helper functions for sending emails.
@@ -66,13 +66,8 @@ object Mail {
       Logger.debug("Mail = [%s]".format(text))
     }
     Akka.system.scheduler.scheduleOnce(1.seconds) {
-      val mail = use[MailerPlugin].email
-      mail.setSubject(subject)
-      mail.setRecipient(recipients.toList:_*)
-      mail.setFrom(from)
-
-      // the mailer plugin handles null / empty string gracefully
-      mail.send("", text)
+      val email = Email(subject, from, to=recipients.toSeq, bodyText=Some(text))
+      MailerPlugin.send(email)
     }
   }
 

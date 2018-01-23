@@ -1,26 +1,21 @@
 import java.io.{PrintWriter, StringWriter}
-
-import play.api.{Application, GlobalSettings}
-import play.api.Logger
-import play.libs.Akka
-import securesocial.core.SecureSocial
-import services.{AppConfiguration, AppConfigurationService, DI, UserService, DatasetService,
-                FileService, CollectionService, SpaceService}
-
-import scala.concurrent.Future
-import scala.concurrent.duration._
-import play.api.libs.concurrent.Execution.Implicits._
-import models._
 import java.util.Calendar
 
-import play.api.mvc.{RequestHeader, WithFilters}
-import play.api.mvc.Results._
 import akka.actor.Cancellable
 import filters.CORSFilter
 import julienrf.play.jsonp.Jsonp
+import models._
+import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json.Json._
-
+import play.api.mvc.Results._
+import play.api.mvc.{RequestHeader, WithFilters}
+import play.api.{Application, GlobalSettings, Logger}
 import play.filters.gzip.GzipFilter
+import play.libs.Akka
+import services._
+
+import scala.concurrent.Future
+import scala.concurrent.duration._
 
 /**
  * Configure application. Ensure mongo indexes if mongo plugin is enabled.
@@ -123,10 +118,8 @@ object Global extends WithFilters(new GzipFilter(), new Jsonp(), CORSFilter()) w
         "request" -> request.toString(),
         "exception" -> sw.toString.replace("\n", "\\n")))))
     } else {
-      implicit val user = SecureSocial.currentUser(request) match{
-        case Some(identity) =>  users.findByIdentity(identity)
-        case None => None
-      }
+      // TODO get identity from request
+      implicit val user = users.findByIdentity("userId", "providerId")
       Future(InternalServerError(views.html.errorPage(request, sw.toString)(user)))
     }
   }
@@ -136,10 +129,9 @@ object Global extends WithFilters(new GzipFilter(), new Jsonp(), CORSFilter()) w
       Future(InternalServerError(toJson(Map("status" -> "not found",
         "request" -> request.toString()))))
     } else {
-      implicit val user = SecureSocial.currentUser(request) match {
-        case Some(identity) => users.findByIdentity(identity)
-        case None => None
-      }
+      // TODO get idenitity from request
+      val users: UserService = DI.injector.getInstance(classOf[UserService])
+      implicit val user = users.findByIdentity("userId", "providerId")
       Future(NotFound(views.html.errorPage(request, "Not found")(user)))
     }
   }
@@ -150,11 +142,11 @@ object Global extends WithFilters(new GzipFilter(), new Jsonp(), CORSFilter()) w
         "message" -> error,
         "request" -> request.toString()))))
     } else {
-      implicit val user = SecureSocial.currentUser(request) match {
-        case Some(identity) => users.findByIdentity(identity)
-        case None => None
-      }
+      // TODO get identity from request
+      val users: UserService = DI.injector.getInstance(classOf[UserService])
+      implicit val user = users.findByIdentity("userId", "providerId")
       Future(BadRequest(views.html.errorPage(request, error)(user)))
     }
   }
+
 }

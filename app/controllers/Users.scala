@@ -2,8 +2,7 @@ package controllers
 
 import java.util.UUID
 
-import com.typesafe.plugin._
-import models.User
+import models.{Token, User}
 import org.joda.time.DateTime
 import play.api.Play.current
 import play.api.data.Form
@@ -12,10 +11,7 @@ import play.api.data.validation.{Constraint, Invalid, Valid, ValidationError}
 import play.api.i18n.Messages
 import play.api.Play
 import play.api.templates.Html
-import securesocial.controllers.TemplatesPlugin
-import securesocial.core.providers.utils.Mailer
-import securesocial.core.providers.{Token, UsernamePasswordProvider}
-import services.{AppConfigurationService, AppConfiguration, UserService}
+import services.{AppConfiguration, AppConfigurationService, UserService}
 import javax.inject.Inject
 
 import play.api.http.Status._
@@ -28,16 +24,10 @@ import util.{Direction, Formatters, Mail}
 class Users @Inject() (users: UserService, appConfig: AppConfigurationService) extends SecuredController {
   //Custom signup initiation code, to be used if config is set to send signup link emails to admins to forward to users
 
-  val TokenDurationKey = securesocial.controllers.Registration.TokenDurationKey
-  val DefaultDuration = securesocial.controllers.Registration.DefaultDuration
-  val TokenDuration = Play.current.configuration.getInt(TokenDurationKey).getOrElse(DefaultDuration)
+  val TokenDuration = Play.current.configuration.getInt("securesocial.userpass.tokenDuration").getOrElse(60)
 
   val RegistrationEnabled = "securesocial.registrationEnabled"
   lazy val registrationEnabled = current.configuration.getBoolean(RegistrationEnabled).getOrElse(true)
-
-  val onHandleStartSignUpGoTo = securesocial.controllers.Registration.onHandleStartSignUpGoTo
-  val Success = securesocial.controllers.Registration.Success
-  val ThankYouCheckEmail = securesocial.core.providers.utils.Mailer.SignUpEmailSubject
   
   val SignUpEmailSubject = "mails.sendSignUpEmail.subject"
   
@@ -63,7 +53,7 @@ class Users @Inject() (users: UserService, appConfig: AppConfigurationService) e
       now.plusMinutes(TokenDuration),
       isSignUp = isSignUp
     )
-    securesocial.core.UserService.save(token)
+//    securesocial.core.UserService.save(token)
     appConfig.incrementCount('users, 1)
     (uuid, token)
   }

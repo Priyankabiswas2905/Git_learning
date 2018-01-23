@@ -3,17 +3,17 @@
  */
 package services.mongodb
 
-import play.api.Application
-import securesocial.core.{AuthenticatorStore, Authenticator}
-import play.api.Logger
+import play.api.{Application, Logger, Plugin}
 import java.util.Date
-import com.novus.salat.dao.{SalatDAO, ModelCompanion}
+
+import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import com.mongodb.casbah.Imports._
 import play.api.Play._
-import securesocial.core.IdentityId
+
 import scala.Some
 import org.joda.time.DateTime
 import MongoContext.context
+import models.{Authenticator, IdentityId}
 
 /**
  * Track securesocial authenticated users in MongoDB.
@@ -34,21 +34,21 @@ object AuthenticatorDAO extends ModelCompanion[LocalAuthenticator, ObjectId] {
     case Some(x) => new SalatDAO[LocalAuthenticator, ObjectId](collection = x.collection("social.authenticator")) {}
   }
 
-  def save(authenticator: Authenticator) {
-    val localAuth = LocalAuthenticator(authenticator.id, authenticator.identityId,
-      authenticator.creationDate.toDate(), authenticator.lastUsed.toDate(),
-      authenticator.expirationDate.toDate())
+  def saveLocal(authenticator: LocalAuthenticator) {
+    val localAuth = LocalAuthenticator(authenticator.authenticatorId, authenticator.identityId,
+      authenticator.creationDate, authenticator.lastUsed,
+      authenticator.expirationDate)
     Logger.debug("Saving authenticator")
-    dao.update(MongoDBObject("authenticatorId" -> authenticator.id), localAuth, true, false, WriteConcern.Normal)
+    dao.update(MongoDBObject("authenticatorId" -> authenticator.authenticatorId), localAuth, true, false, WriteConcern.Normal)
   }
 
-  def find(id: String): Option[Authenticator] = {
+  def find(id: String): Option[LocalAuthenticator] = {
     Logger.trace("Searching Authenticator " + id)
     dao.findOne(MongoDBObject("authenticatorId" -> id)) match {
       case Some(localAuth) => {
-        Some(Authenticator(localAuth.authenticatorId, localAuth.identityId,
-          new DateTime(localAuth.creationDate), new DateTime(localAuth.lastUsed),
-          new DateTime(localAuth.expirationDate)))
+        Some(LocalAuthenticator(localAuth.authenticatorId, localAuth.identityId,
+          new DateTime(localAuth.creationDate).toDate, new DateTime(localAuth.lastUsed).toDate,
+          new DateTime(localAuth.expirationDate).toDate))
       }
       case None => None
     }
@@ -60,15 +60,15 @@ object AuthenticatorDAO extends ModelCompanion[LocalAuthenticator, ObjectId] {
   }
 
 }
-class MongoDBAuthenticatorStore(app: Application) extends AuthenticatorStore(app) {
+class MongoDBAuthenticatorStore(app: Application) extends Plugin {
   
-  def save(authenticator: Authenticator): Either[Error, Unit] = {
+  def save(authenticator: LocalAuthenticator): Either[Error, Unit] = {
     Logger.trace("Saving Authenticator " + authenticator)
-    AuthenticatorDAO.save(authenticator)
+    AuthenticatorDAO.saveLocal(authenticator)
     Right(())
   }
   
-  def find(id: String): Either[Error, Option[Authenticator]] = {
+  def find(id: String): Either[Error, Option[LocalAuthenticator]] = {
     Logger.trace("Searching Authenticator " + id)
     Right(AuthenticatorDAO.find(id))
   }

@@ -682,9 +682,7 @@ class MongoSalatPlugin(app: Application) extends Plugin {
   private def updateSpaceInvites() {
     collection("spaces.invites").foreach { invite =>
 
-      val TokenDurationKey = securesocial.controllers.Registration.TokenDurationKey
-      val DefaultDuration = securesocial.controllers.Registration.DefaultDuration
-      val TokenDuration = Play.current.configuration.getInt(TokenDurationKey).getOrElse(DefaultDuration)
+      val TokenDuration = Play.current.configuration.getInt("securesocial.userpass.tokenDuration").getOrElse(60)
       invite.put("creationTime", new Date())
       val ONE_MINUTE_IN_MILLIS = 60000
       val date: Calendar = Calendar.getInstance()

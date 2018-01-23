@@ -1,7 +1,7 @@
 package services.mongodb
 
 import com.mongodb.casbah.Imports._
-import securesocial.core.Identity
+
 import services.mongodb.MongoContext.context
 import com.mongodb.casbah.commons.MongoDBObject
 

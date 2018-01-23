@@ -1,8 +1,7 @@
 package services.mongodb
 
-import securesocial.core.{BasicProfile}
+
 import play.api.{Application, Logger}
-import securesocial.core.providers.{MailToken}
 import com.mongodb.casbah.Imports._
 import org.joda.time.DateTime
 import java.util.Date
@@ -13,8 +12,7 @@ import play.api.Play._
 
 import scala.Some
 import MongoContext.context
-import models.{ClowderUser, IdentityId, UUID}
-import securesocial.core.services.{SaveMode, UserService}
+import models.{ClowderUser, IdentityId, MailToken, UUID}
 
 import scala.concurrent.Future
 
@@ -48,7 +46,7 @@ object TokenDAO extends ModelCompanion[MongoToken, ObjectId] {
   }
 }
 
-class MongoUserService(application: Application) extends UserService[ClowderUser] {
+class MongoUserService(application: Application) {
   /**
    * Finds a SocialUser that maches the specified id
    *
@@ -81,7 +79,7 @@ class MongoUserService(application: Application) extends UserService[ClowderUser
    * This is your chance to save the user information in your backing store.
    * @param profile
    */
-  def save(profile: ClowderUser, mode: SaveMode): ClowderUser = {
+  def save(profile: ClowderUser): ClowderUser = {
     Logger.trace("Saving user " + profile.fullName)
     val query = MongoDBObject("identityId.userId"->profile.identityId.userId, "identityId.providerId"->profile.identityId.providerId)
     val dbobj = MongoDBObject("$set" -> SocialUserDAO.toDBObject(profile))
@@ -102,6 +100,7 @@ class MongoUserService(application: Application) extends UserService[ClowderUser
   def saveToken(token: MailToken): Future[MailToken] = {
     Logger.trace("Saving token " + token)
     TokenDAO.save(MongoToken(new ObjectId, token.uuid, token.email, token.creationTime.toDate, token.expirationTime.toDate, token.isSignUp))
+    Future.successful(token)
   }
 
 

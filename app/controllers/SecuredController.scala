@@ -6,10 +6,8 @@ import models.{ClowderUser, RequestResource, ResourceRef, User}
 import org.apache.commons.lang.StringEscapeUtils._
 import play.api.i18n.Messages
 import play.api.mvc._
-import securesocial.core.{Authenticator, SecureSocial, UserService}
+
 import services._
-import securesocial.core.IdentityProvider
-import securesocial.core.providers.utils.RoutesHelper
 
 import scala.concurrent.Future
 
@@ -54,9 +52,9 @@ trait SecuredController extends Controller {
         case Some(u) if !AppConfiguration.acceptedTermsOfServices(u.termsOfServices) => Future.successful(Results.Redirect(routes.Application.tos(Some(request.uri))))
         case Some(u) if u.superAdminMode || Permission.checkPrivateServer(userRequest.user) => block(userRequest)
         case None if Permission.checkPrivateServer(userRequest.user) => block(userRequest)
-        case _ => Future.successful(Results.Redirect(securesocial.controllers.routes.LoginPage.login)
+        case _ => Future.successful(Ok("Must login")
           .flashing("error" -> "You must be logged in to access this page.")
-          .withSession(request.session + (SecureSocial.OriginalUrlKey -> request.uri)))
+          .withSession(request.session + ("original-url" -> request.uri)))
       }
     }
   }
@@ -75,9 +73,9 @@ trait SecuredController extends Controller {
           }
         }
         case Some(u) => block(userRequest)
-        case None => Future.successful(Results.Redirect(securesocial.controllers.routes.LoginPage.login)
+        case None => Future.successful(Ok("Must login")
           .flashing("error" -> "You must be logged in to access this page.")
-          .withSession(request.session + (SecureSocial.OriginalUrlKey -> request.uri)))
+          .withSession(request.session + ("original-url" -> request.uri)))
       }
     }
   }
@@ -88,11 +86,11 @@ trait SecuredController extends Controller {
       val userRequest = getUser(request)
       userRequest.user match {
         case Some(u) if !u.active => Future.successful(Results.Redirect(routes.Error.notActivated()))
-        case Some(u) if !AppConfiguration.acceptedTermsOfServices(u.termsOfServices) => Future.successful(Results.Redirect(routes.Application.tos(Some(request.uri))))
+        case Some(u) if !AppConfiguration.acceptedTermsOfServices(u.termsOfServices) => Future.successful(Ok("Must login"))
         case Some(u) if u.superAdminMode || Permission.checkServerAdmin(userRequest.user) => block(userRequest)
-        case _ => Future.successful(Results.Redirect(securesocial.controllers.routes.LoginPage.login)
+        case _ => Future.successful(Ok("Must login")
           .flashing("error" -> "You must be logged in as an administrator to access this page.")
-          .withSession(request.session + (SecureSocial.OriginalUrlKey -> request.uri)))
+          .withSession(request.session + ("OriginalUrlKey" -> request.uri)))
       }
     }
   }
@@ -109,9 +107,9 @@ trait SecuredController extends Controller {
         case None if Permission.checkPermission(userRequest.user, permission, resourceRef) => block(userRequest)
         // Anonymous user access to a private space
         case None if permission == Permission.ViewSpace => notAuthorizedMessage(userRequest.user, resourceRef)
-        case None => Future.successful(Results.Redirect(securesocial.controllers.routes.LoginPage.login)
+        case None => Future.successful(Ok("Must login")
           .flashing("error" -> "You must be logged in to perform that action.")
-          .withSession(request.session + (SecureSocial.OriginalUrlKey -> request.uri)))
+          .withSession(request.session + ("OriginalUrlKey" -> request.uri)))
       }
     }
   }
@@ -200,17 +198,8 @@ trait SecuredController extends Controller {
     val superAdmin = request.cookies.get("superAdmin").exists(_.value.toBoolean)
 
     // 1) secure social, this allows the web app to make calls to the API and use the secure social user
-    for (
-      authenticator <- SecureSocial.authenticatorFromRequest(request);
-      identity <- UserService.find(authenticator.identityId)
-    ) yield {
-      Authenticator.save(authenticator.touch)
-      val user = DI.injector.getInstance(classOf[services.UserService]).findByIdentity(identity) match {
-        case Some(u: ClowderUser) if Permission.checkServerAdmin(Some(u)) => Some(u.copy(superAdminMode=superAdmin))
-        case Some(u) => Some(u)
-        case None => None
-      }
-      return UserRequest(user, request)
+    if (true) { // TODO check if authentication cookie is availablee
+      return UserRequest(Some(User.anonymous), request)
     }
 
     // 2) anonymous access

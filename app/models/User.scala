@@ -1,42 +1,103 @@
 package models
 
-import play.api.Play.current
 import java.security.MessageDigest
 import java.util.Date
 
-import play.api.Play.configuration
-import play.api.libs.json.{JsObject, Json, Writes}
-import securesocial.core._
+import play.api.Play.{configuration, current}
+import play.api.libs.json.Json
+import org.joda.time.DateTime
+
+// TODO placeholders
+trait Identity {
+  def identityId: IdentityId
+  def firstName: String
+  def lastName: String
+  def fullName: String
+  def email: Option[String]
+  def avatarUrl: Option[String]
+  def authMethod: AuthenticationMethod
+  def oAuth1Info: Option[OAuth1Info]
+  def oAuth2Info: Option[OAuth2Info]
+  def passwordInfo: Option[PasswordInfo]
+}
+case class UserId(id: String, providerId: String)
+case class OAuth1Info(token: String, secret: String)
+case class OAuth2Info(accessToken: String, tokenType: Option[String] = None,
+  expiresIn: Option[Int] = None, refreshToken: Option[String] = None)
+case class PasswordInfo(hasher: String, password: String, salt: Option[String] = None)
+case class AuthenticationMethod(method: String) {
+  def is(m: AuthenticationMethod): Boolean = this == m
+}
+object AuthenticationMethod {
+  val OAuth1 = AuthenticationMethod("oauth1")
+  val OAuth2 = AuthenticationMethod("oauth2")
+  val OpenId = AuthenticationMethod("openId")
+  val UserPassword = AuthenticationMethod("userPassword")
+}
+
+case class IdentityId(userId: String, providerId: String)
+case class Token(uuid: String, email: String, now: DateTime, start: DateTime, isSignUp: Boolean)
+case class Authenticator()
+case class MailToken(uuid: String, email: String, creationTime: DateTime, expirationTime: DateTime, isSignUp: Boolean)
 
 /**
  * Simple class to capture basic User Information. This is similar to Identity in securesocial
  *
  */
-trait User extends BasicProfile {
+trait User extends Identity {
   def id: UUID
+
   def identityId: IdentityId
+
   def active: Boolean
+
   def serverAdmin: Boolean
+
   def profile: Option[Profile]
+
   def friends: Option[List[String]]
+
   def followedEntities: List[TypedID]
+
   def followers: List[UUID]
+
   def viewed: Option[List[UUID]]
+
   def spaceandrole: List[UserSpaceAndRole]
-  def repositoryPreferences: Map[String,Any]
+
+  def repositoryPreferences: Map[String, Any]
+
   def termsOfServices: Option[UserTermsOfServices]
+
+  def email: Option[String]
+
+  def avatarUrl: Option[String]
+
+  def fullName: String
+
+  def firstName: String
+
+  def lastName: String
+
+  def oAuth1Info: Option[OAuth1Info]
+
+  def oAuth2Info: Option[OAuth2Info]
+
+  def passwordInfo: Option[PasswordInfo]
+
+  def authMethod: AuthenticationMethod
 
   // One can only be superAdmin iff you are a serveradmin
   def superAdminMode: Boolean
 
   /**
-   * Get the avatar URL for this user's profile
-   * If user has no avatar URL, this will return a unique URL based on
-   * the hash of this user's email address. Gravatar provide an image
-   * as specified in application.conf
-   *
-   * @return Full gravatar URL for the user's profile picture
-   */
+    * Get the avatar URL for this user's profile
+    * If user has no avatar URL, this will return a unique URL based on
+    * the hash of this user's email address. Gravatar provide an image
+    * as specified in application.conf
+    *
+    * @return Full gravatar URL for the user's profile picture
+    */
   def getAvatarUrl(size: Integer = 256): String = {
     val default_gravatar = configuration.getString("default_gravatar").getOrElse("")
 
@@ -50,8 +111,8 @@ trait User extends BasicProfile {
   }
 
   /**
-   * @return lower case md5 hash of the user's email
-   */
+    * @return lower case md5 hash of the user's email
+    */
   def getEmailHash: String = {
     MessageDigest.getInstance("MD5")
       .digest(email.getOrElse("").getBytes("UTF-8"))
@@ -60,15 +121,15 @@ trait User extends BasicProfile {
       .toLowerCase
   }
 
-  def getFollowedObjectList(objectType : String) : List[TypedID] = {
+  def getFollowedObjectList(objectType: String): List[TypedID] = {
     followedEntities.filter { x => x.objectType == objectType }
   }
 
   /**
-  * return MiniUser constructed from the user model
-  */
+    * return MiniUser constructed from the user model
+    */
   def getMiniUser: MiniUser = {
-    new MiniUser(id = id, fullName = fullName.getOrElse(firstName + " " + lastName), avatarURL = getAvatarUrl(), email = email)
+    new MiniUser(id = id, fullName = fullName, avatarURL = getAvatarUrl(), email = email)
   }
 
   override def toString: String = format(false)
@@ -86,10 +147,6 @@ trait User extends BasicProfile {
     }
   }
 }
-case class IdentityId (
-  providerId: String,
-  userId: String
-)
 
 object User {
   def anonymous = new ClowderUser(UUID("000000000000000000000000"),
@@ -103,6 +160,11 @@ object User {
     serverAdmin=true,
     termsOfServices=Some(UserTermsOfServices(accepted=true, acceptedDate=new Date(), "")))
   implicit def userToMiniUser(x: User): MiniUser = x.getMiniUser
+
+  def findByEmailAndProvider(email: String, provider: AuthenticationMethod): Unit = {
+
+  }
+
 }
 
 case class MiniUser(
@@ -113,18 +175,16 @@ case class MiniUser(
 
 case class ClowderUser(
   id: UUID = UUID.generate(),
-
-  // securesocial identity
   identityId: IdentityId,
-  override val firstName: String,
-  override val lastName: String,
-  override val fullName: String,
-  override val email: Option[String],
-  override val authMethod: AuthenticationMethod,
-  override val avatarUrl: Option[String] = None,
-  override val oAuth1Info: Option[OAuth1Info] = None,
-  override val oAuth2Info: Option[OAuth2Info] = None,
-  override val passwordInfo: Option[PasswordInfo] = None,
+  firstName: String,
+  lastName: String,
+  fullName: String,
+  email: Option[String],
+  authMethod: AuthenticationMethod,
+  avatarUrl: Option[String] = None,
+  oAuth1Info: Option[OAuth1Info] = None,
+  oAuth2Info: Option[OAuth2Info] = None,
+  passwordInfo: Option[PasswordInfo] = None,
 
   // should user be active
   active: Boolean = false,

@@ -7,21 +7,16 @@ import javax.inject.Inject
 import api.Permission
 import api.Permission._
 import models._
-import play.api.{Logger, Play}
+import org.joda.time.DateTime
 import play.api.data.Forms._
 import play.api.data.{Form, Forms}
-import play.api.libs.json.Json
 import play.api.i18n.Messages
-import services._
-import securesocial.core.providers.{Token, UsernamePasswordProvider}
-import org.joda.time.DateTime
-import play.api.i18n.Messages
-import services.AppConfiguration
+import play.api.{Logger, Play}
+import services.{AppConfiguration, _}
 import util.{Formatters, Mail}
 
 import scala.collection.immutable.List
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
-import org.apache.commons.lang.StringEscapeUtils.escapeJava
 
 /**
  * Spaces allow users to partition the data into realms only accessible to users with the right permissions.
@@ -298,7 +293,8 @@ class Spaces @Inject()(spaces: SpaceService, users: UserService, events: EventSe
               case Some(role) => {
                 formData.addresses.map {
                   email =>
-                  securesocial.core.UserService.findByEmailAndProvider(email, UsernamePasswordProvider.UsernamePassword) match {
+                    // TODO find user by email
+                    users.findByIdentity(email, "userpassword") match {
                     case Some(member) => {
                       //Add Person to the space
                       val usr = users.findByEmail(email)
@@ -308,11 +304,10 @@ class Spaces @Inject()(spaces: SpaceService, users: UserService, events: EventSe
                     }
                     case None => {
                       val uuid = UUID.generate()
-                      val TokenDurationKey = securesocial.controllers.Registration.TokenDurationKey
-                      val DefaultDuration = securesocial.controllers.Registration.DefaultDuration
-                      val TokenDuration = Play.current.configuration.getInt(TokenDurationKey).getOrElse(DefaultDuration)
+                      val TokenDuration = Play.current.configuration.getInt("securesocial.userpass.tokenDuration").getOrElse(60)
                       val token = new Token(uuid.stringify, email, DateTime.now(), DateTime.now().plusMinutes(TokenDuration), true)
-                      securesocial.core.UserService.save(token)
+                      // TODO save token
+//                      securesocial.core.UserService.save(token)
                       val ONE_MINUTE_IN_MILLIS=60000
                       val date: Calendar = Calendar.getInstance()
                       val t= date.getTimeInMillis()

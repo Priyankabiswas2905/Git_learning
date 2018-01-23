@@ -69,8 +69,11 @@ object ApplicationBuild extends Build {
   val appDependencies = Seq(
     filters,
     ws,
+
+    "com.typesafe.play" %% "play-mailer" % "2.4.1",
+
     // login
-    "ws.securesocial" %% "securesocial" % "master-SNAPSHOT" exclude("org.scala-stm", "scala-stm_2.10.0"),
+//    "ws.securesocial" %% "securesocial" % "master-SNAPSHOT" exclude("org.scala-stm", "scala-stm_2.10.0"),
     "com.unboundid" % "unboundid-ldapsdk" % "4.0.1",
 
     // messagebus
@@ -92,43 +95,44 @@ object ApplicationBuild extends Build {
     "org.reflections" % "reflections" % "0.9.10",
 
     // RDF
-    "org.openrdf.sesame" % "sesame-rio-api" % "2.7.8",
-    "org.openrdf.sesame" % "sesame-model" % "2.7.8",
-    "org.openrdf.sesame" % "sesame-rio-n3" % "2.7.8",
-    "org.openrdf.sesame" % "sesame-rio-ntriples" % "2.7.8",
-    "org.openrdf.sesame" % "sesame-rio-rdfxml" % "2.7.8",
-    "org.openrdf.sesame" % "sesame-rio-trig" % "2.7.8",
-    "org.openrdf.sesame" % "sesame-rio-trix" % "2.7.8",
-    "org.openrdf.sesame" % "sesame-rio-turtle" % "2.7.8",
-    "info.aduna.commons" % "aduna-commons-io" % "2.8.0",
-    "info.aduna.commons" % "aduna-commons-lang" % "2.9.0",
-    "info.aduna.commons" % "aduna-commons-net" % "2.7.0",
-    "info.aduna.commons" % "aduna-commons-text" % "2.7.0",
-    "info.aduna.commons" % "aduna-commons-xml" % "2.7.0",
+//    "org.openrdf.sesame" % "sesame-rio-api" % "2.7.8",
+//    "org.openrdf.sesame" % "sesame-model" % "2.7.8",
+//    "org.openrdf.sesame" % "sesame-rio-n3" % "2.7.8",
+//    "org.openrdf.sesame" % "sesame-rio-ntriples" % "2.7.8",
+//    "org.openrdf.sesame" % "sesame-rio-rdfxml" % "2.7.8",
+//    "org.openrdf.sesame" % "sesame-rio-trig" % "2.7.8",
+//    "org.openrdf.sesame" % "sesame-rio-trix" % "2.7.8",
+//    "org.openrdf.sesame" % "sesame-rio-turtle" % "2.7.8",
+//    "info.aduna.commons" % "aduna-commons-io" % "2.8.0",
+//    "info.aduna.commons" % "aduna-commons-lang" % "2.9.0",
+//    "info.aduna.commons" % "aduna-commons-net" % "2.7.0",
+//    "info.aduna.commons" % "aduna-commons-text" % "2.7.0",
+//    "info.aduna.commons" % "aduna-commons-xml" % "2.7.0",
     "org.apache.jena" % "apache-jena-libs" % "3.1.1",
 
-    // ??
+    // Used to decode/encode html
     "commons-lang" % "commons-lang" % "2.6",
-    "commons-io" % "commons-io" % "2.4",
-    "commons-logging" % "commons-logging" % "1.1.3",
+
+//    "commons-io" % "commons-io" % "2.4",
+//    "commons-logging" % "commons-logging" % "1.1.3",
 
     // RDF
-    "gr.forth.ics" % "flexigraph" % "1.0",
+//    "gr.forth.ics" % "flexigraph" % "1.0",
 
     // Guice dependency injection
     "com.google.inject" % "guice" % "3.0",
 
-    // ??
+    // Used for IPP server interaction and tests?
     "org.apache.httpcomponents" % "httpclient" % "4.2.3",
     "org.apache.httpcomponents" % "httpcore" % "4.2.3",
     "org.apache.httpcomponents" % "httpmime" % "4.2.3",
 
-    // JSONparser and JSONObject
+    // JSONparser and JSONObject. Used to serialize JSON to XML.
     "com.googlecode.json-simple" % "json-simple" % "1.1.1",
     "org.codeartisans" % "org.json" % "20131017",
 
     // Testing framework
-    "org.scalatestplus" % "play_2.10" % "1.0.0" % "test",
+//    "org.scalatestplus" % "play_2.10" % "1.0.0" % "test",
 
     // iRods filestorage
     "org.irods.jargon" % "jargon-core" % "3.3.3-beta1",
@@ -139,14 +143,14 @@ object ApplicationBuild extends Build {
 
   // Only compile the bootstrap bootstrap.less file and any other *.less file in the stylesheets directory
   def customLessEntryPoints(base: File): PathFinder = (
-    (base / "app" / "assets" / "stylesheets" / "bootstrap" * "bootstrap.less") +++
+    (base / "app" / "assets" / "styleshee ts" / "bootstrap" * "bootstrap.less") +++
     (base / "app" / "assets" / "stylesheets" / "bootstrap" * "responsive.less") +++
     (base / "app" / "assets" / "stylesheets" * "*.less")
   )
 
   val main = Project(appName, file(".")).enablePlugins(play.PlayScala).settings(
     version := appVersion,
-    scalaVersion := "2.10.7",
+    scalaVersion := "2.10.6",
     libraryDependencies ++= appDependencies,
     scalacOptions ++= Seq(s"-target:jvm-$jvm", "-feature"),
     javacOptions ++= Seq("-source", jvm, "-target", jvm),
