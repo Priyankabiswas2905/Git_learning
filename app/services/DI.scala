@@ -3,6 +3,8 @@ package services
 import play.api.Play.current
 import com.google.inject.Guice
 import com.google.inject.AbstractModule
+import com.google.inject.name.Names
+import play.api.{Configuration, Environment}
 
 /**
  * Guide module configuration.
@@ -10,16 +12,17 @@ import com.google.inject.AbstractModule
  *
  */
 object DI {
-    lazy val injector = Guice.createInjector(new ConfigurationModule)
+    lazy val injector = Guice.createInjector(new ConfigurationModule(null, null))
 }
 
 /**
  * Default production module.
  */
-class ConfigurationModule extends AbstractModule {
-  protected def configure() {
-    bind(classOf[AppConfigurationService]).to(get("service.appConfiguration", "services.mongodb.MongoDBAppConfigurationService"))
+class ConfigurationModule(environment: Environment, configuration: Configuration) extends AbstractModule {
+  def configure() {
     bind(classOf[UserService]).to(get("service.users", "services.mongodb.MongoDBUserService"))
+    bind(classOf[UserService]).to(classOf[services.mongodb.MongoDBUserService])
+    bind(classOf[AppConfigurationService]).to(get("service.appConfiguration", "services.mongodb.MongoDBAppConfigurationService"))
 
     // ByteStorageService is used to store the actual bytes
     bind(classOf[ByteStorageService]).to(get("service.byteStorage", "services.mongodb.MongoDBByteStorage"))

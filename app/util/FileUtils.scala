@@ -333,7 +333,7 @@ object FileUtils {
       if (url.isSuccess && url.get.isDefined) {
         url.get.foreach(processURL(_, jsv, user, creator, clowderurl, dataset, folder, key, index, showPreviews, originalZipFile, flagsFromPrevious, intermediateUpload, runExtractors).foreach(uploadedFiles += _))
       } else if (jsv.keys.contains("path")) {
-        val path = Parsers.parseString(jsv \ "path")
+        val path = Parsers.parseString((jsv \ "path").get)
         processPath(path, jsv, user, creator, clowderurl, dataset, folder, key, index, showPreviews, originalZipFile, flagsFromPrevious, intermediateUpload, runExtractors).foreach(uploadedFiles += _)
       }
     }}
@@ -410,14 +410,14 @@ object FileUtils {
     // TODO should really be using content not just the objects
 //    val source = s"""{ "@context": { "source": "http://purl.org/dc/terms/source" }, "content": { "source": "${url.toString}" } }"""
     val source = s"""{ "@context": { "source": "http://purl.org/dc/terms/source" }, "source": "${url.toString}" }"""
-    val metadata = jsv \ "md" match {
-      case x: JsUndefined => {
-        jsv \ "metadata" match {
-          case y: JsUndefined => Some(Seq(source))
+    val metadata = (jsv \ "md").get match {
+      case x => Some(Seq(Json.stringify(x), source))
+      case _ => {
+        (jsv \ "metadata").get match {
           case y => Some(Seq(Json.stringify(y), source))
+          case _ => Some(Seq(source))
         }
       }
-      case x => Some(Seq(Json.stringify(x), source))
     }
     associateMetaData(creator, file, metadata, clowderurl)
     associateDataset(file, fileds, folder, user)
@@ -467,14 +467,15 @@ object FileUtils {
       files.save(file)
 
       // extract metadata
-      val metadata = jsv \ "md" match {
-        case x: JsUndefined => {
-          jsv \ "metadata" match {
-            case y: JsUndefined => None
+      val metadata = (jsv \ "md").get match {
+        case x => Some(Seq(Json.stringify(x)))
+        case _ => {
+          (jsv \ "metadata").get match {
             case y => Some(Seq(Json.stringify(y)))
+            case _ => None
           }
         }
-        case x => Some(Seq(Json.stringify(x)))
+
       }
 
 
@@ -506,7 +507,7 @@ object FileUtils {
       // TODO: should do a metadata validity check first
       // Extract context from metadata object and remove it so it isn't repeated twice
       val jsonmd = Json.parse(md)
-      val context: JsValue = jsonmd \ "@context"
+      val context: JsValue = (jsonmd \ "@context").get
       val content = jsonmd.as[JsObject] - "@context"
 
       // check if the context is a URL to external endpoint

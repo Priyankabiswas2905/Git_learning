@@ -10,7 +10,7 @@ import services.DI
 import scala.concurrent.Future
 import services.ExtractionRequestsService
 import java.net.InetAddress
-import play.api.libs.ws.Response
+import play.api.libs.ws.WSResponse
 
 /**
  *  DTS extractions information
@@ -125,7 +125,7 @@ def updateDTSRequests(file_id:UUID,extractor_id:String)={
    *           currently running extractors list
    *           servers IPs where extractors are running
    */
-  def updateInfoAndGetQueuesList(plugin: services.RabbitmqPlugin, qDetailsResponses: List[Response]) = {
+  def updateInfoAndGetQueuesList(plugin: services.RabbitmqPlugin, qDetailsResponses: List[WSResponse]) = {
     var exDetails = List[ExtractorDetail]()
     var qlistResult = List[String]()
     var ipsList = List[String]()

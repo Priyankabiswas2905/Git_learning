@@ -1,5 +1,7 @@
 @(curationObject: models.CurationObject, space: Option[String], classes:String)(implicit user: Option[models.User])
-
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 <div class="post-box @classes" id="@curationObject.id-tile">
     <div class="panel panel-default dataset-panel">
         <div class="pull-left">

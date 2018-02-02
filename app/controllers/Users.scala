@@ -10,7 +10,7 @@ import play.api.data.Forms._
 import play.api.data.validation.{Constraint, Invalid, Valid, ValidationError}
 import play.api.i18n.Messages
 import play.api.Play
-import play.api.templates.Html
+import play.twirl.api.Html
 import services.{AppConfiguration, AppConfigurationService, UserService}
 import javax.inject.Inject
 
@@ -179,7 +179,7 @@ class Users @Inject() (users: UserService, appConfig: AppConfigurationService) e
   }
 
   def sendEmail(subject: String, from: String, recipient: String, body: String) = AuthenticatedAction { implicit request =>
-    util.Mail.sendEmail(subject, from, List(recipient), Html(body))
+    Mail.sendEmail(subject, from, List(recipient), Html(body))
     Ok("Successfully emailed "+recipient)
   }
 }

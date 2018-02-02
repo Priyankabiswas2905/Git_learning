@@ -8,7 +8,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.mvc._
 import play.api.libs.json._
-import play.api.libs.ws.{Response, WSResponse}
+import play.api.libs.ws.WSResponse
 import play.api.libs.ws.WS._
 import play.api.{Application, Logger, Plugin}
 import models.UUID
@@ -121,10 +121,9 @@ class ToolManagerPlugin(application: Application) extends Plugin {
       val jsonObj = Json.parse(response.body)
 
       jsonObj match {
-        case _: JsUndefined => {}
-        case j: JsObject => {
+        case j: JsObject =>
           toolList = j
-        }
+        case _ => Logger.error("Getting list of tools from toolsmanager did not return a JsObject")
       }
     })
   }
@@ -140,7 +139,6 @@ class ToolManagerPlugin(application: Application) extends Plugin {
       val jsonObj = Json.parse(response.body)
 
       jsonObj match {
-        case _: JsUndefined => {}
         case j: JsObject => {
           for (externalID <- j.keys) {
             // check to make sure this externalID isn't already present in instanceMap
@@ -182,6 +180,7 @@ class ToolManagerPlugin(application: Application) extends Plugin {
             }
           }
         }
+        case _ => Logger.error("Getting list of instances from toolsmanager did not return a JsObject")
       }
     })
   }

@@ -1,5 +1,8 @@
 @(curation: CurationObject, currentFolder: Option[String], foldersList: List[CurationFolder], folderHierarchy: List[CurationFolder], filepage: Int, next: Boolean, files:List[CurationFile], m: List[models.Metadata])(implicit user: Option[models.User])
 @import api.Permission
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 
 @if(files.size > 0 ||folderHierarchy.length > 0 || foldersList.size>0){
     <h2> Files</h2>

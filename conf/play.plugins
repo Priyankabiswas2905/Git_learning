@@ -1,5 +1,5 @@
 9990:services.mongodb.MongoSalatPlugin
-1500:play.api.libs.mailer.CommonsMailerPlugin
+#1500:play.api.libs.mailer.CommonsMailerPlugin
 #9992:services.RabbitmqPlugin
 9994:services.mongodb.MongoDBAuthenticatorStore
 #9995:securesocial.core.DefaultIdGenerator

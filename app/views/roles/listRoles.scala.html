@@ -3,6 +3,8 @@
 <!-- Need this in order to declare the var: -->
 @import api.Permission; var prevResourceStr = ""
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 
 @main("Manage Roles") {
     <script src="@routes.Assets.at("javascripts/manageRoles.js")" type="text/javascript"></script>

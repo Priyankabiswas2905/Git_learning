@@ -15,9 +15,9 @@ trait ThreeDService {
 
   def findTexturesByFileId(fileId: UUID): List[ThreeDTexture]
 
-  def updateTexture(fileId: UUID, textureId: UUID, fields: Seq[(String, JsValue)])
+  def updateTexture(fileId: UUID, textureId: UUID, fields: scala.collection.Map[String, JsValue])
 
-  def updateGeometry(fileId: UUID, geometryId: UUID, fields: Seq[(String, JsValue)])
+  def updateGeometry(fileId: UUID, geometryId: UUID, fields: scala.collection.Map[String, JsValue])
 
   def save(inputStream: InputStream, filename: String, contentType: Option[String]): String
 

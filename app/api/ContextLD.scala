@@ -11,8 +11,7 @@ import play.api.libs.json.Json
  * API controller for Json-ld context service
  *
  */
-class ContextLD @Inject() (
-  contextlds: ContextLDService ) extends ApiController{
+class ContextLD @Inject()(contextlds: ContextLDService ) extends ApiController {
 
   def getContextById(id: models.UUID) = PermissionAction(Permission.ViewMetadata) { implicit request =>
     Logger.debug("context id : " + id)
@@ -34,7 +33,7 @@ class ContextLD @Inject() (
   def addContext() = PermissionAction(Permission.EditMetadata)(parse.json) { implicit request =>
     request.user match {
       case Some(user) => {
-        val context = request.body.\("@context")
+        val context = request.body.\("@context").get
         val contextName = request.body.\("context_name")
         val contextId = contextlds.addContext(contextName.as[JsString], context)
         Ok(toJson(Map("id" -> contextId.toString)))

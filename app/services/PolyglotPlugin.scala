@@ -1,19 +1,19 @@
 package services
 
 import play.libs.Akka
-import play.api.{ Plugin, Logger, Application }
+import play.api.{Application, Logger, Plugin}
 import java.io._
-import play.api.Play.{ current, configuration }
+
+import play.api.Play.{configuration, current}
 import play.api.libs.iteratee._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.ws._
+
 import scala.concurrent._
 import scala.concurrent.duration._
-import com.ning.http.multipart.{ ByteArrayPartSource, Part, FilePart, MultipartRequestEntity }
-import com.ning.http.client.FluentCaseInsensitiveStringsMap
-import play.api.http.{ Writeable, ContentTypeOf }
-import org.apache.commons.io.IOUtils
-import com.ning.http.client.Realm.AuthScheme
+import com.ning.http.client.AsyncHttpClient
+import org.apache.commons.codec.binary.Base64.encodeBase64
+import com.ning.http.client.multipart.FilePart
 
 /**
  * Polyglot Plugin
@@ -94,38 +94,42 @@ class PolyglotPlugin(application: Application) extends Plugin {
       throw new RuntimeException("Polyglot credentials not defined.")
     }
 
-    //post a multipart form data to Polyglot.
-    //based on the code from https://github.com/playframework/playframework/issues/902
-    //comment dated Dec 5, 2014                   
-    // Build up the Multiparts - consists of just one file part               
-    val filePart: FilePart = new FilePart(filename, new ByteArrayPartSource(filename, IOUtils.toByteArray(inputStream)))
-    val parts = Array[Part](filePart)
-    val reqEntity = new MultipartRequestEntity(parts, new FluentCaseInsensitiveStringsMap)
-    val baos = new ByteArrayOutputStream
-    reqEntity.writeRequest(baos)
-    val bytes = baos.toByteArray
-    val reqContentType = reqEntity.getContentType
-
-    // Now just send the data to the WS API                
-    val response = WS.url(polyglotConvertURL.get + outputFormat)
-      .withAuth(polyglotUser.get, polyglotPassword.get, WSAuthScheme.BASIC)
-      .post(bytes)(Writeable.wBytes, ContentTypeOf(Some(reqContentType)))
-
-    //get the url for the converted file on Polyglot  
-    val fileURLFut = response.map {
-      res =>
-        if (res.status != 200) {
-          Logger.debug("Could not get url of converted file - status = " + res.status + "  " + res.statusText)
-          throw new RuntimeException("Could not connect to Polyglot. " + res.statusText)
-        }
-        //TODO: Find an easier way to get rid of html markup 
-        //result is an html link
-        //<a href=http://the_url_string>http://the_url_string</a>
-        val fileURL = res.body.substring(res.body.indexOf("http"), res.body.indexOf(">"))
-        fileURL
+    // FIXME change to WS library call in play 2.5
+    import org.apache.commons.io.IOUtils
+    import java.io.File
+    import java.io.FileOutputStream
+    val PREFIX = "polyglot-clowder"
+    val SUFFIX = ".tmp"
+    val tempFile = File.createTempFile(PREFIX, SUFFIX)
+    tempFile.deleteOnExit()
+    try {
+      val out = new FileOutputStream(tempFile)
+      try
+        IOUtils.copy(inputStream, out)
+      finally if (out != null) out.close()
     }
-    fileURLFut.map { url => Logger.debug("Converted file url =  " + url) }
-    fileURLFut
+
+    val encodedCredentials =
+      new String(encodeBase64("%s:%s".format(polyglotUser.get, polyglotPassword.get).getBytes))
+
+    val asyncHttpClient: AsyncHttpClient = WS.client.underlying
+    val postBuilder = asyncHttpClient.preparePost(polyglotConvertURL.get + outputFormat)
+    val builder = postBuilder
+      .addHeader("Authorization", "Basic " + encodedCredentials)
+      .addBodyPart(new FilePart("myFile", tempFile))
+    val res = asyncHttpClient.executeRequest(builder.build()).get
+
+    //get the url for the converted file on Polyglot
+    if (res.getStatusCode != 200) {
+      Logger.debug("Could not get url of converted file - status = " + res.getStatusCode + "  " + res.getStatusText)
+      throw new RuntimeException("Could not connect to Polyglot. " + res.getStatusText)
+    }
+    //TODO: Find an easier way to get rid of html markup
+    //result is an html link
+    //<a href=http://the_url_string>http://the_url_string</a>
+    val fileURL = res.getResponseBody.substring(res.getResponseBody.indexOf("http"), res.getResponseBody.indexOf(">"))
+    fileURL
+    Future.successful(fileURL)
   }
   
   /**

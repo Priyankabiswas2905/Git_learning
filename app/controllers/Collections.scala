@@ -18,6 +18,7 @@ import scala.collection.mutable.ListBuffer
 import services._
 import org.apache.commons.lang.StringEscapeUtils
 import play.api.i18n.Messages
+import play.api.i18n.Messages.Implicits._
 
 @Singleton
 class Collections @Inject() (datasets: DatasetService, collections: CollectionService, previewsService: PreviewService,
@@ -488,14 +489,14 @@ class Collections @Inject() (datasets: DatasetService, collections: CollectionSe
         case Some(collection) => {
           Logger.debug(s"Found collection $id")
           // only show previewers that have a matching preview object associated with collection
-          Logger.debug("Num previewers " + Previewers.findCollectionPreviewers.size)
+          Logger.debug("Num previewers " + new Previewers().findCollectionPreviewers.size)
 
           //Decode the encoded items
           val dCollection = Utils.decodeCollectionElements(collection)
-
-          for (p <- Previewers.findCollectionPreviewers) Logger.debug("Previewer " + p)
+          val previewers = new Previewers()
+          for (p <- previewers.findCollectionPreviewers) Logger.debug("Previewer " + p)
           val filteredPreviewers = for (
-            previewer <- Previewers.findCollectionPreviewers;
+            previewer <- previewers.findCollectionPreviewers;
             preview <- previewsService.findByCollectionId(id);
             if (previewer.collection);
             if (previewer.supportedPreviews.contains(preview.preview_type.get))
@@ -746,7 +747,7 @@ class Collections @Inject() (datasets: DatasetService, collections: CollectionSe
       collections.get(collection_id) match {
         case Some(collection) => {
           val previewsByCol = previewsService.findByCollectionId(collection_id)
-          Ok(views.html.collectionPreviews(collection_id.toString, previewsByCol, Previewers.findCollectionPreviewers))
+          Ok(views.html.collectionPreviews(collection_id.toString, previewsByCol, new Previewers().findCollectionPreviewers))
         }
         case None => {
           Logger.error("Error getting " + Messages("collection.title")  + " " + collection_id);

@@ -289,7 +289,7 @@ class Metadata @Inject() (
               val userURI = controllers.routes.Application.index().absoluteURL() + "api/users/" + user.id
               val creator = UserAgent(user.id, "cat:user", MiniUser(user.id, user.fullName, user.avatarUrl.getOrElse(""), user.email), Some(new URL(userURI)))
 
-              val context: JsValue = (json \ "@context")
+              val context: JsValue = (json \ "@context").get
 
               // figure out what resource this is attached to
               val attachedTo =
@@ -315,7 +315,7 @@ class Metadata @Inject() (
                 } else None
 
               //parse the rest of the request to create a new models.Metadata object
-              val content = (json \ "content")
+              val content = (json \ "content").get
               val version = None
 
               if (attachedTo.isDefined) {
@@ -452,16 +452,16 @@ class Metadata @Inject() (
       val result = futureResponse.map {
         case response =>
           if (response.status >= 200 && response.status < 300 || response.status == 304) {
-            val people = (response.json \ ("persons")).as[List[JsObject]]
+            val people = ((response.json \ "persons").get).as[List[JsObject]]
             Ok(Json.toJson(people.map { t =>
-              val fName = t \ ("givenName")
-              val lName = t \ ("familyName")
+              val fName = (t \ "givenName").get
+              val lName = (t \ "familyName").get
               val name = JsString(fName.as[String] + " " + lName.as[String])
-              val email = t \ ("email") match {
-                case JsString(_) => t \ ("email")
+              val email = (t \ "email").get match {
+                case JsString(_) => (t \ "email").get
                 case _ => JsString("")
               }
-              Map("name" -> name, "@id" -> t \ ("@id"), "email" -> email)
+              Map("name" -> name, "@id" -> (t \ "@id").get, "email" -> email)
 
             }.filter((x) => {
               if (term.length == 0) {

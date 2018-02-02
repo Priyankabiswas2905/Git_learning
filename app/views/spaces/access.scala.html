@@ -1,5 +1,7 @@
 @(space:models.ProjectSpace, userRoleMap: Map[User, String], classes: String)(implicit user: Option[models.User])
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @import api.Permission
 
 <div class="@classes">

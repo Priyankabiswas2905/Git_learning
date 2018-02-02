@@ -25,6 +25,7 @@ import services._
 import _root_.util._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.collection.mutable.ListBuffer
+import play.api.i18n.Messages.Implicits._
 
 /**
  * Dataset API.
@@ -661,7 +662,7 @@ class  Datasets @Inject()(
 
                     //parse the rest of the request to create a new models.Metadata object
                     val attachedTo = ResourceRef(ResourceRef.dataset, id)
-                    val content = (json \ "content")
+                    val content = (json \ "content").get
                     val version = None
                     val metadata = models.Metadata(UUID.generate, attachedTo, contextID, contextURL, createdAt, creator,
                       content, version)
@@ -1370,7 +1371,7 @@ class  Datasets @Inject()(
  *      id:       the id in the original addTags call
  *      request:  the request in the original addTags call
  *  Return type:
- *      play.api.mvc.SimpleResult[JsValue]
+ *      play.api.mvc.Result[JsValue]
  *      in the form of Ok, NotFound and BadRequest
  *      where: Ok contains the JsObject: "status" -> "success", the other two contain a JsString,
  *      which contains the cause of the error, such as "No 'tags' specified", and
@@ -1692,7 +1693,7 @@ class  Datasets @Inject()(
       case Some(dataset) => {
         val datasetWithFiles = dataset.copy(files = dataset.files)
         val datasetFiles: List[models.File] = datasetWithFiles.files.flatMap(f => files.get(f))
-        val previewers = Previewers.findPreviewers
+        val previewers = new Previewers().findPreviewers
         //NOTE Should the following code be unified somewhere since it is duplicated in Datasets and Files for both api and controllers
         val previewslist = for (f <- datasetFiles; if (f.showPreviews.equals("DatasetLevel"))) yield {
           val pvf = for (p <- previewers; pv <- f.previews; if (p.contentType.contains(pv.contentType))) yield {
@@ -1849,6 +1850,7 @@ class  Datasets @Inject()(
         val listOfMetadata = metadataService.getMetadataByAttachTo(ResourceRef(ResourceRef.dataset, id))
           .filter(_.creator.typeOfAgent == "extractor")
           .map(JSONLD.jsonMetadataWithContext(_) \ "content")
+          .map(_.get)
         Ok(toJson(listOfMetadata))
       }
       case None => Logger.error("Error finding dataset" + id); InternalServerError

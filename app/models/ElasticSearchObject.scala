@@ -91,9 +91,7 @@ object ElasticsearchObject {
       "description" -> JsString(eso.description),
       "tags" -> JsArray(eso.tags.toSeq.map( (t:ElasticsearchTag) => Json.toJson(t)): Seq[JsValue]),
       "comments" -> JsArray(eso.comments.toSeq.map( (c:ElasticsearchComment) => Json.toJson(c)): Seq[JsValue]),
-      "metadata" -> JsArray(eso.metadata.toSeq.map(
-        (m:(String,JsValue)) => new JsObject(Seq(m._1 -> m._2)) )
-      )
+      "metadata" -> JsArray(eso.metadata.toSeq.map( (m:(String,JsValue)) => new JsObject(Map[String,JsValue](m._1 -> m._2))))
     )
   }
 

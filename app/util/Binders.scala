@@ -37,7 +37,7 @@ object Binders {
   /**
    * Convert a ObjectId to a Javascript String
    */
-  implicit def objectIdJavascriptLitteral = new JavascriptLitteral[ObjectId] {
+  implicit def objectIdJavascriptLiteral = new JavascriptLiteral[ObjectId] {
     def to(value: ObjectId) = value.toString
   }
 

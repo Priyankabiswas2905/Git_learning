@@ -1,6 +1,10 @@
 @(curationObjectsList: List[models.CurationObject], prev: String, next: String, limit: Int, mode: Option[String], space: Option[String], title: Option[String])(implicit user: Option[models.User])
 
 @import api.Permission
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
+
 @main(Messages("datasets.title")) {
     @util.masonry()
     <script src="@routes.Assets.at("javascripts/jquery.cookie.js")" type="text/javascript"></script>

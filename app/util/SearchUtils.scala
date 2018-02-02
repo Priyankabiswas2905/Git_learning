@@ -41,10 +41,10 @@ object SearchUtils {
         subjson.keys.foreach(subkey => {
           // If we already have some metadata from this creator, merge the results; otherwise, create new entry
           if (metadata.keySet.exists(_ == subkey)) {
-            metadata += (subkey -> metadata(subkey).as[JsArray].append((subjson \ subkey)))
+            metadata += (subkey -> metadata(subkey).as[JsArray].append((subjson \ subkey).get))
           }
           else {
-            metadata += (subkey -> Json.arr((subjson \ subkey)))
+            metadata += (subkey -> Json.arr((subjson \ subkey).get))
           }
         })
       } else if (md.creator.typeOfAgent=="user") {
@@ -99,10 +99,10 @@ object SearchUtils {
         subjson.keys.foreach(subkey => {
           // If we already have some metadata from this creator, merge the results; otherwise, create new entry
           if (metadata.keySet.exists(_ == subkey)) {
-            metadata += (subkey -> metadata(subkey).as[JsArray].append((subjson \ subkey)))
+            metadata += (subkey -> metadata(subkey).as[JsArray].append((subjson \ subkey).get))
           }
           else {
-            metadata += (subkey -> Json.arr((subjson \ subkey)))
+            metadata += (subkey -> Json.arr((subjson \ subkey).get))
           }
         })
       } else {
@@ -175,10 +175,10 @@ object SearchUtils {
         subjson.keys.foreach(subkey => {
           // If we already have some metadata from this creator, merge the results; otherwise, create new entry
           if (metadata.keySet.exists(_ == subkey)) {
-            metadata += (subkey -> metadata(subkey).as[JsArray].append((subjson \ subkey)))
+            metadata += (subkey -> metadata(subkey).as[JsArray].append((subjson \ subkey).get))
           }
           else {
-            metadata += (subkey -> Json.arr((subjson \ subkey)))
+            metadata += (subkey -> Json.arr((subjson \ subkey).get))
           }
         })
       } else if (md.creator.typeOfAgent=="user") {

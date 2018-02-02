@@ -1,6 +1,9 @@
 @(myForm: Form[models.Profile], allInstitutionOptions: List[String], allProjectOptions: List[String], emailtimes: Map[String,String])(implicit flash: play.api.mvc.Flash, user: Option[models.User])
 
 @import helper._
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @implicitFieldConstructor = @{ FieldConstructor(twitterBootstrapInput.f) }
   <script src="@routes.Assets.at("javascripts/htmlEncodeDecode.js")" language="javascript"></script>
 <link rel="stylesheet" href="@routes.Assets.at("stylesheets/chosen.css")">

@@ -100,13 +100,13 @@ object Global extends WithFilters(new GzipFilter(), new Jsonp(), CORSFilter()) w
     Logger.info("Application shutdown")
   }
 
-  private lazy val injector = services.DI.injector
-  private lazy val users: UserService =  DI.injector.getInstance(classOf[UserService])
+//  private lazy val injector = services.DI.injector
+//  private lazy val users: UserService =  DI.injector.getInstance(classOf[UserService])
 
   /** Used for dynamic controller dispatcher **/
-  override def getControllerInstance[A](clazz: Class[A]) = {
-    injector.getInstance(clazz)
-  }
+//  def getControllerInstance[A](clazz: Class[A]) = {
+//    injector.getInstance(clazz)
+//  }
 
   override def onError(request: RequestHeader, ex: Throwable) = {
     val sw = new StringWriter()
@@ -119,8 +119,9 @@ object Global extends WithFilters(new GzipFilter(), new Jsonp(), CORSFilter()) w
         "exception" -> sw.toString.replace("\n", "\\n")))))
     } else {
       // TODO get identity from request
-      implicit val user = users.findByIdentity("userId", "providerId")
-      Future(InternalServerError(views.html.errorPage(request, sw.toString)(user)))
+//      val users: UserService =  DI.injector.getInstance(classOf[UserService])
+//      implicit val user = users.findByIdentity("userId", "providerId")
+      Future(InternalServerError(views.html.errorPage(request, sw.toString)(Some(User.anonymous))))
     }
   }
 

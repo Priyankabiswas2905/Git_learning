@@ -1,5 +1,7 @@
 @(curationObject: models.CurationObject, files :List[CurationFile], m: List[models.Metadata], limit:Int, spaceName: String)(implicit user: Option[models.User])
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @import helper._
 @import _root_.util.Formatters._
 

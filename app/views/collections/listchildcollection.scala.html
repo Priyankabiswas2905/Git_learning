@@ -1,5 +1,8 @@
 @(parent: models.Collection, collection: models.Collection, redirect: Call)(implicit flash: play.api.mvc.Flash, user: Option[models.User])
 @import api.Permission
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 <div class="panel panel-default collection-panel" id="@collection.id-listitem">
     <div class="panel-body">
         <div class="row">

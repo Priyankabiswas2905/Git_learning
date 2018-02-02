@@ -6,10 +6,8 @@ import java.net.{URL, URLEncoder}
 import javax.inject.Inject
 import javax.mail.internet.MimeUtility
 
-import _root_.util.{FileUtils, Parsers, JSONLD, SearchUtils, RequestUtils}
-
+import _root_.util.{FileUtils, JSONLD, Parsers, RequestUtils, SearchUtils}
 import com.mongodb.casbah.Imports._
-import controllers.Previewers
 import jsonutils.JsonUtil
 import models._
 import play.api.Logger
@@ -19,17 +17,16 @@ import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.iteratee.Enumerator
 import play.api.libs.json.Json._
 import play.api.libs.json._
-import play.api.mvc.{ResponseHeader, SimpleResult}
-
+import play.api.mvc.{ResponseHeader, Result}
+import play.api.i18n.Messages.Implicits._
 import services._
 
 import scala.collection.mutable.ListBuffer
 import scala.util.parsing.json.JSONArray
-
 import java.text.SimpleDateFormat
 import java.util.Date
 
-import controllers.Utils
+import controllers.{Previewers, Utils}
 
 /**
  * Json API for files.
@@ -114,7 +111,7 @@ class Files @Inject()(
 		                range match {
 		                  case (start, end) =>
 		                    inputStream.skip(start)
-		                    SimpleResult(
+		                    Result(
 		                      header = ResponseHeader(PARTIAL_CONTENT,
 		                        Map(
 		                          CONNECTION -> "keep-alive",
@@ -174,7 +171,7 @@ class Files @Inject()(
                 range match {
                   case (start, end) =>
                     inputStream.skip(start)
-                    SimpleResult(
+                    Result(
                       header = ResponseHeader(PARTIAL_CONTENT,
                         Map(
                           CONNECTION -> "keep-alive",
@@ -324,7 +321,7 @@ class Files @Inject()(
                 case s: JsSuccess[Agent] => {
                   creator = s.get
                   //if creator is found, continue processing
-                  val context: JsValue = (json \ "@context")
+                  val context: JsValue = (json \ "@context").get
     
                   // check if the context is a URL to external endpoint
                   val contextURL: Option[URL] = context.asOpt[String].map(new URL(_))
@@ -338,11 +335,11 @@ class Files @Inject()(
                     } else None
     
                   // when the new metadata is added
-                  val createdAt = Parsers.parseDate((json \ "created_at")).fold(new Date())(_.toDate)
+                  val createdAt = Parsers.parseDate((json \ "created_at").get).fold(new Date())(_.toDate)
     
                   //parse the rest of the request to create a new models.Metadata object
                   val attachedTo = ResourceRef(ResourceRef.file, id)
-                  val content = (json \ "content")
+                  val content = (json \ "content").get
                   val version = None
                   val metadata = models.Metadata(UUID.generate, attachedTo, contextID, contextURL, createdAt, creator,
                     content, version)
@@ -841,8 +838,7 @@ class Files @Inject()(
                       case (start, end) =>
 
                         inputStream.skip(start)
-                        import play.api.mvc.{ResponseHeader, SimpleResult}
-                        SimpleResult(
+                        Result(
                           header = ResponseHeader(PARTIAL_CONTENT,
                             Map(
                               CONNECTION -> "keep-alive",
@@ -897,7 +893,7 @@ class Files @Inject()(
 
                         inputStream.skip(start)
 
-                        SimpleResult(
+                        Result(
                           header = ResponseHeader(PARTIAL_CONTENT,
                             Map(
                               CONNECTION -> "keep-alive",
@@ -1144,13 +1140,13 @@ class Files @Inject()(
    *      id:       the id in the original addTags call
    *      request:  the request in the original addTags call
    *  Return type:
-   *      play.api.mvc.SimpleResult[JsValue]
+   *      play.api.mvc.Result[JsValue]
    *      in the form of Ok, NotFound and BadRequest
    *      where: Ok contains the JsObject: "status" -> "success", the other two contain a JsString,
    *      which contains the cause of the error, such as "No 'tags' specified", and
    *      "The file with id 5272d0d7e4b0c4c9a43e81c8 is not found".
    */
-  def addTagsHelper(obj_type: TagCheckObjType, id: UUID, request: UserRequest[JsValue]): SimpleResult = {
+  def addTagsHelper(obj_type: TagCheckObjType, id: UUID, request: UserRequest[JsValue]): Result = {
 
     val (not_found, error_str) = tags.addTagsHelper(obj_type, id, request)
     files.get(id) match {
@@ -1171,7 +1167,7 @@ class Files @Inject()(
     }
   }
 
-  def removeTagsHelper(obj_type: TagCheckObjType, id: UUID, request: UserRequest[JsValue]): SimpleResult = {
+  def removeTagsHelper(obj_type: TagCheckObjType, id: UUID, request: UserRequest[JsValue]): Result = {
 
     val (not_found, error_str) = tags.removeTagsHelper(obj_type, id, request)
     files.get(id) match {
@@ -1412,7 +1408,7 @@ class Files @Inject()(
           case Some(file) => {
 
             val previewsFromDB = previews.findByFileId(file.id)
-            val previewers = Previewers.findPreviewers
+            val previewers = new Previewers().findPreviewers
             //Logger.debug("Number of previews " + previews.length);
             val files = List(file)
             //NOTE Should the following code be unified somewhere since it is duplicated in Datasets and Files for both api and controllers
@@ -1491,6 +1487,7 @@ class Files @Inject()(
             val listOfMetadata = metadataService.getMetadataByAttachTo(ResourceRef(ResourceRef.file, id))
               .filter(metadata => metadata.creator.typeOfAgent == "extractor" || metadata.creator.typeOfAgent == "cat:extractor")
               .map(JSONLD.jsonMetadataWithContext(_) \ "content")
+              .map(_.get)
             Ok(toJson(listOfMetadata))
           }
           case None => {

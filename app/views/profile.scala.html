@@ -1,4 +1,7 @@
 @(profile: User, keys: List[UserApiKey], ownProfile: Boolean)(implicit user: Option[models.User] = None)
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @main("Profile") {
     <script src="@routes.Application.javascriptRoutes" type="text/javascript"></script>
     <script src="@routes.Assets.at("javascripts/recommendation.js")" type="text/javascript"></script>

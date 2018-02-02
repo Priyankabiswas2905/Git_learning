@@ -1,4 +1,8 @@
 @(curationObjects: List[models.CurationObject])(implicit user: Option[models.User])
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
+
 @if(curationObjects.size > 0) {
     <div class="row bottom-padding">
         <div class="col-md-12">

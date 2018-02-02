@@ -375,7 +375,7 @@ class PostgresPlugin(application: Application) extends Plugin {
 
     val query2 = "UPDATE sensors SET metadata = CAST(? AS json) WHERE gid = ?"
     val st2 = conn.prepareStatement(query2)
-    st2.setString(1, Json.stringify((updatedJSON \ "properties")))
+    st2.setString(1, Json.stringify((updatedJSON \ "properties").get))
     st2.setInt(2, id.toInt)
     Logger.debug("Sensors put statement: " + st2)
     val rs2 = st2.executeUpdate()
@@ -433,7 +433,7 @@ class PostgresPlugin(application: Application) extends Plugin {
 
     val query2 = "UPDATE streams SET metadata = CAST(? AS json) WHERE gid = ?"
     val st2 = conn.prepareStatement(query2)
-    st2.setString(1, Json.stringify((updatedJSON \ "properties")))
+    st2.setString(1, Json.stringify((updatedJSON \ "properties").get))
     st2.setInt(2, id.toInt)
     Logger.debug("Stream put statement: " + st2)
     val rs2 = st2.executeUpdate()

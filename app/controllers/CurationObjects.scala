@@ -27,6 +27,7 @@ import play.api.libs.ws._
 import scala.concurrent.duration._
 import play.api.libs.json.Reads._
 import play.api.libs.ws.ning.NingWSResponse
+import play.api.i18n.Messages.Implicits._
 
 
 /**

@@ -1,5 +1,7 @@
 @(user:models.User, spaceid: String, spacename:String, requestmessage: String)(implicit request: RequestHeader)
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 <html>
   <body>
     <p>Hello,</p>

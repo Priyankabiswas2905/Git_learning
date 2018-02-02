@@ -2,10 +2,11 @@ package services
 
 import javax.inject.Inject
 
-import play.api.templates.Html
-import play.api.{ Plugin, Logger, Application }
+import play.twirl.api.Html
+import play.api.{Application, Logger, Plugin}
 import play.api.Play.current
 import models.UUID
+import play.twirl.api.Html
 import util.Mail
 
 class AdminsNotifierPlugin @Inject()(userService: UserService) (application:Application) extends Plugin {

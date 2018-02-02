@@ -9,7 +9,7 @@ import java.security.MessageDigest
 import _root_.util.{Parsers, PeekIterator}
 import org.joda.time.{DateTime, IllegalInstantException}
 import org.joda.time.format.{DateTimeFormat, ISODateTimeFormat}
-import play.api.mvc.{Request, SimpleResult}
+import play.api.mvc.{Request, Result}
 import play.api.libs.json._
 import play.api.libs.json.Json._
 import play.api.libs.functional.syntax._
@@ -34,7 +34,7 @@ import services.AppConfiguration
  * Geostreaming endpoints. A geostream is a time and geospatial referenced
  * sequence of datapoints.
  */
-object Geostreams extends ApiController {
+class Geostreams extends ApiController {
 
   val pluginNotEnabled = InternalServerError(toJson("Geostreaming not enabled"))
 
@@ -135,9 +135,9 @@ object Geostreams extends ApiController {
       case (data) => {
         current.plugin[PostgresPlugin] match {
           case Some(plugin) if plugin.isEnabled => {
-            plugin.updateSensorMetadata(id, Json.stringify(data \ "properties")) match {
+            plugin.updateSensorMetadata(id, Json.stringify((data \ "properties").get)) match {
               case Some(d) => {
-                plugin.updateSensorGeometry(id, Json.stringify(data \ "geometry")) match {
+                plugin.updateSensorGeometry(id, Json.stringify((data \ "geometry").get)) match {
                   case Some(d2) => {
                     jsonp(d2, request)
                   }
@@ -267,10 +267,11 @@ object Geostreams extends ApiController {
             case Some(d) => {
               val data = Json.parse(d)
               Json.obj(
-                "range" -> Map[String, JsValue]("min_start_time" -> data \ "min_start_time",
-                                                "max_end_time" -> data \ "max_end_time"),
-                "parameters" -> data \ "parameters"
-              )
+                "range" -> Map[String, JsValue](
+                  "min_start_time" -> (data \ "min_start_time").get,
+                  "max_end_time" -> (data \ "max_end_time").get,
+                  "parameters" -> (data \ "parameters").get
+              ))
             }
             case None => Json.obj("range" -> Map.empty[String, String], "parameters" -> Array.empty[String])
           }
@@ -558,30 +559,30 @@ object Geostreams extends ApiController {
     // loop over all values
     var count = 0
     var timer = System.currentTimeMillis()
-    val sensorName = data.peek.get.\("sensor_name")
+    val sensorName = (data.peek.get \ "sensor_name").get
     do {
       val sensor = data.next
 
       // get depth code
-      val depthCode = sensor.\("properties").\("DEPTH_CODE") match {
-        case x: JsUndefined => "NA"
-        case x => Parsers.parseString(x)
+      val depthCode = (sensor \ "properties" \ "DEPTH_CODE").toOption match {
+        case None => "NA"
+        case Some(depthCode) => Parsers.parseString(depthCode)
       }
       val extras = Json.obj("depth_code" -> depthCode)
 
       // get source
-      val source = sensor.\("properties").\("source") match {
-        case x: JsUndefined => ""
-        case x => Parsers.parseString(x)
+      val source = (sensor \ "properties" \ "source").toOption match {
+        case None => ""
+        case Some(source) => Parsers.parseString(source)
       }
 
       // get depth
-      val coordinates = sensor.\("geometry").\("coordinates").as[JsArray]
-      val depthBin = depth * Math.ceil(Parsers.parseDouble(coordinates(2)).getOrElse(0.0) / depth)
+      val coordinates = (sensor \ "geometry" \ "coordinates").get
+      val depthBin = depth * Math.ceil(Parsers.parseDouble(coordinates(2).get).getOrElse(0.0) / depth)
 
       // bin time
-      val startTime = Parsers.parseDate(sensor.\("start_time")).getOrElse(DateTime.now)
-      val endTime = Parsers.parseDate(sensor.\("end_time")).getOrElse(DateTime.now)
+      val startTime = Parsers.parseDate((sensor \ "start_time").get).getOrElse(DateTime.now)
+      val endTime = Parsers.parseDate((sensor \ "end_time").get).getOrElse(DateTime.now)
       val times = timeBins(time, startTime, endTime)
 
       // each property is either added to all, or is new result
@@ -920,11 +921,11 @@ object Geostreams extends ApiController {
     if (semi.get.toLowerCase != "spring" && semi.get.toLowerCase != "summer") return true
 
     // get start/end
-    val startTime = Parsers.parseDate(obj.\("start_time")) match {
+    val startTime = Parsers.parseDate((obj \ "start_time").get) match {
       case Some(x) => x
       case None => return false
     }
-    val endTime = Parsers.parseDate(obj.\("end_time")) match {
+    val endTime = Parsers.parseDate((obj \ "end_time").get) match {
       case Some(x) => x
       case None => return false
     }
@@ -1010,9 +1011,9 @@ object Geostreams extends ApiController {
     val sensor = data.next()
     val counter = collection.mutable.HashMap.empty[String, Int]
     val properties = collection.mutable.HashMap.empty[String, Either[collection.mutable.ListBuffer[String], Double]]
-    var startDate = Parsers.parseString(sensor.\("start_time"))
-    var endDate = Parsers.parseString(sensor.\("end_time"))
-    var streams = collection.mutable.ListBuffer[String](Parsers.parseString(sensor.\("stream_id")))
+    var startDate = Parsers.parseString((sensor \"start_time").get)
+    var endDate = Parsers.parseString((sensor \ "end_time").get)
+    var streams = collection.mutable.ListBuffer[String](Parsers.parseString((sensor \ "stream_id").get))
     sensor.\("properties").as[JsObject].fieldSet.foreach(f => {
       counter(f._1) = 1
       val s = Parsers.parseString(f._2)
@@ -1027,14 +1028,14 @@ object Geostreams extends ApiController {
 
     while (data.hasNext && sensorName.equals(data.peek().get.\("sensor_name"))) {
       val nextSensor = data.next()
-      if (startDate.compareTo(Parsers.parseString(nextSensor.\("start_time"))) > 0) {
-        startDate = Parsers.parseString(nextSensor.\("start_time"))
+      if (startDate.compareTo(Parsers.parseString((nextSensor \ "start_time").get)) > 0) {
+        startDate = Parsers.parseString(nextSensor \ ("start_time") get)
       }
-      if (endDate.compareTo(Parsers.parseString(nextSensor.\("end_time").toString())) < 0) {
-        endDate = Parsers.parseString(nextSensor.\("end_time"))
+      if (endDate.compareTo(Parsers.parseString((nextSensor \ "end_time").get.toString())) < 0) {
+        endDate = Parsers.parseString((nextSensor \ "end_time").get)
       }
-      if (!streams.contains(Parsers.parseString(nextSensor.\("stream_id")))) {
-        streams += Parsers.parseString(nextSensor.\("stream_id"))
+      if (!streams.contains(Parsers.parseString((nextSensor \ "stream_id").get))) {
+        streams += Parsers.parseString((nextSensor \ "stream_id").get)
       }
       nextSensor.\("properties").as[JsObject].fieldSet.foreach(f => {
         if (properties contains f._1) {
@@ -1114,9 +1115,9 @@ object Geostreams extends ApiController {
     val propertiesAll = collection.mutable.HashMap.empty[String, Either[collection.mutable.ListBuffer[String], Double]]
     val propertiesLast = collection.mutable.HashMap.empty[String, Either[collection.mutable.ListBuffer[String], Double]]
     val sensor = data.next()
-    var startDate = Parsers.parseString(sensor.\("start_time"))
-    var endDate = Parsers.parseString(sensor.\("end_time"))
-    var streams = collection.mutable.ListBuffer[String](Parsers.parseString(sensor.\("stream_id")))
+    var startDate = Parsers.parseString((sensor \ "start_time").get)
+    var endDate = Parsers.parseString((sensor \ "end_time").get)
+    var streams = collection.mutable.ListBuffer[String](Parsers.parseString((sensor \ "stream_id").get))
     sensor.\("properties").as[JsObject].fieldSet.foreach(f => {
       counterTrend(f._1) = 1
       counterAll(f._1) = 1
@@ -1134,8 +1135,8 @@ object Geostreams extends ApiController {
     var lastBin = "nada"
     while (data.hasNext && sensorName.equals(data.peek().get.\("sensor_name"))) {
       val nextSensor = data.next()
-      val sensorStart = Parsers.parseString(nextSensor.\("start_time"))
-      val sensorEnd = Parsers.parseString(nextSensor.\("end_time"))
+      val sensorStart = Parsers.parseString((nextSensor \ "start_time").get)
+      val sensorEnd = Parsers.parseString((nextSensor \ "end_time").get)
       if (startDate.compareTo(sensorStart) > 0) {
         startDate = sensorStart
       }
@@ -1145,8 +1146,8 @@ object Geostreams extends ApiController {
       // check to see what bin this is
       // TODO fix this for better grouping see MMDB-1678
       val currentBin = timeBins(binning, Parsers.parseDate(sensorStart).get, Parsers.parseDate(sensorEnd).get).keys.last
-      if (!streams.contains(Parsers.parseString(nextSensor.\("stream_id")))) {
-        streams += Parsers.parseString(nextSensor.\("stream_id"))
+      if (!streams.contains(Parsers.parseString((nextSensor \ "stream_id").get))) {
+        streams += Parsers.parseString((nextSensor \ "stream_id").get)
       }
       nextSensor.\("properties").as[JsObject].fieldSet.foreach(f => {
         // compute last grouping worth of data
@@ -1356,17 +1357,17 @@ object Geostreams extends ApiController {
     var sensors = collection.mutable.ListBuffer.empty[String]
     data.foreach(sensor => {
       sensor.\("properties").as[JsObject].fieldSet.foreach(f => {
-        if (startDate.isEmpty || startDate.compareTo(Parsers.parseString(sensor.\("start_time"))) > 0) {
-          startDate = Parsers.parseString(sensor.\("start_time"))
+        if (startDate.isEmpty || startDate.compareTo(Parsers.parseString((sensor \ "start_time").get)) > 0) {
+          startDate = Parsers.parseString((sensor \ "start_time").get)
         }
-        if (endDate.isEmpty || endDate.compareTo(Parsers.parseString(sensor.\("end_time"))) < 0) {
-          endDate = Parsers.parseString(sensor.\("end_time"))
+        if (endDate.isEmpty || endDate.compareTo(Parsers.parseString((sensor \ "end_time").get)) < 0) {
+          endDate = Parsers.parseString((sensor \ "end_time").get)
         }
-        if (!sensors.contains(Parsers.parseString(sensor.\("sensor_id")))) {
-          sensors += Parsers.parseString(sensor.\("sensor_id"))
+        if (!sensors.contains(Parsers.parseString((sensor \ "sensor_id").get))) {
+          sensors += Parsers.parseString((sensor \ "sensor_id").get)
         }
-        if (!streams.contains(Parsers.parseString(sensor.\("stream_id")))) {
-          streams += Parsers.parseString(sensor.\("stream_id"))
+        if (!streams.contains(Parsers.parseString((sensor \ "stream_id").get))) {
+          streams += Parsers.parseString((sensor \ "stream_id").get)
         }
         if (properties contains f._1) {
           properties(f._1) match {
@@ -1447,22 +1448,22 @@ object Geostreams extends ApiController {
     while (rowCount < data.length) {
       val counter = collection.mutable.HashMap.empty[String, Int]
       val sensor = data(rowCount)
-      var startDate = Parsers.parseString(sensor.\("start_time"))
-      var endDate = Parsers.parseString(sensor.\("end_time"))
-      var streams = collection.mutable.ListBuffer[String](Parsers.parseString(sensor.\("stream_id")))
+      var startDate = Parsers.parseString((sensor \ "start_time").get)
+      var endDate = Parsers.parseString((sensor \ "end_time").get)
+      var streams = collection.mutable.ListBuffer[String](Parsers.parseString((sensor \ "stream_id").get))
       sensor.\("properties").as[JsObject].fieldSet.foreach(f => {
         counter(f._1) = 1
       })
       while (rowCount < data.length && sensor.\("sensor_name").equals(data(rowCount).\("sensor_name"))) {
         val nextSensor = data(rowCount)
-        if (startDate.compareTo(Parsers.parseString(nextSensor.\("start_time"))) > 0) {
-          startDate = Parsers.parseString(nextSensor.\("start_time"))
+        if (startDate.compareTo(Parsers.parseString((nextSensor \ "start_time").get)) > 0) {
+          startDate = Parsers.parseString((nextSensor \ "start_time").get)
         }
-        if (endDate.compareTo(Parsers.parseString(nextSensor.\("end_time"))) < 0) {
-          endDate = Parsers.parseString(nextSensor.\("end_time"))
+        if (endDate.compareTo(Parsers.parseString((nextSensor \ "end_time").get)) < 0) {
+          endDate = Parsers.parseString((nextSensor \ "end_time").get)
         }
-        if (!streams.contains(Parsers.parseString(nextSensor.\("stream_id")))) {
-          streams += Parsers.parseString(nextSensor.\("stream_id"))
+        if (!streams.contains(Parsers.parseString((nextSensor \ "stream_id").get))) {
+          streams += Parsers.parseString((nextSensor \ "stream_id").get)
         }
         nextSensor.\("properties").as[JsObject].fieldSet.foreach(f => {
           if (counter contains f._1) {
@@ -1496,7 +1497,7 @@ object Geostreams extends ApiController {
     * @param data Result to transform
    * @param request request made to server
    */
-  def jsonp(data:String, request: Request[Any]): SimpleResult = {
+  def jsonp(data:String, request: Request[Any]): Result = {
     jsonp(Enumerator(data), request)
   }
 
@@ -1506,7 +1507,7 @@ object Geostreams extends ApiController {
     * @param data Result to transform
    * @param request request made to server
    */
-  def jsonp(data:JsValue, request: Request[Any]): SimpleResult = {
+  def jsonp(data:JsValue, request: Request[Any]): Result = {
     jsonp(Enumerator(data.toString), request)
   }
 
@@ -1615,7 +1616,7 @@ object Geostreams extends ApiController {
         val file = new File(x, filename)
         if (file.exists) {
           val data = Json.parse(Source.fromFile(new File(x, filename + ".json")).mkString)
-          Parsers.parseString(data.\("format")) match {
+          Parsers.parseString((data \ "format").get) match {
             case "csv" => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(withCharset("text/csv"))
             case "json" => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(JSON)
             case "geojson" => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(JSON)
@@ -1700,7 +1701,7 @@ object Geostreams extends ApiController {
           val jsonFile = new File(file.getAbsolutePath + ".json")
           if (jsonFile.exists()) {
             val data = Json.parse(Source.fromFile(jsonFile).mkString)
-            (Parsers.parseString(data.\("sensor_id")), Parsers.parseString(data.\("stream_id"))) match {
+            (Parsers.parseString((data \ "sensor_id").get), Parsers.parseString((data \ "stream_id").get)) match {
               case (sensor_value, stream_value) =>
                 if (sensor_id.isDefined && !stream_id.isDefined) {
                   if (sensors.contains(sensor_value) || streams.contains(stream_value)) {

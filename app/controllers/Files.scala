@@ -25,6 +25,7 @@ import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import play.api.i18n.Messages
+import play.api.i18n.Messages.Implicits._
 
 import util.FileUtils
 
@@ -71,7 +72,7 @@ class Files @Inject() (
     files.get(id) match {
       case Some(file) => {
         val previewsFromDB = previews.findByFileId(file.id)
-        val previewers = Previewers.findPreviewers
+        val previewers = new Previewers().findPreviewers
 
         //NOTE Should the following code be unified somewhere since it is duplicated in Datasets and Files for both api and controllers
         val previewsWithPreviewer = {
@@ -698,8 +699,8 @@ class Files @Inject() (
                           range match { case (start,end) =>
 
                         inputStream.skip(start)
-                        import play.api.mvc.{ ResponseHeader, SimpleResult }
-                        SimpleResult(
+                        import play.api.mvc.{ ResponseHeader, Result }
+                        Result(
                           header = ResponseHeader(PARTIAL_CONTENT,
                             Map(
                               CONNECTION -> "keep-alive",
@@ -858,8 +859,8 @@ class Files @Inject() (
 
 
                 inputStream.skip(start)
-                import play.api.mvc.{ ResponseHeader, SimpleResult }
-                SimpleResult(
+                import play.api.mvc.{ ResponseHeader, Result }
+                Result(
                   header = ResponseHeader(PARTIAL_CONTENT,
                     Map(
                       CONNECTION -> "keep-alive",

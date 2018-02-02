@@ -1,6 +1,8 @@
 @(space: models.ProjectSpace, redirect: Call)(implicit user: Option[models.User])
 @import api.Permission
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 <div class="panel panel-default space-panel" id="@space.id-listitem">
     @if(!space.logoURL.isEmpty) {
         <div class="row">

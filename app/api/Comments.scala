@@ -9,8 +9,7 @@ import javax.inject.Inject
 import models._
 import services._
 import play.api.i18n.Messages
-
-
+import play.api.i18n.Messages.Implicits._
 
 /**
  * Comments on datasets.

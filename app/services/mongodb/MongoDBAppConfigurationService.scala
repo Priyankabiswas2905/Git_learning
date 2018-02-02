@@ -10,6 +10,7 @@ import models.{DBCounts, ResourceRef}
 /**
   * App Configuration Service.
  */
+@Singleton
 class MongoDBAppConfigurationService extends AppConfigurationService {
   def addPropertyValue(key: String, value: Any) {
     getCollection.update(MongoDBObject("key" -> key), $addToSet("value" -> value), upsert=true, concern=WriteConcern.Safe)

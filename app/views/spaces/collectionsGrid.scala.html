@@ -1,5 +1,7 @@
 @(collectionsList: List[Collection], space: ProjectSpace)(implicit user: Option[models.User])
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @import api.Permission
 <p>
     <span class="small">@Messages("recent.message", Messages("collections.title").toLowerCase)</span>

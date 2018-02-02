@@ -12,7 +12,7 @@ import com.rabbitmq.client.{Channel, Connection, ConnectionFactory, DefaultConsu
 import models.{Extraction, UUID}
 import play.api.Play.current
 import play.api.libs.json.Json
-import play.api.libs.ws.{Response, WS, WSAuthScheme}
+import play.api.libs.ws.{WSResponse, WS, WSAuthScheme}
 import play.api.{Application, Logger, Plugin}
 import play.libs.Akka
 import play.api.libs.json.JsValue
@@ -193,7 +193,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   // ----------------------------------------------------------------------
   // RABBITMQ MANAGEMENT ENDPOINTS
   // ----------------------------------------------------------------------
-  def getRestEndPoint(path: String): Future[Response] = {
+  def getRestEndPoint(path: String): Future[WSResponse] = {
     connect
 
     restURL match {
@@ -212,7 +212,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
  /**
  * Get the exchange list for a given host
  */
-  def getExchanges : Future[Response] = {
+  def getExchanges : Future[WSResponse] = {
     connect
     getRestEndPoint("/api/exchanges/" + vhost )
   }
@@ -220,7 +220,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   /**
    * get list of queues attached to an exchange
    */
-  def getQueuesNamesForAnExchange(exchange: String): Future[Response] = {
+  def getQueuesNamesForAnExchange(exchange: String): Future[WSResponse] = {
     connect
     getRestEndPoint("/api/exchanges/"+ vhost +"/"+ exchange +"/bindings/source")
   }
@@ -228,7 +228,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   /**
    * Get the binding lists (lists of routing keys) from the rabbitmq broker
    */
-  def getBindings: Future[Response] = {
+  def getBindings: Future[WSResponse] = {
     getRestEndPoint("/api/bindings")
   }
 
@@ -236,7 +236,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
    * Get Channel list from rabbitmq broker
    */
 
-  def getChannelsList: Future[Response] = {
+  def getChannelsList: Future[WSResponse] = {
     getRestEndPoint("/api/channels")
   }
   
@@ -244,7 +244,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
    * Get queue details for a given queue
    */
 
-  def getQueueDetails(qname: String): Future[Response] = {
+  def getQueueDetails(qname: String): Future[WSResponse] = {
     connect
     getRestEndPoint("/api/queues/" + vhost + "/" + qname)
   }
@@ -254,7 +254,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
    * Get queue bindings for a given host and queue from rabbitmq broker
    */
 
-  def getQueueBindings(qname: String): Future[Response] = {
+  def getQueueBindings(qname: String): Future[WSResponse] = {
     connect
     getRestEndPoint("/api/queues/" + vhost + "/" + qname + "/bindings")
   }
@@ -262,7 +262,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   /**
    * Get Channel information from rabbitmq broker for given channel id 'cid'
    */
-  def getChannelInfo(cid: String): Future[Response] = {
+  def getChannelInfo(cid: String): Future[WSResponse] = {
     getRestEndPoint("/api/channels/" + cid)
   }
 }

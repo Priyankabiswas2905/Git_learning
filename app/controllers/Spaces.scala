@@ -18,6 +18,9 @@ import util.{Formatters, Mail}
 import scala.collection.immutable.List
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
+import play.api.Play.current
+import play.api.i18n.Messages.Implicits._
+
 /**
  * Spaces allow users to partition the data into realms only accessible to users with the right permissions.
  */

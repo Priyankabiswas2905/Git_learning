@@ -1,5 +1,7 @@
 @(space: models.ProjectSpace, curationObjects: List[models.CurationObject], prev: Int, next: Int, limit: Int)(implicit user: Option[models.User])
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @import _root_.util.Formatters._
 
 @main("Staging Area") {

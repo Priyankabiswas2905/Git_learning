@@ -7,7 +7,7 @@ import services.PostgresPlugin
 /**
  * Metadata about sensors registered with the system. Datastreams can be associalted with sensors.
  */
-object Sensors extends Controller with ApiController {
+class Sensors extends Controller with ApiController {
 
   def add() = PermissionAction(Permission.AddGeoStream)(parse.json) { implicit request =>
       current.plugin[PostgresPlugin] match {

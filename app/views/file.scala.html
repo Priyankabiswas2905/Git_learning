@@ -8,7 +8,9 @@
 		folderHierarchy: List[Folder], spaces:List[ProjectSpace], allDatasets: List[Dataset])(implicit user: Option[models.User], request: RequestHeader)
 
 @import helper._
+@import play.api.i18n.Messages
 @import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @import api.Permission
 @import _root_.util.FileUtils
 @import _root_.util.Formatters._

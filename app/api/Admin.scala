@@ -9,7 +9,7 @@ import play.api.libs.concurrent.Akka
 import play.api.mvc.Controller
 import play.api.Play.current
 import play.api.libs.json.Json.toJson
-import play.api.templates.Html
+import play.twirl.api.Html
 import services._
 import services.mongodb.MongoSalatPlugin
 import play.api.Logger

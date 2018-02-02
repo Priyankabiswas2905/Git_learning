@@ -37,13 +37,13 @@ class MongoDBThreeDService extends ThreeDService {
     ThreeDTextureDAO.find(MongoDBObject("file_id" -> new ObjectId(fileId.stringify))).toList
   }
 
-  def updateTexture(fileId: UUID, textureId: UUID, fields: Seq[(String, JsValue)]) {
+  def updateTexture(fileId: UUID, textureId: UUID, fields: scala.collection.Map[String, JsValue]) {
     val metadata = fields.toMap.flatMap(tuple => MongoDBObject(tuple._1 -> tuple._2.as[String]))
     ThreeDTextureDAO.dao.collection.update(MongoDBObject("_id" -> new ObjectId(textureId.stringify)),
       $set("metadata" -> metadata, "file_id" -> new ObjectId(fileId.stringify)), false, false, WriteConcern.SAFE)
   }
 
-  def updateGeometry(fileId: UUID, geometryId: UUID, fields: Seq[(String, JsValue)]) {
+  def updateGeometry(fileId: UUID, geometryId: UUID, fields: scala.collection.Map[String, JsValue]) {
     val metadata = fields.toMap.flatMap(tuple => MongoDBObject(tuple._1 -> tuple._2.as[String]))
     GeometryDAO.dao.collection.update(MongoDBObject("_id" -> new ObjectId(geometryId.stringify)),
       $set("metadata" -> metadata, "file_id" -> new ObjectId(fileId.stringify)), false, false, WriteConcern.SAFE)

@@ -16,7 +16,7 @@ import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json.Json._
 import play.api.libs.json._
 import play.api.libs.ws.ning.NingWSResponse
-import play.api.libs.ws.{Response, WS}
+import play.api.libs.ws.{WSResponse, WS}
 import play.api.mvc.MultipartFormData
 import services._
 
@@ -320,7 +320,7 @@ class Extractions @Inject()(
   }
 
 
-  def computeStatus(response: Response, file: models.File, l: scala.collection.mutable.Map[String, String]): String = {
+  def computeStatus(response: WSResponse, file: models.File, l: scala.collection.mutable.Map[String, String]): String = {
 
     var isActivity = "false"
     extractions.findIfBeingProcessed(file.id) match {

@@ -1,11 +1,12 @@
 import sbt._
 import com.typesafe.sbt.packager.Keys._
 import Keys._
-import play.Play.autoImport._
+import play.sbt.Play.autoImport._
 import PlayKeys._
-import play.PlayImport.PlayKeys._
 import play.twirl.sbt.Import.TwirlKeys
 import play.twirl.sbt.SbtTwirl
+import play.sbt.PlayImport
+import play.sbt.routes.RoutesKeys._
 
 
 //import com.typesafe.sbt.SbtLicenseReport.autoImportImpl._
@@ -120,7 +121,7 @@ object ApplicationBuild extends Build {
 //    "gr.forth.ics" % "flexigraph" % "1.0",
 
     // Guice dependency injection
-    "com.google.inject" % "guice" % "3.0",
+//    "com.google.inject" % "guice" % "3.0",
 
     // Used for IPP server interaction and tests?
     "org.apache.httpcomponents" % "httpclient" % "4.2.3",
@@ -133,6 +134,7 @@ object ApplicationBuild extends Build {
 
     // Testing framework
 //    "org.scalatestplus" % "play_2.10" % "1.0.0" % "test",
+//    "org.scalatestplus.play" %% "scalatestplus-play" % "1.5.1" % "test",
 
     // iRods filestorage
     "org.irods.jargon" % "jargon-core" % "3.3.3-beta1",
@@ -143,14 +145,16 @@ object ApplicationBuild extends Build {
 
   // Only compile the bootstrap bootstrap.less file and any other *.less file in the stylesheets directory
   def customLessEntryPoints(base: File): PathFinder = (
-    (base / "app" / "assets" / "styleshee ts" / "bootstrap" * "bootstrap.less") +++
+    (base / "app" / "assets" / "stylesheets" / "bootstrap" * "bootstrap.less") +++
     (base / "app" / "assets" / "stylesheets" / "bootstrap" * "responsive.less") +++
     (base / "app" / "assets" / "stylesheets" * "*.less")
   )
 
-  val main = Project(appName, file(".")).enablePlugins(play.PlayScala).settings(
+  val main = Project(appName, file(".")).enablePlugins(play.sbt.PlayScala).settings(
     version := appVersion,
     scalaVersion := "2.10.6",
+//    scalaVersion := "2.11.12", // TODO not supported by salat
+    //    scalaVersion := "2.12.14",
     libraryDependencies ++= appDependencies,
     scalacOptions ++= Seq(s"-target:jvm-$jvm", "-feature"),
     javacOptions ++= Seq("-source", jvm, "-target", jvm),
@@ -159,11 +163,12 @@ object ApplicationBuild extends Build {
       assert(current >= "1.8", s"Unsupported JDK: java.specification.version $current != $jvm")
     },
     offline := true,
-    lessEntryPoints <<= baseDirectory(customLessEntryPoints),
+//    lessEntryPoints <<= baseDirectory(customLessEntryPoints),
     javaOptions in Test += "-Dconfig.file=" + Option(System.getProperty("config.file")).getOrElse("conf/application.conf"),
     testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-u", "target/scalatest-reports"),
     routesImport += "models._",
     routesImport += "util.Binders._",
+    routesGenerator := InjectedRoutesGenerator,
     TwirlKeys.templateImports += "org.bson.types.ObjectId",
     resolvers += Resolver.url("sbt-plugin-releases", url("http://repo.scala-sbt.org/scalasbt/sbt-plugin-releases/"))(Resolver.ivyStylePatterns),
     resolvers += Resolver.url("sbt-plugin-snapshots", url("http://repo.scala-sbt.org/scalasbt/sbt-plugin-snapshots/"))(Resolver.ivyStylePatterns),

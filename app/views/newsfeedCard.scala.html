@@ -1,6 +1,8 @@
 @(event: models.Event)(implicit user: Option[models.User] = None)
 @import services.AppConfiguration
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @import play.Logger
 @linkForObject(obj_type: String, obj_id: Option[UUID], obj_name: Option[String]) = {
   @obj_type match {

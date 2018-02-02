@@ -17,7 +17,7 @@ import scala.io.Source
 /**
  * Previewers.
  */
-object Previewers extends Controller with SecuredController {
+class Previewers extends Controller with SecuredController {
   def list = PermissionAction(Permission.ViewFile) { implicit request =>
     Ok(views.html.previewers(findPreviewers()))
   }

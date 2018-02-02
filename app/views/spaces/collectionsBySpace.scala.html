@@ -1,6 +1,8 @@
 @(collections: List[Collection], space: ProjectSpace, isPublic: Option[Boolean])(implicit user: Option[models.User])
 @import api.Permission
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @isPublic match {
     case Some(b) => {<h3>@Messages("collections.title")</h3>}
     case None => {<h3>@Messages("a.in.b", Messages("collections.title"), Messages("space.title"))</h3>}

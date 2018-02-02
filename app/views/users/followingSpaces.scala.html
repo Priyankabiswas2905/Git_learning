@@ -1,5 +1,7 @@
 @(spacesList: List[models.ProjectSpace], date: String, limit: Int, owner: Option[String], showAll: Boolean, mode: Option[String], prev: Int, next: Int, title: Option[String])(implicit user: Option[models.User])
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @main("Following Spaces") {
 
     @util.masonry()

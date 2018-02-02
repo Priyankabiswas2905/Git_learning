@@ -1,6 +1,8 @@
 @(metadata: List[models.MetadataDefinition], spaceId: Option[UUID], spaceName: Option[String])(implicit user: Option[models.User])
 
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @import _root_.util.Formatters._
 
 @main("Metadata Definitions") {

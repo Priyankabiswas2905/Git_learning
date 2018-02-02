@@ -9,7 +9,7 @@ import play.api.Logger
  * Documentation about API using swagger.
  *
  */
-object ApiHelp extends Controller {
+class ApiHelp extends Controller {
 
   def options(path:String) = Action { 
     Logger.debug("ApiHelp: preflight request")

@@ -12,6 +12,7 @@ import util.{FileUtils, Formatters, RequiredFieldsConfig, SortingUtils }
 import scala.collection.immutable._
 import scala.collection.mutable.ListBuffer
 import play.api.i18n.Messages
+import play.api.i18n.Messages.Implicits._
 
 /**
  * A dataset is a collection of files and streams.
@@ -500,7 +501,7 @@ class Datasets @Inject() (
   def dataset(id: UUID, currentSpace: Option[String], limit: Int) = PermissionAction(Permission.ViewDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
 
     implicit val user = request.user
-    Previewers.findPreviewers.foreach(p => Logger.debug("Previewer found " + p.id))
+    new Previewers().findPreviewers.foreach(p => Logger.debug("Previewer found " + p.id))
     datasets.get(id) match {
       case Some(dataset) => {
 
@@ -513,7 +514,7 @@ class Datasets @Inject() (
         var datasetWithFiles = dataset.copy(files = filesInDataset.map(_.id))
         datasetWithFiles = Utils.decodeDatasetElements(datasetWithFiles)
 
-        val filteredPreviewers = Previewers.findDatasetPreviewers
+        val filteredPreviewers = new Previewers().findDatasetPreviewers
 
         val m = metadata.getMetadataByAttachTo(ResourceRef(ResourceRef.dataset, dataset.id))
 

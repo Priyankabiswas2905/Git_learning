@@ -1,9 +1,12 @@
 @(id: UUID, name:String, desc:String, defaultspace:Option[ProjectSpace], spaceList: List[models.ProjectSpace], isNameRequired: Boolean, isDescriptionRequired: Boolean, isNew:Boolean, creators: List[String])(implicit user: Option[models.User])
-@import play.api.i18n.Messages
+
 @import _root_.util.Formatters._
 @import api.Permission
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 
-@main("Curation Object") {
+    @main("Curation Object") {
     <script src="@routes.Assets.at("javascripts/curation-create.js")" language="javascript"></script>
     <script src="@routes.Assets.at("javascripts/htmlEncodeDecode.js")" language="javascript"></script>
     <script type="text/javascript" language="javascript">

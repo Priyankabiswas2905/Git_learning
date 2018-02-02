@@ -1,6 +1,6 @@
 package services
 
-import play.api.libs.ws.Response
+import play.api.libs.ws.WSResponse
 import play.api.{Application, Logger}
 
 /**

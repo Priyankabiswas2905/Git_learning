@@ -1,6 +1,8 @@
 @(myForm: Form[controllers.spaceInviteData], space: ProjectSpace, roleList: List[String], invite:List[SpaceInvite])(implicit  flash: play.api.mvc.Flash, user: Option[models.User])
-    @import helper._
-    @import play.api.i18n.Messages
+@import helper._
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
     <div class="container row">
         <div class="col-md-8">
 
