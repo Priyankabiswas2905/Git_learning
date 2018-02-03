@@ -2,11 +2,11 @@ package services.mongodb
 
 import java.io._
 import java.text.SimpleDateFormat
-import java.util.{ ArrayList, Date }
-import javax.inject.{ Inject, Singleton }
+import java.util.{ArrayList, Date}
+import javax.inject.{Inject, Singleton}
 
 import Transformation.LidoToCidocConvertion
-import util.{ Parsers, Formatters }
+import util.{Parsers, Formatters}
 import api.Permission
 import api.Permission.Permission
 import com.mongodb.casbah.Imports._
@@ -14,22 +14,23 @@ import com.mongodb.casbah.WriteConcern
 import com.mongodb.casbah.commons.MongoDBList
 import com.mongodb.casbah.commons.MongoDBObject
 import com.mongodb.util.JSON
-import com.novus.salat.dao.{ ModelCompanion, SalatDAO }
+import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import jsonutils.JsonUtil
-import models.{ File, _ }
+import models.{File, _}
 import org.apache.commons.io.FileUtils
 import org.bson.types.ObjectId
 import org.json.JSONObject
 import play.api.Logger
 import play.api.Play._
 import play.api.libs.json.Json._
-import play.api.libs.json.{ Json, JsValue, JsArray }
+import play.api.libs.json.{Json, JsValue, JsArray}
 import services._
 import services.mongodb.MongoContext.context
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
+import scala.util.parsing.json.JSONArray
 
 /**
  * Use Mongodb to store datasets.
@@ -37,15 +38,15 @@ import scala.collection.mutable.ListBuffer
  */
 @Singleton
 class MongoDBDatasetService @Inject() (
-    collections: CollectionService,
-    files: FileService,
-    comments: CommentService,
-    sparql: RdfSPARQLService,
-    spaces: SpaceService,
-    userService: UserService,
-    folders: FolderService,
-    metadatas: MetadataService,
-    events: EventService) extends DatasetService {
+  collections: CollectionService,
+  files: FileService,
+  comments: CommentService,
+  sparql: RdfSPARQLService,
+  spaces: SpaceService,
+  userService: UserService,
+  folders: FolderService,
+  metadatas:MetadataService,
+  events: EventService) extends DatasetService {
 
   object MustBreak extends Exception {}
 
@@ -60,139 +61,141 @@ class MongoDBDatasetService @Inject() (
    * Count all datasets in a space
    */
   def countSpace(space: String): Long = {
-    count(None, false, None, None, Some(space), Set[Permission](Permission.ViewDataset), None, showAll = true, None)
+    count(None, false, None, None, Some(space), Set[Permission](Permission.ViewDataset), None, showAll=true, None, false)
   }
 
   /**
    * Return a list of datasets in a space, this does not check for permissions
    */
   def listSpace(limit: Integer, space: String): List[Dataset] = {
-    list(None, false, limit, None, None, Some(space), Set[Permission](Permission.ViewDataset), None, status = None, showAll = true, owner = None)
+    list(None, false, limit, None, None, Some(space), Set[Permission](Permission.ViewDataset), None, status=None, showAll=true, owner=None)
   }
 
   /**
    * Return a list of datasets in a space starting at a specific date, this does not check for permissions
    */
   def listSpace(date: String, nextPage: Boolean, limit: Integer, space: String): List[Dataset] = {
-    list(Some(date), nextPage, limit, None, None, Some(space), Set[Permission](Permission.ViewDataset), None, status = None, showAll = true, owner = None)
+    list(Some(date), nextPage, limit, None, None, Some(space), Set[Permission](Permission.ViewDataset), None, status=None, showAll=true, owner=None)
   }
 
   /**
-   * Return a list of datasets in a space
-   */
-  def listSpace(limit: Integer, space: String, user: Option[User]): List[Dataset] = {
-    list(None, false, limit, None, None, Some(space), Set[Permission](Permission.ViewDataset), user, status = None, showAll = false, owner = None)
+    * Return a list of datasets in a space
+    */
+  def listSpace(limit: Integer, space: String, user:Option[User]): List[Dataset] = {
+    list(None, false, limit, None, None, Some(space), Set[Permission](Permission.ViewDataset), user, status=None, showAll=false, owner=None)
   }
 
   /**
-   * Return a list of datasets in a space starting at a specific date, this does not check for permissions
-   */
-  def listSpace(date: String, nextPage: Boolean, limit: Integer, space: String, user: Option[User]): List[Dataset] = {
-    list(Some(date), nextPage, limit, None, None, Some(space), Set[Permission](Permission.ViewDataset), user, status = None, showAll = false, owner = None)
+    * Return a list of datasets in a space starting at a specific date, this does not check for permissions
+    */
+  def listSpace(date: String, nextPage: Boolean, limit: Integer, space: String, user:Option[User]): List[Dataset] = {
+    list(Some(date), nextPage, limit, None, None, Some(space), Set[Permission](Permission.ViewDataset), user, status=None, showAll=false, owner=None)
   }
 
   /**
-   * Return a list of datasets in a space filtered by status, this does not check for permissions
-   */
+    * Return a list of datasets in a space filtered by status, this does not check for permissions
+    */
   def listSpaceStatus(limit: Integer, space: String, status: String): List[Dataset] = {
-    list(None, false, limit, None, None, Some(space), Set[Permission](Permission.ViewDataset), None, Some(status), showAll = true, owner = None)
+    list(None, false, limit, None, None, Some(space), Set[Permission](Permission.ViewDataset), None, Some(status), showAll=true, owner=None)
   }
   /**
-   * Return a list of datasets in a space filtered by status
-   */
-  def listSpaceStatus(limit: Integer, space: String, status: String, user: Option[User]): List[Dataset] = {
-    list(None, false, limit, None, None, Some(space), Set[Permission](Permission.ViewDataset), user, Some(status), showAll = true, owner = None)
+    * Return a list of datasets in a space filtered by status
+    */
+  def listSpaceStatus(limit: Integer, space: String, status: String, user:Option[User]): List[Dataset] = {
+    list(None, false, limit, None, None, Some(space), Set[Permission](Permission.ViewDataset), user, Some(status), showAll=true, owner=None)
   }
 
   /**
-   * Return a list of datasets in a space filtered by status
-   */
-  def listSpaceStatus(date: String, nextPage: Boolean, limit: Integer, space: String, status: String, user: Option[User]): List[Dataset] = {
-    list(Some(date), nextPage, limit, None, None, Some(space), Set[Permission](Permission.ViewDataset), user, Some(status), showAll = true, owner = None)
+    * Return a list of datasets in a space filtered by status
+    */
+  def listSpaceStatus(date: String, nextPage: Boolean, limit: Integer, space: String, status: String, user:Option[User]): List[Dataset] = {
+    list(Some(date), nextPage, limit, None, None, Some(space), Set[Permission](Permission.ViewDataset), user, Some(status), showAll=true, owner=None)
   }
 
   /**
    * Count all datasets in a collection
    */
   def countCollection(collection: String): Long = {
-    count(None, false, None, Some(collection), None, Set[Permission](Permission.ViewDataset), None, showAll = true, None)
+    count(None, false, None, Some(collection), None, Set[Permission](Permission.ViewDataset), None, showAll=true, None, false)
   }
 
   /**
    * Return a list of datasets in a collection, this does not check for permissions
    */
   def listCollection(collection: String): List[Dataset] = {
-    list(None, false, 0, None, Some(collection), None, Set[Permission](Permission.ViewDataset), None, status = None, showAll = false, owner = None)
+    list(None, false, 0, None, Some(collection), None, Set[Permission](Permission.ViewDataset), None, status=None, showAll=false, owner=None)
   }
 
   /**
    * Return a list of datasets in a collection, this does not check for permissions
    */
   def listCollection(limit: Integer, collection: String): List[Dataset] = {
-    list(None, false, limit, None, Some(collection), None, Set[Permission](Permission.ViewDataset), None, status = None, showAll = false, owner = None)
+    list(None, false, limit, None, Some(collection), None, Set[Permission](Permission.ViewDataset), None, status=None, showAll=false, owner=None)
   }
 
   /**
    * Return a list of datasets in a collection starting at a specific date, this does not check for permissions
    */
   def listCollection(date: String, nextPage: Boolean, limit: Integer, collection: String): List[Dataset] = {
-    list(Some(date), nextPage, limit, None, Some(collection), None, Set[Permission](Permission.ViewDataset), None, status = None, showAll = false, owner = None)
+    list(Some(date), nextPage, limit, None, Some(collection), None, Set[Permission](Permission.ViewDataset), None, status=None, showAll=false, owner=None)
   }
 
   /**
-   * Return a list of datasets in a collection
-   */
-  def listCollection(collection: String, user: Option[User]): List[Dataset] = {
-    list(None, false, 0, None, Some(collection), None, Set[Permission](Permission.ViewDataset), user, status = None, showAll = false, owner = None)
+    * Return a list of datasets in a collection
+    */
+  def listCollection(collection: String, user:Option[User]): List[Dataset] = {
+    list(None, false, 0, None, Some(collection), None, Set[Permission](Permission.ViewDataset), user, status=None, showAll=false, owner=None)
   }
 
   /**
-   * Return a list of datasets in a collection
-   */
-  def listCollection(limit: Integer, collection: String, user: Option[User]): List[Dataset] = {
-    list(None, false, limit, None, Some(collection), None, Set[Permission](Permission.ViewDataset), user, status = None, showAll = false, owner = None)
+    * Return a list of datasets in a collection
+    */
+  def listCollection(limit: Integer, collection: String, user:Option[User]): List[Dataset] = {
+    list(None, false, limit, None, Some(collection), None, Set[Permission](Permission.ViewDataset), user, status=None, showAll=false, owner=None)
   }
 
   /**
-   * Return a list of datasets in a collection starting at a specific date
-   */
-  def listCollection(date: String, nextPage: Boolean, limit: Integer, collection: String, user: Option[User]): List[Dataset] = {
-    list(Some(date), nextPage, limit, None, Some(collection), None, Set[Permission](Permission.ViewDataset), user, status = None, showAll = false, owner = None)
+    * Return a list of datasets in a collection starting at a specific date
+    */
+  def listCollection(date: String, nextPage: Boolean, limit: Integer, collection: String, user:Option[User]): List[Dataset] = {
+    list(Some(date), nextPage, limit, None, Some(collection), None, Set[Permission](Permission.ViewDataset), user, status=None, showAll=false, owner=None)
   }
 
   /**
    * Count all datasets the user has access to.
    */
   def countAccess(permissions: Set[Permission], user: Option[User], showAll: Boolean): Long = {
-    count(None, false, None, None, None, permissions, user, showAll, None)
+    count(None, false, None, None, None, permissions, user, showAll, None, false)
   }
 
   /**
    * Return a list of datasets the user has access to.
    */
-  def listAccess(limit: Integer, permissions: Set[Permission], user: Option[User], showAll: Boolean, showPublic: Boolean, showOnlyShared: Boolean): List[Dataset] = {
+  def listAccess(limit: Integer, permissions: Set[Permission], user: Option[User], showAll: Boolean, showPublic: Boolean, showOnlyShared : Boolean): List[Dataset] = {
     list(None, false, limit, None, None, None, permissions, user, None, showAll, None, showPublic)
   }
 
   /**
    * Return a list of datasets the user has access to.
    */
-  def listAccess(limit: Integer, title: String, permissions: Set[Permission], user: Option[User], showAll: Boolean, showPublic: Boolean, showOnlyShared: Boolean): List[Dataset] = {
-    list(None, false, limit, Some(title), None, None, permissions, user, None, showAll, None, showPublic)
+  def listAccess(limit: Integer, title: String, permissions: Set[Permission], user: Option[User],
+                 showAll: Boolean, showPublic: Boolean, showOnlyShared : Boolean, exact: Boolean): List[Dataset] = {
+    list(None, false, limit, Some(title), None, None, permissions, user, None, showAll, None, showPublic, exactMatch=exact)
   }
 
   /**
    * Return a list of datasets the user has access to starting at a specific date.
    */
-  def listAccess(date: String, nextPage: Boolean, limit: Integer, permissions: Set[Permission], user: Option[User], showAll: Boolean, showPublic: Boolean, showOnlyShared: Boolean): List[Dataset] = {
+  def listAccess(date: String, nextPage: Boolean, limit: Integer, permissions: Set[Permission], user: Option[User], showAll: Boolean, showPublic: Boolean, showOnlyShared : Boolean): List[Dataset] = {
     list(Some(date), nextPage, limit, None, None, None, permissions, user, None, showAll, None, showPublic)
   }
 
   /**
    * Return a list of datasets the user has access to starting at a specific date.
    */
-  def listAccess(date: String, nextPage: Boolean, limit: Integer, title: String, permissions: Set[Permission], user: Option[User], showAll: Boolean, showPublic: Boolean, showOnlyShared: Boolean): List[Dataset] = {
-    list(Some(date), nextPage, limit, Some(title), None, None, permissions, user, None, showAll, None, showPublic)
+  def listAccess(date: String, nextPage: Boolean, limit: Integer, title: String, permissions: Set[Permission], user: Option[User],
+                 showAll: Boolean, showPublic: Boolean, showOnlyShared : Boolean, exact: Boolean): List[Dataset] = {
+    list(Some(date), nextPage, limit, Some(title), None, None, permissions, user, None, showAll, None, showPublic, exactMatch=exact)
   }
 
   /**
@@ -265,16 +268,17 @@ class MongoDBDatasetService @Inject() (
   /**
    * return count based on input
    */
-  private def count(date: Option[String], nextPage: Boolean, title: Option[String], collection: Option[String], space: Option[String], permissions: Set[Permission], user: Option[User], showAll: Boolean, owner: Option[User]): Long = {
-    val (filter, _) = filteredQuery(date, nextPage, title, collection, space, Set[Permission](Permission.ViewDataset), user, None, showAll, owner, true, false)
+  private def count(date: Option[String], nextPage: Boolean, title: Option[String], collection: Option[String], space: Option[String], permissions: Set[Permission], user: Option[User], showAll: Boolean, owner: Option[User], exactMatch : Boolean = false): Long = {
+    val (filter, _) = filteredQuery(date, nextPage, title, collection, space, Set[Permission](Permission.ViewDataset), user, None, showAll, owner, true, false, exactMatch)
     Dataset.count(filter)
   }
 
   /**
    * return list based on input
    */
-  private def list(date: Option[String], nextPage: Boolean, limit: Integer, title: Option[String], collection: Option[String], space: Option[String], permissions: Set[Permission], user: Option[User], status: Option[String], showAll: Boolean, owner: Option[User], showPublic: Boolean = true, showOnlyShared: Boolean = false): List[Dataset] = {
-    val (filter, sort) = filteredQuery(date, nextPage, title, collection, space, permissions, user, status, showAll, owner, showPublic, showOnlyShared)
+  private def list(date: Option[String], nextPage: Boolean, limit: Integer, title: Option[String], collection: Option[String], space: Option[String], permissions: Set[Permission], user: Option[User], status: Option[String],
+                   showAll: Boolean, owner: Option[User], showPublic: Boolean = true, showOnlyShared : Boolean = false, exactMatch : Boolean = false): List[Dataset] = {
+    val (filter, sort) = filteredQuery(date, nextPage, title, collection, space, permissions, user, status, showAll, owner, showPublic, showOnlyShared, exactMatch)
     if (date.isEmpty || nextPage) {
       Dataset.find(filter).sort(sort).limit(limit).toList
     } else {
@@ -285,7 +289,8 @@ class MongoDBDatasetService @Inject() (
   /**
    * Monster function, does all the work. Will create a filters and sorts based on the given parameters
    */
-  private def filteredQuery(date: Option[String], nextPage: Boolean, titleSearch: Option[String], collection: Option[String], space: Option[String], permissions: Set[Permission], user: Option[User], status: Option[String], showAll: Boolean, owner: Option[User], showPublic: Boolean, showOnlyShared: Boolean): (DBObject, DBObject) = {
+  private def filteredQuery(date: Option[String], nextPage: Boolean, titleSearch: Option[String], collection: Option[String], space: Option[String], permissions: Set[Permission], user: Option[User], status:Option[String],
+                            showAll: Boolean, owner: Option[User], showPublic: Boolean, showOnlyShared : Boolean, exactMatch : Boolean): (DBObject, DBObject) = {
     // filter =
     // - owner   == show datasets owned by owner that user can see
     // - space   == show all datasets in space
@@ -307,7 +312,7 @@ class MongoDBDatasetService @Inject() (
           val orlist = scala.collection.mutable.ListBuffer.empty[MongoDBObject]
           if (permissions.contains(Permission.ViewDataset) && enablePublic && showPublic) {
             // if enablePublic == true, only list the dataset user can access, in a space page or /datasets
-            if (!u.superAdminMode) {
+            if(!u.superAdminMode) {
               orlist += MongoDBObject("status" -> DatasetStatus.PUBLIC.toString)
               orlist += MongoDBObject("status" -> DatasetStatus.DEFAULT.toString) ++ ("spaces" $in publicSpaces)
             } else {
@@ -317,26 +322,27 @@ class MongoDBDatasetService @Inject() (
           }
           //if you are viewing other user's datasets, return the ones you have permission. otherwise filterAccess should
           // including your own datasets. the if condition here is mainly for efficiency.
-          if (user == owner || owner.isEmpty) {
-            if (owner.isEmpty && !showOnlyShared) {
+          if(user == owner || owner.isEmpty) {
+            if (owner.isEmpty && !showOnlyShared){
               orlist += MongoDBObject("author._id" -> new ObjectId(u.id.stringify))
-            } else if (!owner.isEmpty) {
+            } else if (!owner.isEmpty){
               orlist += MongoDBObject("author._id" -> new ObjectId(u.id.stringify))
             }
           }
           val permissionsString = permissions.map(_.toString)
-          val okspaces = if (showOnlyShared) {
-            u.spaceandrole.filter(_.role.permissions.intersect(permissionsString).nonEmpty).filter((p: UserSpaceAndRole) =>
+          val okspaces = if (showOnlyShared){
+            u.spaceandrole.filter(_.role.permissions.intersect(permissionsString).nonEmpty).filter((p: UserSpaceAndRole)=>
               (spaces.get(p.spaceId) match {
                 case Some(space) => {
-                  if (space.userCount > 1) {
+                  if (space.userCount > 1){
                     true
                   } else {
                     false
                   }
                 }
                 case None => false
-              }))
+              })
+            )
           } else {
             u.spaceandrole.filter(_.role.permissions.intersect(permissionsString).nonEmpty)
           }
@@ -359,7 +365,7 @@ class MongoDBDatasetService @Inject() (
     }
     val filterOwner = owner match {
       case Some(o) => {
-        if (showOnlyShared) {
+        if (showOnlyShared){
           MongoDBObject()
         } else {
           MongoDBObject("author._id" -> new ObjectId(o.id.stringify))
@@ -390,11 +396,16 @@ class MongoDBDatasetService @Inject() (
       case None => MongoDBObject()
     }
     val filterTitle = titleSearch match {
-      case Some(title) => MongoDBObject("name" -> ("(?i)" + title).r)
+      case Some(title) =>  {
+        if (exactMatch)
+          MongoDBObject("name" -> title)
+        else
+          MongoDBObject("name" -> ("(?i)" + title).r)
+      }
       case None => MongoDBObject()
     }
 
-    val filterNotShared = if (showOnlyShared && owner.isEmpty) {
+    val filterNotShared = if (showOnlyShared && owner.isEmpty){
       MongoDBObject("root_spaces" -> MongoDBObject("$not" -> MongoDBObject("$size" -> 0)))
     } else {
       MongoDBObject()
@@ -412,7 +423,7 @@ class MongoDBDatasetService @Inject() (
     }
 
     val sort = if (date.isDefined && !nextPage) {
-      MongoDBObject("created" -> 1) ++ MongoDBObject("name" -> 1)
+      MongoDBObject("created"-> 1) ++ MongoDBObject("name" -> 1)
     } else {
       MongoDBObject("created" -> -1) ++ MongoDBObject("name" -> 1)
     }
@@ -451,7 +462,7 @@ class MongoDBDatasetService @Inject() (
         for (fileId <- dataset.files) {
           files.get(fileId) match {
             case Some(file) => {
-              if (file.filename.equals(filename)) {
+              if(file.filename.equals(filename)) {
                 return Some(fileId)
               }
             }
@@ -466,8 +477,8 @@ class MongoDBDatasetService @Inject() (
 
   def toJSON(dataset: Dataset): JsValue = {
     var datasetThumbnail = "None"
-    if (!dataset.thumbnail_id.isEmpty)
-      datasetThumbnail = dataset.thumbnail_id.toString().substring(5, dataset.thumbnail_id.toString().length - 1)
+    if(!dataset.thumbnail_id.isEmpty)
+      datasetThumbnail = dataset.thumbnail_id.toString().substring(5,dataset.thumbnail_id.toString().length-1)
 
     toJson(Map("id" -> dataset.id.toString, "datasetname" -> dataset.name, "description" -> dataset.description,
       "created" -> dataset.created.toString, "thumbnail" -> datasetThumbnail, "authorId" -> dataset.author.id.stringify))
@@ -477,13 +488,13 @@ class MongoDBDatasetService @Inject() (
    * Return a list of tags and counts found in sections
    */
   def getTags(user: Option[User]): Map[String, Long] = {
-    if (configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public") {
-      val x = Dataset.dao.collection.aggregate(MongoDBObject("$unwind" -> "$tags"),
+    if(configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public"){
+      val x = Dataset.dao.collection.aggregate( MongoDBObject("$unwind" -> "$tags"),
         MongoDBObject("$group" -> MongoDBObject("_id" -> "$tags.name", "count" -> MongoDBObject("$sum" -> 1L))))
       x.results.map(x => (x.getAsOrElse[String]("_id", "??"), x.getAsOrElse[Long]("count", 0L))).toMap
 
     } else {
-      val x = Dataset.dao.collection.aggregate(MongoDBObject("$match" -> buildTagFilter(user)), MongoDBObject("$unwind" -> "$tags"),
+      val x = Dataset.dao.collection.aggregate(MongoDBObject("$match" ->  buildTagFilter(user)), MongoDBObject("$unwind" -> "$tags"),
         MongoDBObject("$group" -> MongoDBObject("_id" -> "$tags.name", "count" -> MongoDBObject("$sum" -> 1L))))
       x.results.map(x => (x.getAsOrElse[String]("_id", "??"), x.getAsOrElse[Long]("count", 0L))).toMap
 
@@ -492,20 +503,21 @@ class MongoDBDatasetService @Inject() (
 
   private def buildTagFilter(user: Option[User]): MongoDBObject = {
     val orlist = collection.mutable.ListBuffer.empty[MongoDBObject]
-    if (!(configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public")) {
+    if(!(configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public")){
       user match {
-        case Some(u) => {
-          orlist += MongoDBObject("status" -> DatasetStatus.PUBLIC.toString)
+        case Some(u)  => {
+          orlist += MongoDBObject("status" -> DatasetStatus.PUBLIC.toString )
           orlist += MongoDBObject("spaces" -> List.empty) ++ MongoDBObject("author._id" -> new ObjectId(u.id.stringify))
           val okspaces = u.spaceandrole.filter(_.role.permissions.intersect(Set(Permission.ViewDataset.toString)).nonEmpty)
-          if (okspaces.nonEmpty) {
+          if(okspaces.nonEmpty){
             orlist += ("spaces" $in okspaces.map(x => new ObjectId(x.spaceId.stringify)))
           }
 
         }
-        case None => orlist += MongoDBObject("status" -> DatasetStatus.PUBLIC.toString)
+        case None => orlist += MongoDBObject("status" -> DatasetStatus.PUBLIC.toString )
       }
-    } else {
+    }
+    else {
       orlist += MongoDBObject()
     }
     $or(orlist.map(_.asDBObject))
@@ -575,7 +587,7 @@ class MongoDBDatasetService @Inject() (
   }
 
   def findByTag(tag: String, user: Option[User]): List[Dataset] = {
-    if (configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public") {
+    if(configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public"){
       Dataset.dao.find(MongoDBObject("tags.name" -> tag)).toList
     } else {
       Dataset.dao.find(buildTagFilter(user) ++
@@ -593,7 +605,7 @@ class MongoDBDatasetService @Inject() (
         MongoDBObject("tags.name" -> tag) ++ ("created" $lte Parsers.fromISO8601(start))
       }
     }
-    if (!(configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public")) {
+    if(!(configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public")) {
       filter = buildTagFilter(user) ++ filter
     }
     val order = if (reverse) {
@@ -613,9 +625,9 @@ class MongoDBDatasetService @Inject() (
    * Implementation of updateInformation defined in services/DatasetService.scala.
    */
   def updateInformation(id: UUID, description: String, name: String) {
-    val result = Dataset.update(MongoDBObject("_id" -> new ObjectId(id.stringify)),
-      $set("description" -> description, "name" -> name),
-      false, false, WriteConcern.Safe)
+      val result = Dataset.update(MongoDBObject("_id" -> new ObjectId(id.stringify)),
+          $set("description" -> description, "name" -> name),
+          false, false, WriteConcern.Safe)
   }
 
   def updateName(id: UUID, name: String) {
@@ -625,7 +637,7 @@ class MongoDBDatasetService @Inject() (
       false, false, WriteConcern.Safe)
   }
 
-  def updateDescription(id: UUID, description: String) {
+  def updateDescription(id: UUID, description: String){
     val result = Dataset.update(MongoDBObject("_id" -> new ObjectId(id.stringify)),
       $set("description" -> description),
       false, false, WriteConcern.Safe)
@@ -673,10 +685,10 @@ class MongoDBDatasetService @Inject() (
    * Implementation of updateLicenseing defined in services/DatasetService.scala.
    */
   def updateLicense(id: UUID, licenseType: String, rightsHolder: String, licenseText: String, licenseUrl: String, allowDownload: String) {
-    val licenseData = models.LicenseData(m_licenseType = licenseType, m_rightsHolder = rightsHolder, m_licenseText = licenseText, m_licenseUrl = licenseUrl, m_allowDownload = allowDownload.toBoolean)
-    val result = Dataset.update(MongoDBObject("_id" -> new ObjectId(id.stringify)),
-      $set("licenseData" -> LicenseData.toDBObject(licenseData)),
-      false, false, WriteConcern.Safe)
+      val licenseData = models.LicenseData(m_licenseType = licenseType, m_rightsHolder = rightsHolder, m_licenseText = licenseText, m_licenseUrl = licenseUrl, m_allowDownload = allowDownload.toBoolean)
+      val result = Dataset.update(MongoDBObject("_id" -> new ObjectId(id.stringify)),
+          $set("licenseData" -> LicenseData.toDBObject(licenseData)),
+          false, false, WriteConcern.Safe)
   }
 
   def addTags(id: UUID, userIdStr: Option[String], eid: Option[String], tags: List[String]) {
@@ -766,7 +778,8 @@ class MongoDBDatasetService @Inject() (
         queryMap.add(MongoDBObject("$and" -> builder))
         builder = MongoDBList()
         orFound = true
-      } else {
+      }
+      else {
         var actualKey = keyTrimmed
         if (keyTrimmed.endsWith("__not")) {
           actualKey = actualKey.substring(0, actualKey.length() - 5)
@@ -780,29 +793,32 @@ class MongoDBDatasetService @Inject() (
           if (reqValue.isInstanceOf[String]) {
             val currValue = reqValue.asInstanceOf[String]
             if (keyTrimmed.endsWith("__not")) {
-              if (currValue.contains(" IGNORE CASE") || currValue.contains(" ANYWHERE")) {
+              if(currValue.contains(" IGNORE CASE") || currValue.contains(" ANYWHERE")){
                 var realValue = currValue.replace(" IGNORE CASE", "").replace(" ANYWHERE", "");
-                if (!currValue.contains(" ANYWHERE")) {
-                  realValue = "^" + realValue + "$";
+                if(!currValue.contains(" ANYWHERE")){
+                  realValue = "^"+realValue+"$";
                 }
-                if (currValue.contains(" IGNORE CASE")) {
-                  realValue = "(?i)" + realValue;
+                if(currValue.contains(" IGNORE CASE")){
+                  realValue = "(?i)"+realValue;
                 }
-                builder += MongoDBObject(actualKey -> MongoDBObject("$not" -> realValue.r))
-              } else {
-                builder += MongoDBObject(actualKey -> MongoDBObject("$ne" -> currValue))
+                builder += MongoDBObject(actualKey -> MongoDBObject("$not" ->  realValue.r))
               }
-            } else {
-              if (currValue.contains(" IGNORE CASE") || currValue.contains(" ANYWHERE")) {
+              else{
+                builder += MongoDBObject(actualKey -> MongoDBObject("$ne" ->  currValue))
+              }
+            }
+            else {
+              if(currValue.contains(" IGNORE CASE") || currValue.contains(" ANYWHERE")){
                 var realValue = currValue.replace(" IGNORE CASE", "").replace(" ANYWHERE", "");
-                if (!currValue.contains(" ANYWHERE")) {
-                  realValue = "^" + realValue + "$";
+                if(!currValue.contains(" ANYWHERE")){
+                  realValue = "^"+realValue+"$";
                 }
-                if (currValue.contains(" IGNORE CASE")) {
-                  realValue = "(?i)" + realValue;
+                if(currValue.contains(" IGNORE CASE")){
+                  realValue = "(?i)"+realValue;
                 }
                 builder += MongoDBObject(actualKey -> realValue.r)
-              } else {
+              }
+              else{
                 builder += MongoDBObject(actualKey -> currValue)
               }
             }
@@ -812,7 +828,8 @@ class MongoDBDatasetService @Inject() (
               val currValue = searchMetadataFormulateQuery(reqValue.asInstanceOf[java.util.LinkedHashMap[String, Any]], "")
               val elemMatch = actualKey $elemMatch currValue
               builder.add(elemMatch)
-            } else {
+            }
+            else {
               val currValue = searchMetadataFormulateQuery(reqValue.asInstanceOf[java.util.LinkedHashMap[String, Any]], actualKey)
               builder += currValue
             }
@@ -827,29 +844,32 @@ class MongoDBDatasetService @Inject() (
               if (reqValue.isInstanceOf[String]) {
                 val currValue = reqValue.asInstanceOf[String]
                 if (keyTrimmed.endsWith("__not")) {
-                  if (currValue.contains(" IGNORE CASE") || currValue.contains(" ANYWHERE")) {
-                    var realValue = currValue.replace(" IGNORE CASE", "").replace(" ANYWHERE", "");
-                    if (!currValue.contains(" ANYWHERE")) {
-                      realValue = "^" + realValue + "$";
-                    }
-                    if (currValue.contains(" IGNORE CASE")) {
-                      realValue = "(?i)" + realValue;
-                    }
-                    objectForEach += MongoDBObject(tempActualKey -> MongoDBObject("$not" -> realValue.r))
-                  } else {
-                    objectForEach += MongoDBObject(tempActualKey -> MongoDBObject("$ne" -> currValue))
+                  if(currValue.contains(" IGNORE CASE") || currValue.contains(" ANYWHERE")){
+	                var realValue = currValue.replace(" IGNORE CASE", "").replace(" ANYWHERE", "");
+	                if(!currValue.contains(" ANYWHERE")){
+	                  realValue = "^"+realValue+"$";
+	                }
+	                if(currValue.contains(" IGNORE CASE")){
+	                  realValue = "(?i)"+realValue;
+	                }
+	                objectForEach += MongoDBObject(tempActualKey -> MongoDBObject("$not" ->  realValue.r))
                   }
-                } else {
-                  if (currValue.contains(" IGNORE CASE") || currValue.contains(" ANYWHERE")) {
-                    var realValue = currValue.replace(" IGNORE CASE", "").replace(" ANYWHERE", "");
-                    if (!currValue.contains(" ANYWHERE")) {
-                      realValue = "^" + realValue + "$";
-                    }
-                    if (currValue.contains(" IGNORE CASE")) {
-                      realValue = "(?i)" + realValue;
-                    }
-                    objectForEach += MongoDBObject(tempActualKey -> realValue.r)
-                  } else {
+                  else{
+                	objectForEach += MongoDBObject(tempActualKey -> MongoDBObject("$ne" ->  currValue))
+                  }
+                }
+                else {
+                  if(currValue.contains(" IGNORE CASE") || currValue.contains(" ANYWHERE")){
+	                var realValue = currValue.replace(" IGNORE CASE", "").replace(" ANYWHERE", "");
+	                if(!currValue.contains(" ANYWHERE")){
+	                  realValue = "^"+realValue+"$";
+	                }
+	                if(currValue.contains(" IGNORE CASE")){
+	                  realValue = "(?i)"+realValue;
+	                }
+	                objectForEach += MongoDBObject(tempActualKey -> realValue.r)
+                  }
+                  else{
                     objectForEach += MongoDBObject(tempActualKey -> currValue)
                   }
                 }
@@ -859,7 +879,8 @@ class MongoDBDatasetService @Inject() (
                   val currValue = searchMetadataFormulateQuery(reqValue.asInstanceOf[java.util.LinkedHashMap[String, Any]], "")
                   val elemMatch = tempActualKey $elemMatch currValue
                   objectForEach.add(elemMatch)
-                } else {
+                }
+                else {
                   val currValue = searchMetadataFormulateQuery(reqValue.asInstanceOf[java.util.LinkedHashMap[String, Any]], tempActualKey)
                   objectForEach += currValue
                 }
@@ -875,11 +896,14 @@ class MongoDBDatasetService @Inject() (
     if (orFound) {
       queryMap.add(MongoDBObject("$and" -> builder))
       return MongoDBObject("$or" -> queryMap)
-    } else if (!builder.isEmpty) {
+    }
+    else if (!builder.isEmpty) {
       return MongoDBObject("$and" -> builder)
-    } else if (!root.equals("")) {
+    }
+    else if (!root.equals("")) {
       return (root $exists true)
-    } else {
+    }
+    else {
       return new MongoDBObject()
     }
   }
@@ -898,7 +922,8 @@ class MongoDBDatasetService @Inject() (
           return true
         else
           allMatch = true
-      } else {
+      }
+      else {
         if (allMatch) {
           var isNot = false
           if (reqKeyCompare.endsWith("__not")) {
@@ -920,12 +945,14 @@ class MongoDBDatasetService @Inject() (
                         throw MustBreak
                       }
                     }
-                  } else {
+                  }
+                  else {
                     if (reqValue.asInstanceOf[String].trim().equals("*") || reqValue.asInstanceOf[String].trim().equalsIgnoreCase(currValue.asInstanceOf[String].trim())) {
                       matchFound = true
                     }
                   }
-                } //If search subtree remaining is not a string (ie we haven't reached a leaf yet), then remaining subtree currently examined is bound to not be a string, as the path so far was the same.
+                }
+                //If search subtree remaining is not a string (ie we haven't reached a leaf yet), then remaining subtree currently examined is bound to not be a string, as the path so far was the same.
                 //Therefore, we do maps (actually subtrees) comparison.
                 else {
                   if (currValue.isInstanceOf[com.mongodb.BasicDBList]) {
@@ -936,7 +963,8 @@ class MongoDBDatasetService @Inject() (
                         throw MustBreak
                       }
                     }
-                  } else {
+                  }
+                  else {
                     val currValueMap = currValue.asInstanceOf[com.mongodb.BasicDBObject].toMap().asScala.asInstanceOf[scala.collection.mutable.Map[String, Any]]
                     if (searchMetadata(id, reqValue.asInstanceOf[java.util.LinkedHashMap[String, Any]], currValueMap)) {
                       matchFound = true
@@ -988,8 +1016,7 @@ class MongoDBDatasetService @Inject() (
     Dataset.findOneById(new ObjectId(datasetId.stringify)) match {
       case Some(dataset) => {
         val filesInDataset = dataset.files map {
-          f =>
-            {
+          f => {
               files.get(f).getOrElse {
                 None
               }
@@ -1104,7 +1131,8 @@ class MongoDBDatasetService @Inject() (
     var dsDumpMoveDir = play.api.Play.configuration.getString("datasetdumpmove.dir").getOrElse("")
     if (dsDumpMoveDir.equals("")) {
       Logger.warn("Will not move dumped dataset groupings to staging directory. No staging directory set.")
-    } else {
+			}
+			else{
       if (!dsDumpMoveDir.endsWith(fileSep))
         dsDumpMoveDir = dsDumpMoveDir + fileSep
     }
@@ -1123,7 +1151,8 @@ class MongoDBDatasetService @Inject() (
         val filePrintStream = new PrintStream(groupingFile)
         for (fileId <- dataset.files) {
           files.get(fileId).foreach(file =>
-            filePrintStream.println("id:" + file.id.toString + " " + "filename:" + file.filename))
+				      filePrintStream.println("id:"+file.id.toString+" "+"filename:"+file.filename)
+            )
         }
         filePrintStream.close()
 
@@ -1138,22 +1167,17 @@ class MongoDBDatasetService @Inject() (
               Logger.warn("Could not move dumped dataset file grouping to staging directory.")
               throw new Exception("Could not move dumped dataset file grouping to staging directory.")
             }
-          } catch {
-            case ex: Exception => {
+					  }catch {case ex:Exception =>{
               val badDatasetId = dataset.id.toString
               Logger.error("Unable to stage file grouping of dataset with id " + badDatasetId + ": " + ex.printStackTrace())
               unsuccessfulDumps += badDatasetId
             }
-          }
-        }
-      } catch {
-        case ex: Exception => {
+			  }catch {case ex:Exception =>{
           val badDatasetId = dataset.id.toString
           Logger.error("Unable to dump file grouping of dataset with id " + badDatasetId + ": " + ex.printStackTrace())
           unsuccessfulDumps += badDatasetId
+			  }}
         }
-      }
-    }
 
     return unsuccessfulDumps.toList
   }

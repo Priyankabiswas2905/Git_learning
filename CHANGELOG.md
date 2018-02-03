@@ -4,21 +4,76 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/) 
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [In Development]
+## 1.3.3 - 2017-12-21
 
 ### Added
-
+- Add LDAP authorization
+  [CATS-54](https://opensource.ncsa.illinois.edu/jira/browse/CATS-54)
+- Ability for users to create their own API keys.
+  [CATS-686](https://opensource.ncsa.illinois.edu/jira/browse/CATS-686)
+- Abilty for CiLogon provider to filter by LDAP groups.
+- Added an *exact* flag on collection and dataset API endpoints that accept a *title* flag. This will use
+  exact matching on the title field instead of regular expression fuzzy matching.
+  
 ### Changed
-- Created email to be sent when registerThroughAdmins=true
-  [CATS-791](https://opensource.ncsa.illinois.edu/jira/browse/CATS-791)
+- File and dataset GET metadata endpoints to include their corresponding IDs and resource type information. 
+  [CATS-718](https://opensource.ncsa.illinois.edu/jira/browse/CATS-718)
 
 ### Fixed
-- Dataset descriptions of sufficient length no longer cause the page to freeze in tiles view.
+- Fixed GreenIndex previewer on clowder dataset page. 
+  [BD-1912](https://opensource.ncsa.illinois.edu/jira/browse/BD-1912)
+- Only show the sort by dropdown in the collection page when the sort in memory flag is false. 
+  [CATS-840](https://opensource.ncsa.illinois.edu/jira/browse/CATS-840)
+- Extraction status returns "Done" instead of "Processing" when one of the extractor fails 
+  [CATS-719] (https://opensource.ncsa.illinois.edu/jira/browse/CATS-719) 
+
+## 1.3.3 - 2017-12-21
+
+- Endpoint to get a list of traversing paths from datasets to the parent
+  folders of the given file.
+  [CATS-811](https://opensource.ncsa.illinois.edu/jira/browse/CATS-811)
+- clowder.upload.previews flag to application.conf to turn on/off
+  previews in upload page.
+  [CATS-813](https://opensource.ncsa.illinois.edu/jira/browse/CATS-813)
+- Added ability to disable username/password login. 
+  [CATS-803](https://opensource.ncsa.illinois.edu/jira/browse/CATS-803)
+
+### Changed
+- Send email with instructions when registerThroughAdmins=true.
+  [CATS-791](https://opensource.ncsa.illinois.edu/jira/browse/CATS-791)
+- Default showAll to true when listing spaces.
+  [CATS-815](https://opensource.ncsa.illinois.edu/jira/browse/CATS-718)
+- Move submit for extraction to the top on file page and dataset page.
+  Remove parameter text field on Submit for Extraction page.
+  [CATS-794](https://opensource.ncsa.illinois.edu/jira/browse/CATS-794)
+- Add 'cat:' as prefix for typeOfAgent in UserAgent and ExtractorAgent
+  constructors. Add filter or condition to check typeOfAgent is
+  cat:extractor in getTechnicalMetadataJSON endpoint.
+  [CATS-798](https://opensource.ncsa.illinois.edu/jira/browse/CATS-798)
+
+### Fixed
+- Dataset geospatial previewer now has a max of 20 layers shown by default.
+  The dataset page was taking too long to load for datasets with lots of
+  files because of this.
+  [CATS-826](https://opensource.ncsa.illinois.edu/jira/browse/CATS-826)
+- Dataset descriptions of sufficient length no longer cause the page to
+  freeze in tiles view.
+- Tags lists now showing up to 10000 entries when using elasticsearch.
+  Was defaulting to 10.
+  [SEAD-1169](https://opensource.ncsa.illinois.edu/jira/browse/SEAD-1169)
+- Add js route to get the JSONLD metadata of a file.
+  [GitHub-PR#2](https://github.com/ncsa/clowder/pull/2)
+- Geostreams POST /sensors lat and long are reversed.
+  [GLGVO-382](https://opensource.ncsa.illinois.edu/jira/browse/GLGVO-382)
+- Edit license breaks on names with apostrophes in them.
+  [CATS-820](https://opensource.ncsa.illinois.edu/jira/browse/CATS-820)
+- Rolling log file wrote to wrong folder, now writes to logs folder.
 
 ## 1.3.2 - 2017-08-15
 
 ### Fixed
-- Elasticsearch searches are broken. [CATS-783](https://opensource.ncsa.illinois.edu/jira/browse/CATS-783)
+- Elasticsearch searches are broken.
+  [CATS-783](https://opensource.ncsa.illinois.edu/jira/browse/CATS-783)
 
 ## 1.3.1 - 2017-07-24
 
@@ -28,7 +83,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   [CATS-771](https://opensource.ncsa.illinois.edu/jira/browse/CATS-771)
 - When doing a reindex all indices in elasticsearch were removed.
   [CATS-772](https://opensource.ncsa.illinois.edu/jira/browse/CATS-772)
-- CILogin properly works by specifying berer token in header.
+- CILogin properly works by specifying bearer token in header.
 - Collections id properly removed from child collections when deleting parent collection.
   [CATS-774](https://opensource.ncsa.illinois.edu/jira/browse/CATS-774)
 - The modal for adding a relationship between sensors and datasets is now on top of the background and can be clicked.
@@ -44,6 +99,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Ability to mention other users using '@' in a comment on a file or dataset. Mentioned users will receive a 
   notification email and a notice in their event feed. [SEAD-781](https://opensource.ncsa.illinois.edu/jira/browse/SEAD-781)
 - Description field to metadata definition. [SEAD-1101](https://opensource.ncsa.illinois.edu/jira/browse/SEAD-1101)
+- Improved documentation for the user interface.
 
 ### Changed
 - Ability to search datapoints, averages and trends using a start and end time.
@@ -93,7 +149,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Updated docker compose repositories from ncsa/* to clowder/*. [CATS-734](https://opensource.ncsa.illinois.edu/jira/browse/CATS-734])
 - Improved handling of special characters and long descriptions for datasets and Staging Area publication requests 
   [SEAD-1143](https://opensource.ncsa.illinois.edu/jira/browse/SEAD-1143), 
-  [CAT-692](https://opensource.ncsa.illinois.edu/jira/browse/CATS-692)
+  [CATS-692](https://opensource.ncsa.illinois.edu/jira/browse/CATS-692)
 - Default for clowder.diskStorage.path changed from /tmp/clowder to /home/clowder/data. 
   [CATS-748](https://opensource.ncsa.illinois.edu/jira/browse/SEAD-1143)
 
@@ -121,7 +177,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Only show Quicktime preview for Quicktime-VR videos.
 - Organize public/published datasets into multiple tabs on project space page. 
   [SEAD-1036](https://opensource.ncsa.illinois.edu/jira/browse/SEAD-1036)
-- Changed Rabbitmq delivery mode to persistent. [CATS-714](https://opensource.ncsa.illinois.edu/jira/browse/CATS-714)
+- Changed RabbitMQ delivery mode to persistent. [CATS-714](https://opensource.ncsa.illinois.edu/jira/browse/CATS-714)
 - Dataset and collection listing layout is not consistent with space listing layout.
 
 ### Removed

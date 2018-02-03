@@ -22,7 +22,7 @@ import play.api.libs.json._
 import play.api.libs.json.Json._
 import play.api.mvc.AnyContent
 import services._
-import _root_.util.{FileUtils, JSONLD, License, SearchUtils}
+import _root_.util._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.collection.mutable.ListBuffer
 
@@ -57,26 +57,26 @@ class  Datasets @Inject()(
     }
   }
 
-  def list(title: Option[String], date: Option[String], limit: Int) = PrivateServerAction { implicit request =>
-    Ok(toJson(listDatasets(title, date, limit, Set[Permission](Permission.ViewDataset), request.user, request.user.fold(false)(_.superAdminMode))))
+  def list(title: Option[String], date: Option[String], limit: Int, exact: Boolean) = PrivateServerAction { implicit request =>
+    Ok(toJson(listDatasets(title, date, limit, Set[Permission](Permission.ViewDataset), request.user, request.user.fold(false)(_.superAdminMode), exact)))
   }
 
-  def listCanEdit(title: Option[String], date: Option[String], limit: Int) = PrivateServerAction { implicit request =>
-      Ok(toJson(listDatasets(title, date, limit, Set[Permission](Permission.AddResourceToDataset, Permission.EditDataset), request.user, request.user.fold(false)(_.superAdminMode))))
+  def listCanEdit(title: Option[String], date: Option[String], limit: Int, exact: Boolean) = PrivateServerAction { implicit request =>
+      Ok(toJson(listDatasets(title, date, limit, Set[Permission](Permission.AddResourceToDataset, Permission.EditDataset), request.user, request.user.fold(false)(_.superAdminMode), exact)))
   }
 
-  def listMoveFileToDataset(file_id: UUID, title: Option[String], limit: Int) = PrivateServerAction { implicit request =>
+  def listMoveFileToDataset(file_id: UUID, title: Option[String], limit: Int, exact: Boolean) = PrivateServerAction { implicit request =>
     if (play.Play.application().configuration().getBoolean("datasetFileWithinSpace")) {
-      Ok(toJson(listDatasetsInSpace(file_id, title, limit, Set[Permission](Permission.AddResourceToDataset, Permission.EditDataset), request.user, request.user.fold(false)(_.superAdminMode))))
+      Ok(toJson(listDatasetsInSpace(file_id, title, limit, Set[Permission](Permission.AddResourceToDataset, Permission.EditDataset), request.user, request.user.fold(false)(_.superAdminMode), exact)))
     } else {
-      Ok(toJson(listDatasets(title, None, limit, Set[Permission](Permission.AddResourceToDataset, Permission.EditDataset), request.user, request.user.fold(false)(_.superAdminMode))))
+      Ok(toJson(listDatasets(title, None, limit, Set[Permission](Permission.AddResourceToDataset, Permission.EditDataset), request.user, request.user.fold(false)(_.superAdminMode), exact)))
     }
   }
 
   /**
     * Returns list of datasets based on space restrictions and permissions. The spaceId is obtained from the file itself
     */
-  private def listDatasetsInSpace(file_id: UUID, title: Option[String], limit: Int, permission: Set[Permission], user: Option[User], superAdmin: Boolean) : List[Dataset] = {
+  private def listDatasetsInSpace(file_id: UUID, title: Option[String], limit: Int, permission: Set[Permission], user: Option[User], superAdmin: Boolean, exact: Boolean) : List[Dataset] = {
     var datasetAll = List[Dataset]()
     val datasetList = datasets.findByFileId(file_id)
     datasetList match {
@@ -89,7 +89,7 @@ class  Datasets @Inject()(
                 if (d.spaces.isEmpty) {
                   title match {
                     case Some(t) => {
-                      datasetAll = datasets.listAccess(limit, t, permission, user, superAdmin, true,false)
+                      datasetAll = datasets.listAccess(limit, t, permission, user, superAdmin, true,false, exact)
                     }
                     case None => {
                       datasetAll = datasets.listAccess(limit, permission, user, superAdmin, true,false)
@@ -118,7 +118,7 @@ class  Datasets @Inject()(
         if (x.spaces.isEmpty) {
           title match {
             case Some(t) => {
-              datasetAll = datasets.listAccess(limit, t, permission, user, superAdmin, true,false)
+              datasetAll = datasets.listAccess(limit, t, permission, user, superAdmin, true,false, exact)
             }
             case None => {
               datasetAll = datasets.listAccess(limit, permission, user, superAdmin, true,false)
@@ -144,13 +144,13 @@ class  Datasets @Inject()(
   /**
     * Returns list of datasets based on parameters and permissions.
     */
-  private def listDatasets(title: Option[String], date: Option[String], limit: Int, permission: Set[Permission], user: Option[User], superAdmin: Boolean) : List[Dataset] = {
+  private def listDatasets(title: Option[String], date: Option[String], limit: Int, permission: Set[Permission], user: Option[User], superAdmin: Boolean, exact: Boolean) : List[Dataset] = {
     (title, date) match {
       case (Some(t), Some(d)) => {
-        datasets.listAccess(d, true, limit, t, permission, user, superAdmin, true,false)
+        datasets.listAccess(d, true, limit, t, permission, user, superAdmin, true,false, exact)
       }
       case (Some(t), None) => {
-        datasets.listAccess(limit, t, permission, user, superAdmin, true,false)
+        datasets.listAccess(limit, t, permission, user, superAdmin, true,false, exact)
       }
       case (None, Some(d)) => {
         datasets.listAccess(d, true, limit, permission, user, superAdmin, true,false)
@@ -714,14 +714,15 @@ class  Datasets @Inject()(
   }
 
   def getMetadataJsonLD(id: UUID, extFilter: Option[String]) = PermissionAction(Permission.ViewMetadata, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
+    val (baseUrlExcludingContext, isHttps) = RequestUtils.getBaseUrlAndProtocol(request, false)
     datasets.get(id) match {
       case Some(dataset) => {
         //get metadata and also fetch context information
         val listOfMetadata = extFilter match {
           case Some(f) => metadataService.getExtractedMetadataByAttachTo(ResourceRef(ResourceRef.dataset, id), f)
-                                    .map(JSONLD.jsonMetadataWithContext(_))
+                                    .map(JSONLD.jsonMetadataWithContext(_, baseUrlExcludingContext, isHttps))
           case None => metadataService.getMetadataByAttachTo(ResourceRef(ResourceRef.dataset, id))
-                                    .map(JSONLD.jsonMetadataWithContext(_))
+                                    .map(JSONLD.jsonMetadataWithContext(_, baseUrlExcludingContext, isHttps))
         }
         Ok(toJson(listOfMetadata))
       }
@@ -797,7 +798,14 @@ class  Datasets @Inject()(
     }
   }
 
-  def datasetAllFilesList(id: UUID) = PermissionAction(Permission.ViewDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
+  /**
+    * List all files withing a dataset and its nested folders.
+    *
+    * @param id dataset id
+    * @param max max number of files to return, default is
+    * @return
+    */
+  def datasetAllFilesList(id: UUID, max: Option[Int] = None) = PermissionAction(Permission.ViewDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     datasets.get(id) match {
       case Some(dataset) => {
         val listFiles: List[JsValue]= dataset.files.map(fileId => files.get(fileId) match {
@@ -815,7 +823,12 @@ class  Datasets @Inject()(
           case None => false
         }
         val list = listFiles ++ getFilesWithinFolders(id, serveradmin)
-        Ok(toJson(list))
+        // Keep only the first `max` elements in the list
+        val filteredFiles = max match {
+          case Some(i) => list.take(i)
+          case None => list
+        }
+        Ok(toJson(filteredFiles))
       }
       case None => Logger.error("Error getting dataset" + id); InternalServerError
     }
@@ -1745,7 +1758,7 @@ class  Datasets @Inject()(
     datasets.get(id) match {
       case Some(dataset) => {
         val listOfMetadata = metadataService.getMetadataByAttachTo(ResourceRef(ResourceRef.dataset, id))
-          .filter(_.creator.typeOfAgent == "extractor")
+          .filter(metadata => metadata.creator.typeOfAgent == "extractor" || metadata.creator.typeOfAgent == "cat:extractor")
           .map(JSONLD.jsonMetadataWithContext(_) \ "content")
         Ok(toJson(listOfMetadata))
       }
