@@ -71,6 +71,8 @@ object ApplicationBuild extends Build {
     filters,
     ws,
 
+//    "net.codingwell" %% "scala-guice" % "4.1.1",
+
     "com.typesafe.play" %% "play-mailer" % "2.4.1",
 
     // login
@@ -84,8 +86,10 @@ object ApplicationBuild extends Build {
     "org.elasticsearch" % "elasticsearch" % "2.3.5" exclude("io.netty", "netty"),
 
     // mongo storage
-    "com.novus" %% "salat" % "1.9.5" exclude("org.scala-stm", "scala-stm_2.10.0"),
-    "org.mongodb" %% "casbah" % "2.6.3",
+//    "net.cloudinsights" %% "play-plugins-salat" % "1.5.9",
+    "com.novus" %% "salat" % "1.9.9" exclude("org.scala-stm", "scala-stm_2.10.0"),
+    "org.mongodb" %% "casbah" % "2.8.2",
+//    "org.github.salat" %% "salat" % "1.11.2",
 
     // geostreams
     "org.postgresql" % "postgresql" % "42.1.1",
@@ -140,7 +144,7 @@ object ApplicationBuild extends Build {
     "org.irods.jargon" % "jargon-core" % "3.3.3-beta1",
 
     // jsonp return from /api
-    "org.julienrf" %% "play-jsonp-filter" % "1.1"
+    "org.julienrf" %% "play-jsonp-filter" % "1.2"
   )
 
   // Only compile the bootstrap bootstrap.less file and any other *.less file in the stylesheets directory
@@ -152,8 +156,8 @@ object ApplicationBuild extends Build {
 
   val main = Project(appName, file(".")).enablePlugins(play.sbt.PlayScala).settings(
     version := appVersion,
-    scalaVersion := "2.10.6",
-//    scalaVersion := "2.11.12", // TODO not supported by salat
+//    scalaVersion := "2.10.6",
+    scalaVersion := "2.11.12", // TODO not supported by salat
     //    scalaVersion := "2.12.14",
     libraryDependencies ++= appDependencies,
     scalacOptions ++= Seq(s"-target:jvm-$jvm", "-feature"),
@@ -172,6 +176,7 @@ object ApplicationBuild extends Build {
     TwirlKeys.templateImports += "org.bson.types.ObjectId",
     resolvers += Resolver.url("sbt-plugin-releases", url("http://repo.scala-sbt.org/scalasbt/sbt-plugin-releases/"))(Resolver.ivyStylePatterns),
     resolvers += Resolver.url("sbt-plugin-snapshots", url("http://repo.scala-sbt.org/scalasbt/sbt-plugin-snapshots/"))(Resolver.ivyStylePatterns),
+    resolvers += "Sonatype OSS Releases" at "https://oss.sonatype.org/content/repositories/public",
     resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
     resolvers += "Aduna" at "http://maven-us.nuxeo.org/nexus/content/repositories/public/",
     //resolvers += "Forth" at "http://139.91.183.63/repository",

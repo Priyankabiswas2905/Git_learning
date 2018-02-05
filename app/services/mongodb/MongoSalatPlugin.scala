@@ -1,9 +1,10 @@
 package services.mongodb
 
 import java.net.URL
-import java.util.{ Calendar, Date }
+import java.util.{Calendar, Date}
+import javax.inject.Singleton
 
-import com.mongodb.{ BasicDBObject, CommandFailureException }
+import com.mongodb.{BasicDBObject, CommandFailureException}
 import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.commons.MongoDBObject
 import MongoContext.context
@@ -12,7 +13,7 @@ import org.apache.commons.codec.digest.DigestUtils
 import org.apache.commons.io.input.CountingInputStream
 import org.bson.BSONException
 import play.api.libs.json._
-import play.api.{ Play, Plugin, Logger, Application }
+import play.api.{Application, Logger, Play, Plugin}
 import play.api.Play.current
 import com.mongodb.casbah.MongoURI
 import com.mongodb.casbah.MongoConnection
@@ -22,12 +23,14 @@ import com.mongodb.casbah.gridfs.GridFS
 import com.mongodb.casbah.Imports.DBObject
 import org.bson.types.ObjectId
 import services.filesystem.DiskByteStorageService
-import services.{ ByteStorageService, MetadataService, DI, AppConfigurationService }
+import services.{AppConfigurationService, ByteStorageService, DI, MetadataService}
+
 import scala.collection.JavaConverters._
 
 /**
  * Mongo Salat service.
  */
+@Singleton
 class MongoSalatPlugin(app: Application) extends Plugin {
   // URI to the mongodatabase, for example mongodb://127.0.0.1:27017/clowder
   var mongoURI: MongoURI = null
