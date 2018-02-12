@@ -5,6 +5,7 @@ package services.mongodb
 
 import play.api.{Application, Logger, Plugin}
 import java.util.Date
+import javax.inject.Inject
 
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import com.mongodb.casbah.Imports._
@@ -60,7 +61,7 @@ object AuthenticatorDAO extends ModelCompanion[LocalAuthenticator, ObjectId] {
   }
 
 }
-class MongoDBAuthenticatorStore(app: Application) extends Plugin {
+class MongoDBAuthenticatorStore @Inject() (app: Application) extends Plugin {
   
   def save(authenticator: LocalAuthenticator): Either[Error, Unit] = {
     Logger.trace("Saving Authenticator " + authenticator)

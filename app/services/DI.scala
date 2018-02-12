@@ -19,7 +19,6 @@ object DI {
  * Default production module.
  */
 class ConfigurationModule() extends AbstractModule {
-//class ConfigurationModule() extends AbstractModule {
   def configure() {
     bind(classOf[UserService]).to(classOf[services.mongodb.MongoDBUserService])
     bind(classOf[AppConfigurationService]).to(classOf[services.mongodb.MongoDBAppConfigurationService])

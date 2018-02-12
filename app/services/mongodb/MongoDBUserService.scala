@@ -621,7 +621,7 @@ class MongoDBUserService @Inject() (
   }
 }
 
-class MongoDBSecureSocialUserService(application: Application) extends Plugin {
+class MongoDBSecureSocialUserService @Inject() (application: Application) extends Plugin {
   def find(id: IdentityId): Option[User] = {
     // Convert userpass to lowercase so emails aren't case sensitive
     if (id.providerId == "userpass")

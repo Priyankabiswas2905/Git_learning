@@ -2,7 +2,7 @@ package services.mongodb
 
 import java.net.URL
 import java.util.{Calendar, Date}
-import javax.inject.Singleton
+import javax.inject.{Inject, Singleton}
 
 import com.mongodb.{BasicDBObject, CommandFailureException}
 import com.mongodb.casbah.Imports._
@@ -31,7 +31,7 @@ import scala.collection.JavaConverters._
  * Mongo Salat service.
  */
 @Singleton
-class MongoSalatPlugin(app: Application) extends Plugin {
+class MongoSalatPlugin @Inject() (app: Application) extends Plugin {
   // URI to the mongodatabase, for example mongodb://127.0.0.1:27017/clowder
   var mongoURI: MongoURI = null
 

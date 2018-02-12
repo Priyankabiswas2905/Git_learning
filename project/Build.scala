@@ -96,8 +96,9 @@ object ApplicationBuild extends Build {
 
     // Find listing of previewers/stylesheets at runtime
     //  servlet is needed here since it is not specified in org.reflections.
-    "javax.servlet" % "servlet-api" % "2.5",
-    "org.reflections" % "reflections" % "0.9.10",
+//    "javax.servlet" % "servlet-api" % "2.5",
+//    "org.reflections" % "reflections" % "0.9.10",
+    "org.reflections" % "reflections" % "0.9.11",
 
     // RDF
 //    "org.openrdf.sesame" % "sesame-rio-api" % "2.7.8",
@@ -160,8 +161,8 @@ object ApplicationBuild extends Build {
     scalaVersion := "2.11.12", // TODO not supported by salat
     //    scalaVersion := "2.12.14",
     libraryDependencies ++= appDependencies,
-    scalacOptions ++= Seq(s"-target:jvm-$jvm", "-feature"),
-    javacOptions ++= Seq("-source", jvm, "-target", jvm),
+//    scalacOptions ++= Seq(s"-target:jvm-$jvm", "-feature"),
+//    javacOptions ++= Seq("-source", jvm, "-target", jvm),
     initialize := {
       val current  = sys.props("java.specification.version")
       assert(current >= "1.8", s"Unsupported JDK: java.specification.version $current != $jvm")
