@@ -18,12 +18,12 @@ import scala.collection.immutable.Map
  */
 class VersusPlugin(application: Application) extends Plugin {
 
-  val files: FileService = DI.injector.getInstance(classOf[FileService])
-  val previews: PreviewService = DI.injector.getInstance(classOf[PreviewService])
-  val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
-  val sections: SectionService = DI.injector.getInstance(classOf[SectionService])
-  val queries: MultimediaQueryService = DI.injector.getInstance(classOf[MultimediaQueryService])
-  val sectionIndexInfo: SectionIndexInfoService = DI.injector.getInstance(classOf[SectionIndexInfoService])
+  val files: FileService = DI.injector.instanceOf[FileService]
+  val previews: PreviewService = DI.injector.instanceOf[PreviewService]
+  val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
+  val sections: SectionService = DI.injector.instanceOf[SectionService]
+  val queries: MultimediaQueryService = DI.injector.instanceOf[MultimediaQueryService]
+  val sectionIndexInfo: SectionIndexInfoService = DI.injector.instanceOf[SectionIndexInfoService]
 
   override def onStart() {
     Logger.debug("Starting Versus Plugin")

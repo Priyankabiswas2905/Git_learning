@@ -2,7 +2,8 @@ package services.mongodb
 
 import models._
 import java.util.Date
-import services.SchedulerService
+
+import services.{DI, SchedulerService}
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
 import play.api.Play.current
@@ -113,8 +114,6 @@ class MongoDBSchedulerService extends SchedulerService {
 }
 
 object Jobs extends ModelCompanion[TimerJob, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[TimerJob, ObjectId](collection = x.collection("jobs")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[TimerJob, ObjectId](collection = mongoService.collection("jobs")) {}
 }

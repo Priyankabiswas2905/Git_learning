@@ -1109,7 +1109,7 @@ class PostgresPlugin(application: Application) extends Plugin {
   }
 
   private def updatePostgres(updateKey: String, block: () => Unit): Unit = {
-    val appConfig: AppConfigurationService = DI.injector.getInstance(classOf[AppConfigurationService])
+    val appConfig: AppConfigurationService = DI.injector.instanceOf[AppConfigurationService]
 
     if (!appConfig.hasPropertyValue("postgres.updates", updateKey)) {
       if (System.getProperty("POSTGRESUPDATE") != null) {

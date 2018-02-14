@@ -20,7 +20,7 @@ import play.api.libs.mailer._
   */
 object Mail {
 
-//  val mailerClient: MailerAPI = DI.injector.getInstance(classOf[MailerAPI])
+//  val mailerClient: MailerAPI = DI.injector.instanceOf[MailerAPI]
 
   /**
    * Send email to a single recipient
@@ -77,7 +77,7 @@ object Mail {
   }
 
   private def getAdmins: List[String] = {
-    val userService: UserService = DI.injector.getInstance(classOf[UserService])
+    val userService: UserService = DI.injector.instanceOf[UserService]
 
     val admins = mutable.ListBuffer[String]()
     val seen = mutable.HashSet[String]()

@@ -11,7 +11,7 @@ import play.api.Play.current
  */
 class RDFExporterPlugin(application: Application) extends Plugin {
 
-  val files: FileService =  DI.injector.getInstance(classOf[FileService])
+  val files: FileService =  DI.injector.instanceOf[FileService]
 
   override def onStart() {
     Logger.debug("Starting up RDF Exporter Plugin")

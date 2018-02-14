@@ -4,182 +4,182 @@ import java.net.URL
 import java.util.{Calendar, Date}
 import javax.inject.{Inject, Singleton}
 
-import com.mongodb.{BasicDBObject, CommandFailureException}
-import com.mongodb.casbah.Imports._
+import com.mongodb.casbah.Imports.{DBObject, _}
+import com.mongodb.casbah.{MongoCollection, MongoConnection, MongoDB, MongoURI}
 import com.mongodb.casbah.commons.MongoDBObject
-import MongoContext.context
+import com.mongodb.casbah.gridfs.GridFS
+import com.mongodb.{BasicDBObject, CommandFailureException}
 import models._
 import org.apache.commons.codec.digest.DigestUtils
 import org.apache.commons.io.input.CountingInputStream
 import org.bson.BSONException
-import play.api.libs.json._
-import play.api.{Application, Logger, Play, Plugin}
-import play.api.Play.current
-import com.mongodb.casbah.MongoURI
-import com.mongodb.casbah.MongoConnection
-import com.mongodb.casbah.MongoDB
-import com.mongodb.casbah.MongoCollection
-import com.mongodb.casbah.gridfs.GridFS
-import com.mongodb.casbah.Imports.DBObject
 import org.bson.types.ObjectId
+import play.api.Play.current
+import play.api.inject.ApplicationLifecycle
+import play.api.libs.json._
+import play.api.{Logger, Play}
 import services.filesystem.DiskByteStorageService
-import services.{AppConfigurationService, ByteStorageService, DI, MetadataService}
+import services.mongodb.MongoContext.context
+import services.{ByteStorageService, DI, MetadataService}
 
 import scala.collection.JavaConverters._
+import scala.concurrent.Future
+
+trait MongoService {
+  def collection(collection: String): MongoCollection
+}
 
 /**
  * Mongo Salat service.
  */
 @Singleton
-class MongoSalatPlugin @Inject() (app: Application) extends Plugin {
+class MongoSalatPlugin @Inject() (lifecycle: ApplicationLifecycle) extends MongoService {
   // URI to the mongodatabase, for example mongodb://127.0.0.1:27017/clowder
   var mongoURI: MongoURI = null
 
   // hold the connection, if connection failed it will be tried to open next time
   var mongoConnection: MongoConnection = null
 
-  lazy val appConfig: AppConfigurationService = DI.injector.getInstance(classOf[AppConfigurationService])
 
-  override def onStart() {
-    mongoURI = if (play.api.Play.configuration.getString("mongodbURI").isDefined) {
-      MongoURI(play.api.Play.configuration.getString("mongodbURI").get)
-    } else if (play.api.Play.configuration.getString("mongodb.default").isDefined) {
-      Logger.info("mongodb.default is deprecated, please use mongodbURI")
-      MongoURI(play.api.Play.configuration.getString("mongodb.default").get)
-    } else {
-      Logger.info("no connection to mongo specified in , will use default URI mongodb://127.0.0.1:27017/clowder")
-      MongoURI("mongodb://127.0.0.1:27017/clowder")
-    }
-    Logger.info("Connecting to : " + mongoURI.toString())
+  mongoURI = if (play.api.Play.configuration.getString("mongodbURI").isDefined) {
+    MongoURI(play.api.Play.configuration.getString("mongodbURI").get)
+  } else if (play.api.Play.configuration.getString("mongodb.default").isDefined) {
+    Logger.info("mongodb.default is deprecated, please use mongodbURI")
+    MongoURI(play.api.Play.configuration.getString("mongodb.default").get)
+  } else {
+    Logger.info("no connection to mongo specified in , will use default URI mongodb://127.0.0.1:27017/clowder")
+    MongoURI("mongodb://127.0.0.1:27017/clowder")
+  }
+  Logger.info("Connecting to : " + mongoURI.toString())
 
-    // connect to the database
-    mongoConnection = mongoURI.connect.fold(l => throw l, r => r)
+  // connect to the database
+  mongoConnection = mongoURI.connect.fold(l => throw l, r => r)
 
-    // update database if needed
-    updateDatabase()
+  // update database if needed
+  updateDatabase()
 
-    // drop old indices
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("datasets").dropIndex("tags.name_text")
-    }
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("uploads.files").dropIndex("tags.name_text")
-    }
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("uploads.files").dropIndex("tags_1")
-    }
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("sections").dropIndex("tags.name_text")
-    }
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("uploads.files").dropIndex("uploadDate_-1")
-    }
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("uploads.files").dropIndex("author.email_1")
-    }
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("uploads.files").dropIndex("tags.name_1")
-    }
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("uploads.files").dropIndex("filename_1_uploadDate_1")
-    }
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("previews.files").dropIndex("uploadDate_-1_file_id_1")
-    }
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("previews.files").dropIndex("uploadDate_-1_section_id_1")
-    }
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("previews.files").dropIndex("section_id_-1")
-    }
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("previews.files").dropIndex("file_id_-1")
-    }
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("previews.files").dropIndex("filename_1_uploadDate_1")
-    }
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("textures.files").dropIndex("file_id_1")
-    }
-    scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
-      collection("tiles.files").dropIndex("preview_id_1_filename_1_level_1")
-    }
-
-    // create indices.
-    Logger.debug("Ensuring indices exist")
-    collection("spaces.projects").ensureIndex(MongoDBObject("created" -> -1))
-    collection("spaces.projects").ensureIndex(MongoDBObject("public" -> 1))
-    collection("spaces.projects").ensureIndex(MongoDBObject("creator" -> 1))
-
-    collection("collections").ensureIndex(MongoDBObject("created" -> -1))
-    collection("collections").ensureIndex(MongoDBObject("spaces" -> 1))
-    collection("collections").ensureIndex(MongoDBObject("datasets._id" -> 1))
-    collection("collections").ensureIndex(MongoDBObject("public" -> 1))
-    collection("collections").ensureIndex(MongoDBObject("author._id" -> 1))
-
-    collection("datasets").ensureIndex(MongoDBObject("created" -> -1))
-    collection("datasets").ensureIndex(MongoDBObject("tags" -> 1))
-    collection("datasets").ensureIndex(MongoDBObject("files._id" -> 1))
-    collection("datasets").ensureIndex(MongoDBObject("tags.name" -> 1))
-    collection("datasets").ensureIndex(MongoDBObject("status" -> 1))
-    collection("datasets").ensureIndex(MongoDBObject("collections" -> 1))
-    collection("datasets").ensureIndex(MongoDBObject("spaces" -> 1))
-    collection("datasets").ensureIndex(MongoDBObject("public" -> 1))
-    collection("datasets").ensureIndex(MongoDBObject("name" -> 1))
-    collection("datasets").ensureIndex(MongoDBObject("author._id" -> 1))
-    collection("datasets").ensureIndex(MongoDBObject("status" -> 1, "spaces" -> 1, "author._id" -> 1))
-    collection("datasets").ensureIndex(MongoDBObject("created" -> -1, "name" -> 1))
-    collection("datasets").ensureIndex(MongoDBObject("files" -> 1))
-
-    collection("dtsrequests").ensureIndex(MongoDBObject("fileid" -> 1))
-
-    collection("events").ensureIndex(MongoDBObject("targetuser._id" -> 1))
-    collection("events").ensureIndex(MongoDBObject("object_id" -> 1))
-    collection("events").ensureIndex(MongoDBObject("user._id" -> 1))
-
-    collection("extractions").ensureIndex(MongoDBObject("file_id" -> 1))
-
-    collection("folders").ensureIndex(MongoDBObject("parentDatasetId" -> 1))
-
-    collection("uploads").ensureIndex(MongoDBObject("uploadDate" -> -1))
-    collection("uploads").ensureIndex(MongoDBObject("author.email" -> 1))
-    collection("uploads").ensureIndex(MongoDBObject("tags.name" -> 1))
-    collection("uploads").ensureIndex(MongoDBObject("author._id" -> 1, "_id" -> 1))
-    collection("uploads").ensureIndex(MongoDBObject("status" -> 1))
-
-    collection("uploadquery.files").ensureIndex(MongoDBObject("uploadDate" -> -1))
-
-    collection("previews").ensureIndex(MongoDBObject("uploadDate" -> -1, "file_id" -> 1))
-    collection("previews").ensureIndex(MongoDBObject("uploadDate" -> -1, "section_id" -> 1))
-    collection("previews").ensureIndex(MongoDBObject("section_id" -> -1))
-    collection("previews").ensureIndex(MongoDBObject("file_id" -> -1))
-
-    collection("textures").ensureIndex(MongoDBObject("file_id" -> 1))
-    collection("tiles").ensureIndex(MongoDBObject("preview_id" -> 1, "filename" -> 1, "level" -> 1))
-
-    collection("sections").ensureIndex(MongoDBObject("uploadDate" -> -1, "file_id" -> 1))
-    collection("sections").ensureIndex(MongoDBObject("file_id" -> -1))
-    collection("sections").ensureIndex(MongoDBObject("tags.name" -> 1))
-    collection("sections").ensureIndex(MongoDBObject("file_id" -> 1, "author._id" -> 1))
-
-    collection("metadata").ensureIndex(MongoDBObject("createdAt" -> -1))
-    collection("metadata").ensureIndex(MongoDBObject("creator" -> 1))
-    collection("metadata").ensureIndex(MongoDBObject("attachedTo" -> 1))
-    collection("metadata").ensureIndex(MongoDBObject("attachedTo.resourceType" -> 1, "attachedTo._id" -> 1))
-
-    collection("contextld").ensureIndex(MongoDBObject("contextName" -> 1))
-
-    collection("dtsrequests").ensureIndex(MongoDBObject("startTime" -> -1, "endTime" -> -1))
-    collection("dtsrequests").ensureIndex(MongoDBObject("file_id" -> -1))
-    collection("versus.descriptors").ensureIndex(MongoDBObject("fileId" -> 1))
-
-    collection("multimedia.distances").ensureIndex(MongoDBObject("source_section" -> 1, "representation" -> 1, "distance" -> 1, "target_spaces" -> 1))
+  // drop old indices
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("datasets").dropIndex("tags.name_text")
+  }
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("uploads.files").dropIndex("tags.name_text")
+  }
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("uploads.files").dropIndex("tags_1")
+  }
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("sections").dropIndex("tags.name_text")
+  }
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("uploads.files").dropIndex("uploadDate_-1")
+  }
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("uploads.files").dropIndex("author.email_1")
+  }
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("uploads.files").dropIndex("tags.name_1")
+  }
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("uploads.files").dropIndex("filename_1_uploadDate_1")
+  }
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("previews.files").dropIndex("uploadDate_-1_file_id_1")
+  }
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("previews.files").dropIndex("uploadDate_-1_section_id_1")
+  }
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("previews.files").dropIndex("section_id_-1")
+  }
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("previews.files").dropIndex("file_id_-1")
+  }
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("previews.files").dropIndex("filename_1_uploadDate_1")
+  }
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("textures.files").dropIndex("file_id_1")
+  }
+  scala.util.control.Exception.ignoring(classOf[CommandFailureException]) {
+    collection("tiles.files").dropIndex("preview_id_1_filename_1_level_1")
   }
 
-  override def onStop() {
+  // create indices.
+  Logger.debug("Ensuring indices exist")
+  collection("spaces.projects").ensureIndex(MongoDBObject("created" -> -1))
+  collection("spaces.projects").ensureIndex(MongoDBObject("public" -> 1))
+  collection("spaces.projects").ensureIndex(MongoDBObject("creator" -> 1))
+
+  collection("collections").ensureIndex(MongoDBObject("created" -> -1))
+  collection("collections").ensureIndex(MongoDBObject("spaces" -> 1))
+  collection("collections").ensureIndex(MongoDBObject("datasets._id" -> 1))
+  collection("collections").ensureIndex(MongoDBObject("public" -> 1))
+  collection("collections").ensureIndex(MongoDBObject("author._id" -> 1))
+
+  collection("datasets").ensureIndex(MongoDBObject("created" -> -1))
+  collection("datasets").ensureIndex(MongoDBObject("tags" -> 1))
+  collection("datasets").ensureIndex(MongoDBObject("files._id" -> 1))
+  collection("datasets").ensureIndex(MongoDBObject("tags.name" -> 1))
+  collection("datasets").ensureIndex(MongoDBObject("status" -> 1))
+  collection("datasets").ensureIndex(MongoDBObject("collections" -> 1))
+  collection("datasets").ensureIndex(MongoDBObject("spaces" -> 1))
+  collection("datasets").ensureIndex(MongoDBObject("public" -> 1))
+  collection("datasets").ensureIndex(MongoDBObject("name" -> 1))
+  collection("datasets").ensureIndex(MongoDBObject("author._id" -> 1))
+  collection("datasets").ensureIndex(MongoDBObject("status" -> 1, "spaces" -> 1, "author._id" -> 1))
+  collection("datasets").ensureIndex(MongoDBObject("created" -> -1, "name" -> 1))
+  collection("datasets").ensureIndex(MongoDBObject("files" -> 1))
+
+  collection("dtsrequests").ensureIndex(MongoDBObject("fileid" -> 1))
+
+  collection("events").ensureIndex(MongoDBObject("targetuser._id" -> 1))
+  collection("events").ensureIndex(MongoDBObject("object_id" -> 1))
+  collection("events").ensureIndex(MongoDBObject("user._id" -> 1))
+
+  collection("extractions").ensureIndex(MongoDBObject("file_id" -> 1))
+
+  collection("folders").ensureIndex(MongoDBObject("parentDatasetId" -> 1))
+
+  collection("uploads").ensureIndex(MongoDBObject("uploadDate" -> -1))
+  collection("uploads").ensureIndex(MongoDBObject("author.email" -> 1))
+  collection("uploads").ensureIndex(MongoDBObject("tags.name" -> 1))
+  collection("uploads").ensureIndex(MongoDBObject("author._id" -> 1, "_id" -> 1))
+  collection("uploads").ensureIndex(MongoDBObject("status" -> 1))
+
+  collection("uploadquery.files").ensureIndex(MongoDBObject("uploadDate" -> -1))
+
+  collection("previews").ensureIndex(MongoDBObject("uploadDate" -> -1, "file_id" -> 1))
+  collection("previews").ensureIndex(MongoDBObject("uploadDate" -> -1, "section_id" -> 1))
+  collection("previews").ensureIndex(MongoDBObject("section_id" -> -1))
+  collection("previews").ensureIndex(MongoDBObject("file_id" -> -1))
+
+  collection("textures").ensureIndex(MongoDBObject("file_id" -> 1))
+  collection("tiles").ensureIndex(MongoDBObject("preview_id" -> 1, "filename" -> 1, "level" -> 1))
+
+  collection("sections").ensureIndex(MongoDBObject("uploadDate" -> -1, "file_id" -> 1))
+  collection("sections").ensureIndex(MongoDBObject("file_id" -> -1))
+  collection("sections").ensureIndex(MongoDBObject("tags.name" -> 1))
+  collection("sections").ensureIndex(MongoDBObject("file_id" -> 1, "author._id" -> 1))
+
+  collection("metadata").ensureIndex(MongoDBObject("createdAt" -> -1))
+  collection("metadata").ensureIndex(MongoDBObject("creator" -> 1))
+  collection("metadata").ensureIndex(MongoDBObject("attachedTo" -> 1))
+  collection("metadata").ensureIndex(MongoDBObject("attachedTo.resourceType" -> 1, "attachedTo._id" -> 1))
+
+  collection("contextld").ensureIndex(MongoDBObject("contextName" -> 1))
+
+  collection("dtsrequests").ensureIndex(MongoDBObject("startTime" -> -1, "endTime" -> -1))
+  collection("dtsrequests").ensureIndex(MongoDBObject("file_id" -> -1))
+  collection("versus.descriptors").ensureIndex(MongoDBObject("fileId" -> 1))
+
+  collection("multimedia.distances").ensureIndex(MongoDBObject("source_section" -> 1, "representation" -> 1, "distance" -> 1, "target_spaces" -> 1))
+
+  lifecycle.addStopHook { () =>
     if (mongoConnection != null)
       mongoConnection.close()
     mongoConnection = null
+    Future.successful(())
   }
 
   /**
@@ -285,12 +285,10 @@ class MongoSalatPlugin @Inject() (app: Application) extends Plugin {
       collection("roles").drop()
       removeFiles("logos")
 
+      // FIXME is this still required?
       // call global onStart to initialize
-      app.global.onStart(app)
+//      app.global.onStart(app)
     }
-
-    // call onStart to make sure all indices exist.
-    onStart()
 
     Logger.debug("**DANGER** Data deleted **DANGER**")
   }
@@ -418,13 +416,13 @@ class MongoSalatPlugin @Inject() (app: Application) extends Plugin {
   }
 
   private def updateMongo(updateKey: String, block: () => Unit): Unit = {
-    if (!appConfig.hasPropertyValue("mongodb.updates", updateKey)) {
+    if (!hasPropertyValue("mongodb.updates", updateKey)) {
       if (System.getProperty("MONGOUPDATE") != null) {
         Logger.info(s"About to begin update of mongo : ${updateKey}.")
         val start = System.currentTimeMillis()
         try {
           block()
-          appConfig.addPropertyValue("mongodb.updates", updateKey)
+          addPropertyValue("mongodb.updates", updateKey)
         } catch {
           case e: Exception => {
             Logger.error(s"Could not run mongo update for ${updateKey}", e)
@@ -585,7 +583,7 @@ class MongoSalatPlugin @Inject() (app: Application) extends Plugin {
   }
 
   private def migrateMetadataRepresentationtoJSONLD() {
-    val metadataService: MetadataService = DI.injector.getInstance(classOf[MetadataService])
+    val metadataService: MetadataService = DI.injector.instanceOf[MetadataService]
 
     // update metadata on datasets
     collection("datasets").foreach { ds =>
@@ -767,7 +765,7 @@ class MongoSalatPlugin @Inject() (app: Application) extends Plugin {
     }
 
     // no need to fixSha512
-    appConfig.addPropertyValue("mongodb.updates", "fixing-mongo-sha512")
+    addPropertyValue("mongodb.updates", "fixing-mongo-sha512")
   }
 
   private def fixSha512() {
@@ -1018,7 +1016,7 @@ class MongoSalatPlugin @Inject() (app: Application) extends Plugin {
   }
 
   private def useMiniUser(): Unit = {
-    if (!appConfig.hasPropertyValue("mongodb.updates", "split-gridfs")) {
+    if (!hasPropertyValue("mongodb.updates", "split-gridfs")) {
       throw new Exception("Missing split-gridfs migration.")
     }
 
@@ -1200,7 +1198,7 @@ class MongoSalatPlugin @Inject() (app: Application) extends Plugin {
   }
 
   private def addMetadataPerSpace() {
-    val metadataService: MetadataService = DI.injector.getInstance(classOf[MetadataService])
+    val metadataService: MetadataService = DI.injector.instanceOf[MetadataService]
 
     collection("spaces.projects").foreach { space =>
       val metadatas = collection("metadata.definitions").find(MongoDBObject("spaceId" -> null))
@@ -1375,5 +1373,13 @@ class MongoSalatPlugin @Inject() (app: Application) extends Plugin {
   private def updateInCurationStatus(): Unit = {
     CurationDAO.update(MongoDBObject("status" -> "In Curation"),
       $set("status" -> "In Preparation"), false, true, WriteConcern.Safe)
+  }
+
+  private def hasPropertyValue(key: String, value: Any) = {
+    collection("app.configuration").findOne(("value" $in value :: Nil) ++ ("key" -> key)).nonEmpty
+  }
+
+  private def addPropertyValue(key: String, value: Any) {
+    collection("app.configuration").update(MongoDBObject("key" -> key), $addToSet("value" -> value), upsert=true, concern=WriteConcern.Safe)
   }
 }

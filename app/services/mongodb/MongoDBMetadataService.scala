@@ -11,17 +11,18 @@ import play.api.Play.current
 import com.mongodb.casbah.Imports._
 import play.api.libs.json.JsValue
 import javax.inject.{Inject, Singleton}
+
 import com.mongodb.casbah.commons.TypeImports.ObjectId
 import com.mongodb.casbah.WriteConcern
-
-import services.{ContextLDService, DatasetService, FileService, FolderService, ExtractorMessage, RabbitmqPlugin, MetadataService, ElasticsearchPlugin, CurationService}
-import api.{UserRequest, Permission}
+import services._
+import api.{Permission, UserRequest}
 
 /**
  * MongoDB Metadata Service Implementation
  */
 @Singleton
-class MongoDBMetadataService @Inject() (contextService: ContextLDService, datasets: DatasetService, files: FileService, folders: FolderService, curations: CurationService) extends MetadataService {
+class MongoDBMetadataService @Inject() (contextService: ContextLDService, datasets: DatasetService, files: FileService,
+  folders: FolderService, curations: CurationService) extends MetadataService {
 
   /**
    * Add metadata to the metadata collection and attach to a section /file/dataset/collection
@@ -292,15 +293,11 @@ class MongoDBMetadataService @Inject() (contextService: ContextLDService, datase
 }
 
 object MetadataDAO extends ModelCompanion[Metadata, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin")
-    case Some(x) => new SalatDAO[Metadata, ObjectId](collection = x.collection("metadata")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Metadata, ObjectId](collection = mongoService.collection("metadata")) {}
 }
 
 object MetadataDefinitionDAO extends ModelCompanion[MetadataDefinition, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin")
-    case Some(x) => new SalatDAO[MetadataDefinition, ObjectId](collection = x.collection("metadata.definitions")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[MetadataDefinition, ObjectId](collection = mongoService.collection("metadata.definitions")) {}
 }

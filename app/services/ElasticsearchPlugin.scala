@@ -34,10 +34,10 @@ import org.elasticsearch.ElasticsearchException
  *
  */
 class ElasticsearchPlugin(application: Application) extends Plugin {
-  val comments: CommentService = DI.injector.getInstance(classOf[CommentService])
-  val files: FileService = DI.injector.getInstance(classOf[FileService])
-  val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
-  val collections: CollectionService = DI.injector.getInstance(classOf[CollectionService])
+  val comments: CommentService = DI.injector.instanceOf[CommentService]
+  val files: FileService = DI.injector.instanceOf[FileService]
+  val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
+  val collections: CollectionService = DI.injector.instanceOf[CollectionService]
   var client: Option[TransportClient] = None
   val nameOfCluster = play.api.Play.configuration.getString("elasticsearchSettings.clusterName").getOrElse("clowder")
   val serverAddress = play.api.Play.configuration.getString("elasticsearchSettings.serverAddress").getOrElse("localhost")

@@ -23,9 +23,9 @@ import models.UUID
  */
 class RDFExportService (application: Application) extends Plugin {
   
-  val files: FileService =  DI.injector.getInstance(classOf[FileService])
-  val datasets: DatasetService =  DI.injector.getInstance(classOf[DatasetService])
-  val previews: PreviewService =  DI.injector.getInstance(classOf[PreviewService])
+  val files: FileService =  DI.injector.instanceOf[FileService]
+  val datasets: DatasetService =  DI.injector.instanceOf[DatasetService]
+  val previews: PreviewService =  DI.injector.instanceOf[PreviewService]
   
   val resultsDir = System.getProperty("java.io.tmpdir") + System.getProperty("file.separator") + "clowder__rdfdumptemporaryfiles" + System.getProperty("file.separator")
   val filesMappingsQuantity = Integer.parseInt(play.api.Play.configuration.getString("filesxmltordfmapping.dircount").getOrElse("1"))

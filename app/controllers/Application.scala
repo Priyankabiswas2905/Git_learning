@@ -96,7 +96,7 @@ class Application @Inject() (files: FileService, collections: CollectionService,
    * Main page.
    */
   def index = UserAction(needActive = false) { implicit request =>
-    val appConfig: AppConfigurationService = DI.injector.getInstance(classOf[AppConfigurationService])
+    val appConfig: AppConfigurationService = DI.injector.instanceOf[AppConfigurationService]
 
   	implicit val user = request.user
 

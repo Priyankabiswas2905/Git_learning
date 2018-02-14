@@ -7,7 +7,7 @@
         @*<label><input type="radio" name="@(path)@(name)Opt" id="@(path)@(name)Default" value="default">No Logo</label>*@
     @*}*@
 @*</div>*@
-@*@services.DI.injector.getInstance(classOf[services.LogoService]).get(path, name).map{ logo =>*@
+@*@services.DI.injector.instanceOf[services.LogoService].get(path, name).map{ logo =>*@
     @*<div class="radio">*@
         @*<label><input type="radio" name="@(path)@(name)Opt" value="current" id="@(path)@(name)Current">Current <img height="16px" src="@api.routes.Logos.downloadPath(path, name)"></label>*@
     @*</div>*@
@@ -16,7 +16,7 @@
     @*<label><input type="radio" name="@(path)@(name)Opt" id="@(path)@(name)Upload" value="upload" disabled><input class="form-control" id="@(path)@(name)File" type="file"></label>*@
 @*</div>*@
 @*@if(showText.isDefined) {*@
-    @*@services.DI.injector.getInstance(classOf[services.LogoService]).get(path, name) match {*@
+    @*@services.DI.injector.instanceOf[services.LogoService].get(path, name) match {*@
         @*case Some(logo) => {*@
             @*@if(logo.showText) {*@
                 @*<input type="checkbox" id="@(path)@(name)Text" checked> @showText*@
@@ -71,7 +71,7 @@
     @*function upload@(path)@(name)File(nextFunction) {*@
         @*switch ($('input[name=@(path)@(name)Opt]:checked').val()) {*@
             @*case "default":*@
-                @*@services.DI.injector.getInstance(classOf[services.LogoService]).get(path, name) match {*@
+                @*@services.DI.injector.instanceOf[services.LogoService].get(path, name) match {*@
                     @*case Some(x) => {*@
                         @*$.ajax({*@
                             @*url:  "@api.routes.Logos.deletePath(path, name).url",*@

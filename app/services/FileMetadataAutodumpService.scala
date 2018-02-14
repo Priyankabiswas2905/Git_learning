@@ -11,7 +11,7 @@ import play.api.libs.concurrent.Execution.Implicits._
  */
 class FileMetadataAutodumpService (application: Application) extends Plugin {
 
-  val files: FileService = DI.injector.getInstance(classOf[FileService])
+  val files: FileService = DI.injector.instanceOf[FileService]
   
   override def onStart() {
     Logger.debug("Starting file metadata autodumper Plugin")

@@ -107,20 +107,20 @@ object Permission extends Enumeration {
      READONLY += DownloadFiles
   }
 
-  lazy val files: FileService = DI.injector.getInstance(classOf[FileService])
-  lazy val previews: PreviewService = DI.injector.getInstance(classOf[PreviewService])
-  lazy val relations: RelationService = DI.injector.getInstance(classOf[RelationService])
-  lazy val collections: CollectionService = DI.injector.getInstance(classOf[CollectionService])
-  lazy val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
-  lazy val spaces: SpaceService = DI.injector.getInstance(classOf[SpaceService])
-  lazy val folders: FolderService = DI.injector.getInstance(classOf[FolderService])
-  lazy val users: services.UserService = DI.injector.getInstance(classOf[services.UserService])
-  lazy val comments: services.CommentService = DI.injector.getInstance(classOf[services.CommentService])
-  lazy val curations: services.CurationService = DI.injector.getInstance(classOf[services.CurationService])
-  lazy val sections: SectionService = DI.injector.getInstance(classOf[SectionService])
-  lazy val metadatas: MetadataService = DI.injector.getInstance(classOf[MetadataService])
-  lazy val vocabularies: VocabularyService = DI.injector.getInstance(classOf[VocabularyService])
-  lazy val vocabularyterms: VocabularyTermService = DI.injector.getInstance(classOf[VocabularyTermService])
+  lazy val files: FileService = DI.injector.instanceOf[FileService]
+  lazy val previews: PreviewService = DI.injector.instanceOf[PreviewService]
+  lazy val relations: RelationService = DI.injector.instanceOf[RelationService]
+  lazy val collections: CollectionService = DI.injector.instanceOf[CollectionService]
+  lazy val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
+  lazy val spaces: SpaceService = DI.injector.instanceOf[SpaceService]
+  lazy val folders: FolderService = DI.injector.instanceOf[FolderService]
+  lazy val users: services.UserService = DI.injector.instanceOf[services.UserService]
+  lazy val comments: services.CommentService = DI.injector.instanceOf[services.CommentService]
+  lazy val curations: services.CurationService = DI.injector.instanceOf[services.CurationService]
+  lazy val sections: SectionService = DI.injector.instanceOf[SectionService]
+  lazy val metadatas: MetadataService = DI.injector.instanceOf[MetadataService]
+  lazy val vocabularies: VocabularyService = DI.injector.instanceOf[VocabularyService]
+  lazy val vocabularyterms: VocabularyTermService = DI.injector.instanceOf[VocabularyTermService]
 
   /** Returns true if the user is listed as a server admin */
 	def checkServerAdmin(user: Option[User]): Boolean = {

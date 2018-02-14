@@ -123,7 +123,7 @@ trait ApiController extends Controller {
     // 1) secure social, this allows the web app to make calls to the API and use the secure social user
     if (true) {
       val user = Some(User.anonymous)
-//      val user = DI.injector.getInstance(classOf[services.UserService]).findByIdentity(identity) match {
+//      val user = DI.injector.instanceOf[services.UserService].findByIdentity(identity) match {
 //        case Some(u: ClowderUser) if Permission.checkServerAdmin(Some(u)) => Some(u.copy(superAdminMode=superAdmin))
 //        case Some(u) => Some(u)
 //        case None => None
@@ -137,10 +137,10 @@ trait ApiController extends Controller {
       val credentials = header.split(":")
       // TODO get identity
       val identity = null
-      val user = DI.injector.getInstance(classOf[services.UserService]).findByIdentity(identity)
+      val user = DI.injector.instanceOf[services.UserService].findByIdentity(identity)
       // TODO check password
       if (true) {
-        val user = DI.injector.getInstance(classOf[services.UserService]).findByIdentity(identity) match {
+        val user = DI.injector.instanceOf[services.UserService].findByIdentity(identity) match {
           case Some(u: ClowderUser) if Permission.checkServerAdmin(Some(u)) => Some(u.copy(superAdminMode=superAdmin))
           case Some(u) => Some(u)
           case None => None
@@ -152,7 +152,7 @@ trait ApiController extends Controller {
     // 3) key, this will need to become better, right now it will only accept the one key, when using the
     //    key it will assume you are anonymous!
     request.queryString.get("key").foreach { key =>
-      val userservice = DI.injector.getInstance(classOf[services.UserService])
+      val userservice = DI.injector.instanceOf[services.UserService]
       val commkey = play.Play.application().configuration().getString("commKey")
       key.foreach { realkey =>
         // check to see if this is the global key

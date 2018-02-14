@@ -15,7 +15,7 @@ object JSONLD {
    * Converts models.Metadata object and context information to JsValue object.
    */
   def jsonMetadataWithContext(metadata: Metadata, baseUrlExcludingContext: String = "", isHttps: Boolean = false): JsValue = {
-    val contextService: ContextLDService = DI.injector.getInstance(classOf[ContextLDService])
+    val contextService: ContextLDService = DI.injector.instanceOf[ContextLDService]
     // check if there is a context url or a local context definition
     val contextLd = metadata.contextId.flatMap(contextService.getContextById(_))
     val contextJson: Option[JsObject] =

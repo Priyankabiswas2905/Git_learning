@@ -5,13 +5,14 @@ import play.api.Logger
 import com.mongodb.casbah.Imports._
 import play.api.Play.current
 import javax.inject.{Inject, Singleton}
+
 import models.{DBCounts, ResourceRef}
 
 /**
   * App Configuration Service.
  */
 @Singleton
-class MongoDBAppConfigurationService extends AppConfigurationService {
+class MongoDBAppConfigurationService @Inject() (mongoService: MongoService) extends AppConfigurationService {
   def addPropertyValue(key: String, value: Any) {
     getCollection.update(MongoDBObject("key" -> key), $addToSet("value" -> value), upsert=true, concern=WriteConcern.Safe)
   }
@@ -71,12 +72,7 @@ class MongoDBAppConfigurationService extends AppConfigurationService {
   }
 
   /** returns the collection with app configuration values */
-  def getCollection = {
-    current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("Mongo not configured");
-      case Some(mongo) => mongo.collection("app.configuration")
-    }
-  }
+  def getCollection = mongoService.collection("app.configuration")
 
   /** Try to get counts from appConfig, returning 0 if not found **/
   def getIndexCounts(): DBCounts = {

@@ -23,7 +23,7 @@ object MetadataDefinition {
   def registerDefaultDefinitions(): Unit = {
     // add default definition
     Logger.debug("Adding core metadata vocabulary definitions to database")
-    val metadataService: MetadataService = DI.injector.getInstance(classOf[MetadataService])
+    val metadataService: MetadataService = DI.injector.instanceOf[MetadataService]
     val default = List(
       Json.parse("""{"label":"Alternative Title",
           "uri":"http://purl.org/dc/terms/alternative",

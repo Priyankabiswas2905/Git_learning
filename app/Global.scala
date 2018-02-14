@@ -28,12 +28,13 @@ object Global extends WithFilters(new GzipFilter(), new Jsonp(), CORSFilter()) w
 
 
   override def onStart(app: Application) {
-    val appConfig: AppConfigurationService = DI.injector.getInstance(classOf[AppConfigurationService])
+//    val appConfig: AppConfigurationService = DI.injector.instanceOf[AppConfigurationService]
+    val appConfig: AppConfigurationService = DI.injector.instanceOf[AppConfigurationService]
 
     ServerStartTime.startTime = Calendar.getInstance().getTime
     Logger.debug("\n----Server Start Time----" + ServerStartTime.startTime + "\n \n")
 
-    val users: UserService = DI.injector.getInstance(classOf[UserService])
+    val users: UserService = DI.injector.instanceOf[UserService]
 
     // set the default ToS version
     AppConfiguration.setDefaultTermsOfServicesVersion()
@@ -74,11 +75,11 @@ object Global extends WithFilters(new GzipFilter(), new Jsonp(), CORSFilter()) w
 
         Akka.system().scheduler.scheduleOnce(10 seconds) {
           Logger.debug("initializing appConfig counts")
-          val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
-          val files: FileService = DI.injector.getInstance(classOf[FileService])
-          val collections: CollectionService = DI.injector.getInstance(classOf[CollectionService])
-          val spaces: SpaceService = DI.injector.getInstance(classOf[SpaceService])
-          val users: UserService = DI.injector.getInstance(classOf[UserService])
+          val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
+          val files: FileService = DI.injector.instanceOf[FileService]
+          val collections: CollectionService = DI.injector.instanceOf[CollectionService]
+          val spaces: SpaceService = DI.injector.instanceOf[SpaceService]
+          val users: UserService = DI.injector.instanceOf[UserService]
 
           // Store the results in appConfig so they can be fetched quickly later
           appConfig.incrementCount('datasets, datasets.count())
@@ -101,7 +102,7 @@ object Global extends WithFilters(new GzipFilter(), new Jsonp(), CORSFilter()) w
   }
 
 //  private lazy val injector = services.DI.injector
-//  private lazy val users: UserService =  DI.injector.getInstance(classOf[UserService])
+//  private lazy val users: UserService =  DI.injector.instanceOf[UserService]
 
   /** Used for dynamic controller dispatcher **/
 //  def getControllerInstance[A](clazz: Class[A]) = {
@@ -119,7 +120,7 @@ object Global extends WithFilters(new GzipFilter(), new Jsonp(), CORSFilter()) w
         "exception" -> sw.toString.replace("\n", "\\n")))))
     } else {
       // TODO get identity from request
-//      val users: UserService =  DI.injector.getInstance(classOf[UserService])
+//      val users: UserService =  DI.injector.instanceOf[UserService]
 //      implicit val user = users.findByIdentity("userId", "providerId")
       Future(InternalServerError(views.html.errorPage(request, sw.toString)(Some(User.anonymous))))
     }
@@ -131,7 +132,7 @@ object Global extends WithFilters(new GzipFilter(), new Jsonp(), CORSFilter()) w
         "request" -> request.toString()))))
     } else {
       // TODO get idenitity from request
-      val users: UserService = DI.injector.getInstance(classOf[UserService])
+      val users: UserService = DI.injector.instanceOf[UserService]
       implicit val user = users.findByIdentity("userId", "providerId")
       Future(NotFound(views.html.errorPage(request, "Not found")(user)))
     }
@@ -144,7 +145,7 @@ object Global extends WithFilters(new GzipFilter(), new Jsonp(), CORSFilter()) w
         "request" -> request.toString()))))
     } else {
       // TODO get identity from request
-      val users: UserService = DI.injector.getInstance(classOf[UserService])
+      val users: UserService = DI.injector.instanceOf[UserService]
       implicit val user = users.findByIdentity("userId", "providerId")
       Future(BadRequest(views.html.errorPage(request, error)(user)))
     }

@@ -68,7 +68,7 @@ object Agent {
 
   implicit object AgentReads extends Reads[Agent] {
 
-    val userService: UserService = DI.injector.getInstance(classOf[UserService])
+    val userService: UserService = DI.injector.instanceOf[UserService]
 
     def reads(json: JsValue) = {
       //creator(agent) may be User or Extractor depending on the json 

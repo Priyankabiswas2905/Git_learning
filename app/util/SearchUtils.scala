@@ -10,12 +10,12 @@ import scala.collection.immutable.List
 
 
 object SearchUtils {
-  lazy val files: FileService = DI.injector.getInstance(classOf[FileService])
-  lazy val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
-  lazy val folders: FolderService = DI.injector.getInstance(classOf[FolderService])
-  lazy val collections: CollectionService = DI.injector.getInstance(classOf[CollectionService])
-  lazy val metadatas: MetadataService = DI.injector.getInstance(classOf[MetadataService])
-  lazy val comments: CommentService = DI.injector.getInstance(classOf[CommentService])
+  lazy val files: FileService = DI.injector.instanceOf[FileService]
+  lazy val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
+  lazy val folders: FolderService = DI.injector.instanceOf[FolderService]
+  lazy val collections: CollectionService = DI.injector.instanceOf[CollectionService]
+  lazy val metadatas: MetadataService = DI.injector.instanceOf[MetadataService]
+  lazy val comments: CommentService = DI.injector.instanceOf[CommentService]
 
   /**Convert File to ElasticsearchObject and return, fetching metadata as necessary**/
   def getElasticsearchObject(f: File): Option[ElasticsearchObject] = {

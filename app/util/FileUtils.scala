@@ -26,19 +26,19 @@ import javax.mail.internet.MimeUtility
 import java.net.URLEncoder
 
 object FileUtils {
-  val appConfig: AppConfigurationService = DI.injector.getInstance(classOf[AppConfigurationService])
+  val appConfig: AppConfigurationService = DI.injector.instanceOf[AppConfigurationService]
 
-  lazy val files: FileService = DI.injector.getInstance(classOf[FileService])
-  lazy val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
-  lazy val dtsrequests:ExtractionRequestsService = DI.injector.getInstance(classOf[ExtractionRequestsService])
-  lazy val sqarql: RdfSPARQLService = DI.injector.getInstance(classOf[RdfSPARQLService])
-  lazy val metadataService: MetadataService = DI.injector.getInstance(classOf[MetadataService])
-  lazy val contextService: ContextLDService = DI.injector.getInstance(classOf[ContextLDService])
-  lazy val events: EventService = DI.injector.getInstance(classOf[EventService])
-  lazy val userService: UserService = DI.injector.getInstance(classOf[UserService])
-  lazy val folders: FolderService = DI.injector.getInstance(classOf[FolderService])
-  lazy val previews : PreviewService = DI.injector.getInstance(classOf[PreviewService])
-  lazy val thumbnails : ThumbnailService = DI.injector.getInstance(classOf[ThumbnailService])
+  lazy val files: FileService = DI.injector.instanceOf[FileService]
+  lazy val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
+  lazy val dtsrequests:ExtractionRequestsService = DI.injector.instanceOf[ExtractionRequestsService]
+  lazy val sqarql: RdfSPARQLService = DI.injector.instanceOf[RdfSPARQLService]
+  lazy val metadataService: MetadataService = DI.injector.instanceOf[MetadataService]
+  lazy val contextService: ContextLDService = DI.injector.instanceOf[ContextLDService]
+  lazy val events: EventService = DI.injector.instanceOf[EventService]
+  lazy val userService: UserService = DI.injector.instanceOf[UserService]
+  lazy val folders: FolderService = DI.injector.instanceOf[FolderService]
+  lazy val previews : PreviewService = DI.injector.instanceOf[PreviewService]
+  lazy val thumbnails : ThumbnailService = DI.injector.instanceOf[ThumbnailService]
 
 
   def getContentType(filename: Option[String], contentType: Option[String]): String = {

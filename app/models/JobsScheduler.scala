@@ -15,7 +15,7 @@ import services.DI
  */
 
   object JobsScheduler {
-    val scheduler: SchedulerService =  DI.injector.getInstance(classOf[SchedulerService])
+    val scheduler: SchedulerService =  DI.injector.instanceOf[SchedulerService]
 
     def runScheduledJobs() = {
       val curr_time = Calendar.getInstance().getTime()

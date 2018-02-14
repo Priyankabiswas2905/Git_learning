@@ -54,7 +54,7 @@
                   <span class="glyphicon-bar"></span>
                   <span class="glyphicon-bar"></span>
                 </button>
-                @services.DI.injector.getInstance(classOf[services.LogoService]).get("GLOBAL", "logo") match {
+                @services.DI.injector.instanceOf[services.LogoService].get("GLOBAL", "logo") match {
                     case Some(logo) => {
                         <a class="navbar-brand" style="padding-top: 5px; padding-bottom: 5px" href="@routes.Application.index">
                             <img class="pull-left" style="height: 100%" src="@api.routes.Logos.downloadPath("GLOBAL", "logo")" alt="LOGO">

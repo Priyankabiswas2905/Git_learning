@@ -4,6 +4,7 @@ import java.io.IOException
 import java.net.URI
 import java.text.SimpleDateFormat
 import java.net.URLEncoder
+import javax.inject.Inject
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props}
 import com.ning.http.client.Realm.AuthScheme
@@ -11,8 +12,9 @@ import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.{Channel, Connection, ConnectionFactory, DefaultConsumer, Envelope}
 import models.{Extraction, UUID}
 import play.api.Play.current
+import play.api.inject.ApplicationLifecycle
 import play.api.libs.json.Json
-import play.api.libs.ws.{WSResponse, WS, WSAuthScheme}
+import play.api.libs.ws.{WS, WSAuthScheme, WSResponse}
 import play.api.{Application, Logger, Plugin}
 import play.libs.Akka
 import play.api.libs.json.JsValue
@@ -34,12 +36,14 @@ case class ExtractorMessage(
   flags: String,
   secretKey: String = play.api.Play.configuration.getString("commKey").getOrElse(""))
 
+trait RabbitMQService
+
 /**
  * Rabbitmq service.
  *
  */
-class RabbitmqPlugin(application: Application) extends Plugin {
-  val files: FileService = DI.injector.getInstance(classOf[FileService])
+class RabbitmqPlugin @Inject() (lifecycle: ApplicationLifecycle) extends RabbitMQService {
+  val files: FileService = DI.injector.instanceOf[FileService]
 
   var extractQueue: Option[ActorRef] = None
   var channel: Option[Channel] = None
@@ -54,34 +58,34 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   var exchange: String = ""
   var mgmtPort: String = ""
 
-  override def onStart() {
-    Logger.debug("Starting Rabbitmq Plugin")
-    val configuration = play.api.Play.configuration
-    rabbitmquri = configuration.getString("clowder.rabbitmq.uri").getOrElse("amqp://guest:guest@localhost:5672/%2f")
-    exchange = configuration.getString("clowder.rabbitmq.exchange").getOrElse("clowder")
-    mgmtPort = configuration.getString("clowder.rabbitmq.managmentPort").getOrElse("15672")
-    Logger.debug("uri= "+ rabbitmquri)
 
-    try {
-      val uri = new URI(rabbitmquri)
-      factory = Some(new ConnectionFactory())
-      factory.get.setUri(uri)
-    } catch {
-      case t: Throwable => {
-        factory = None
-        Logger.error("Invalid URI for RabbitMQ", t)
-      }
+  Logger.debug("Starting Rabbitmq Plugin")
+  val configuration = play.api.Play.configuration
+  rabbitmquri = configuration.getString("clowder.rabbitmq.uri").getOrElse("amqp://guest:guest@localhost:5672/%2f")
+  exchange = configuration.getString("clowder.rabbitmq.exchange").getOrElse("clowder")
+  mgmtPort = configuration.getString("clowder.rabbitmq.managmentPort").getOrElse("15672")
+  Logger.debug("uri= "+ rabbitmquri)
+
+  try {
+    val uri = new URI(rabbitmquri)
+    factory = Some(new ConnectionFactory())
+    factory.get.setUri(uri)
+  } catch {
+    case t: Throwable => {
+      factory = None
+      Logger.error("Invalid URI for RabbitMQ", t)
     }
   }
 
-  override def onStop() {
+  lifecycle.addStopHook { () =>
     Logger.debug("Shutting down Rabbitmq Plugin")
     factory = None
     close()
+    Future.successful(())
   }
 
-  override lazy val enabled = {
-    !application.configuration.getString("rabbitmqplugin").filter(_ == "disabled").isDefined
+  lazy val enabled = {
+    !current.configuration.getString("rabbitmqplugin").filter(_ == "disabled").isDefined
   }
 
   def close() {
@@ -352,7 +356,7 @@ class MsgConsumer(channel: Channel, target: ActorRef) extends DefaultConsumer(ch
  * Actual message on reply queue
  */
 class EventFilter(channel: Channel, queue: String) extends Actor {
-  val extractions: ExtractionService = DI.injector.getInstance(classOf[ExtractionService])
+  val extractions: ExtractionService = DI.injector.instanceOf[ExtractionService]
 
   def receive = {
     case statusBody: String =>

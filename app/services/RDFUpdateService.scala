@@ -25,9 +25,9 @@ import play.api.libs.concurrent.Execution.Implicits._
  */
 class RDFUpdateService(application: Application) extends Plugin {
 
-  val files: FileService = DI.injector.getInstance(classOf[FileService])
-  val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
-  val sparql: RdfSPARQLService = DI.injector.getInstance(classOf[RdfSPARQLService])
+  val files: FileService = DI.injector.instanceOf[FileService]
+  val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
+  val sparql: RdfSPARQLService = DI.injector.instanceOf[RdfSPARQLService]
 
   object MustBreak extends Exception {}
 

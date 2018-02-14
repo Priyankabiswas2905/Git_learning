@@ -31,6 +31,7 @@ import javax.inject.Inject
  *
  */
 class MongoDBUserService @Inject() (
+  mongoService: MongoService,
   files: FileService,
   datasets: DatasetService,
   collections: CollectionService,
@@ -607,17 +608,11 @@ class MongoDBUserService @Inject() (
   }
 
   object UserDAO extends ModelCompanion[User, ObjectId] {
-    val dao = current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("No MongoSalatPlugin");
-      case Some(x) => new SalatDAO[User, ObjectId](collection = x.collection("social.users")) {}
-    }
+    val dao = new SalatDAO[User, ObjectId](collection = mongoService.collection("social.users")) {}
   }
 
   object UserApiKeyDAO extends ModelCompanion[UserApiKey, ObjectId] {
-    val dao = current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("No MongoSalatPlugin");
-      case Some(x) => new SalatDAO[UserApiKey, ObjectId](collection = x.collection("users.apikey")) {}
-    }
+    val dao = new SalatDAO[UserApiKey, ObjectId](collection = mongoService.collection("users.apikey")) {}
   }
 }
 
@@ -734,10 +729,9 @@ class MongoDBSecureSocialUserService @Inject() (application: Application) extend
 
 object RoleDAO extends ModelCompanion[Role, ObjectId] {
 
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Role, ObjectId](collection = x.collection("roles")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+
+  val dao = new SalatDAO[Role, ObjectId](collection = mongoService.collection("roles")) {}
 
   def findById(id: String): Option[Role] = {
     dao.findOne(MongoDBObject("_id" -> new ObjectId(id)))

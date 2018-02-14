@@ -10,7 +10,7 @@ import play.api.libs.concurrent.Execution.Implicits._
  */
 class DatasetsAutodumpService (application: Application) extends Plugin {
 
-  val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
+  val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
   
   override def onStart() {
     Logger.debug("Starting dataset file groupings autodumper Plugin")

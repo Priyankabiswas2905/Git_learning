@@ -30,8 +30,8 @@ class ToolInstance() {
   var created = (new SimpleDateFormat("yyyy-MM-dd hh:mm:ss")).format(Calendar.getInstance.getTime)
   var updated = created
 
-  val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
-  val users: UserService = DI.injector.getInstance(classOf[UserService])
+  val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
+  val users: UserService = DI.injector.instanceOf[UserService]
 
   // Add a new dataset upload event to the uploadHistory
   def updateHistory(datasetId: UUID, uploaderId: String): Unit = {
@@ -87,10 +87,10 @@ class ToolManagerPlugin(application: Application) extends Plugin {
   var toolList: JsObject = JsObject(Seq[(String, JsValue)]()) // ToolAPIEndpoint -> {"name": <>, "description": <>}
   var instanceMap: Map[UUID, ToolInstance] = Map() // ToolManager SessionId -> ToolInstance instance
 
-  val comments: CommentService = DI.injector.getInstance(classOf[CommentService])
-  val files: FileService = DI.injector.getInstance(classOf[FileService])
-  val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
-  val collections: CollectionService = DI.injector.getInstance(classOf[CollectionService])
+  val comments: CommentService = DI.injector.instanceOf[CommentService]
+  val files: FileService = DI.injector.instanceOf[FileService]
+  val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
+  val collections: CollectionService = DI.injector.instanceOf[CollectionService]
 
   //TODO: decide on terminology. API has "tools" and "instances" - should we have Instance Manager? consistent naming!
 

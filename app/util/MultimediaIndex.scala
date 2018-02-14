@@ -9,7 +9,7 @@ import services.{DI, MultimediaQueryService}
  */
 object MultimediaIndex {
 
-  val queries: MultimediaQueryService = DI.injector.getInstance(classOf[MultimediaQueryService])
+  val queries: MultimediaQueryService = DI.injector.instanceOf[MultimediaQueryService]
 
   def recomputeAllDistances(): Unit = {
     Logger.debug("Recomputing all feature distances")

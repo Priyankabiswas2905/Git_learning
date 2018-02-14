@@ -65,7 +65,7 @@ trait AppConfigurationService {
  * Object to handle some common configuration options.
  */
 object AppConfiguration {
-  val appConfig: AppConfigurationService = DI.injector.getInstance(classOf[AppConfigurationService])
+  val appConfig: AppConfigurationService = DI.injector.instanceOf[AppConfigurationService]
 
   // ----------------------------------------------------------------------
 
@@ -201,7 +201,7 @@ object AppConfiguration {
 
   /** Set the version of the Terms of Service and returns the version */
   def setTermsOfServicesVersionDate(date: Date) = {
-    DI.injector.getInstance(classOf[UserService]).newTermsOfServices()
+    DI.injector.instanceOf[UserService].newTermsOfServices()
     appConfig.setProperty("tos.date", date)
   }
 
