@@ -3,6 +3,7 @@ package services
 import play.libs.Akka
 import play.api.{Application, Logger, Plugin}
 import java.io._
+import javax.inject.Inject
 
 import play.api.Play.{configuration, current}
 import play.api.libs.iteratee._
@@ -14,12 +15,20 @@ import scala.concurrent.duration._
 import com.ning.http.client.AsyncHttpClient
 import org.apache.commons.codec.binary.Base64.encodeBase64
 import com.ning.http.client.multipart.FilePart
+import play.api.inject.ApplicationLifecycle
+
+trait PolyglotService {
+  def checkForFileAndDownload(triesLeft: Int, url: String, outputStream: OutputStream): Future[Unit]
+  def getConvertedFileURL(filename: String, inputStream: InputStream, outputFormat: String): Future[String]
+  def getOutputFormats(inputType: String): Future[Option[List[String]]]
+  def getOutputFormatsPolyglot(inputType: String): Future[Option[List[String]]]
+}
 
 /**
  * Polyglot Plugin
  *
  */
-class PolyglotPlugin(application: Application) extends Plugin {
+class PolyglotServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends PolyglotService {
 
   val polyglotUser: Option[String] = configuration.getString("polyglot.username")
   val polyglotPassword: Option[String] = configuration.getString("polyglot.password")
@@ -30,12 +39,11 @@ class PolyglotPlugin(application: Application) extends Plugin {
   //store them in memory to avoind making a request to Polyglot each time
   val formatsTable = scala.collection.mutable.HashMap.empty[String, List[String]]
 
-  override def onStart() {
-    Logger.debug("Starting Polyglot Plugin")
-  }
+  Logger.debug("Starting Polyglot Plugin")
 
-  override def onStop() {
+  lifecycle.addStopHook { () =>
     Logger.debug("Stopping Polyglot Plugin")
+    Future.successful(())
   }
 
   //using code from https://www.playframework.com/documentation/2.2.x/ScalaWS

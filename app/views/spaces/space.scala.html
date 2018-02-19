@@ -55,12 +55,12 @@
                         <li role="presentation"><a href="#tab-public" role="tab" data-toggle="tab">Public Data</a></li>
                             <!-- Published Data tab and code is disabled, currently it shows Curation objects with Published status.
                             The use of DOI and remote repositories is being discussed.
-                        if(play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined) -->
+                        if(play.api.Play.current.configuration.getBoolean("stagingarea.enabled")) -->
                         @if(false){
                             <li role="presentation"><a href="#tab-publish" role="tab" data-toggle="tab">Published Data</a></li>
                         }
                     } else {
-                        @if(play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined) {
+                        @if(play.api.Play.current.configuration.getBoolean("stagingarea.enabled")) {
                             <li role="presentation" class="active"><a href="#tab-public" role="tab" data-toggle="tab">Public Data</a></li>
                             <!-- Published Data tab and code is disabled, currently it shows Curation objects with Published status.
                             The use of DOI and remote repositories is being discussed.

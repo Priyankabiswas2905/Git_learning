@@ -36,7 +36,8 @@ class Metadata @Inject() (
     files: FileService,
     curations: CurationService,
     events: EventService,
-    spaceService: SpaceService) extends ApiController {
+    spaceService: SpaceService,
+    elasticsearchService: ElasticsearchService) extends ApiController {
 
   def getDefinitions() = PermissionAction(Permission.ViewDataset) {
     implicit request =>
@@ -67,20 +68,17 @@ class Metadata @Inject() (
     }
 
     // Next get Elasticsearch metadata fields if plugin available
-    current.plugin[ElasticsearchPlugin] match {
-      case Some(plugin) => {
-        val mdTerms = plugin.getAutocompleteMetadataFields(query)
-        for (term <- mdTerms) {
-          // e.g. "metadata.http://localhost:9000/clowder/api/extractors/terra.plantcv.angle",
-          //      "metadata.Jane Doe.Alternative Title"
-          if (!(listOfTerms contains term))
-            listOfTerms.append(term)
-        }
-        Ok(toJson(listOfTerms.distinct))
+    if (current.configuration.getBoolean("elasticsearchSettings.enabled").getOrElse(false)) {
+      val mdTerms = elasticsearchService.getAutocompleteMetadataFields(query)
+      for (term <- mdTerms) {
+        // e.g. "metadata.http://localhost:9000/clowder/api/extractors/terra.plantcv.angle",
+        //      "metadata.Jane Doe.Alternative Title"
+        if (!(listOfTerms contains term))
+          listOfTerms.append(term)
       }
-      case None => {
-        BadRequest("Elasticsearch plugin is not enabled")
-      }
+      Ok(toJson(listOfTerms.distinct))
+    } else {
+      BadRequest("Elasticsearch plugin is not enabled")
     }
   }
 
@@ -382,20 +380,19 @@ class Metadata @Inject() (
               }
 
               Logger.debug("re-indexing after metadata removal")
-              current.plugin[ElasticsearchPlugin].foreach { p =>
-                // Delete existing index entry and re-index
-                m.attachedTo.resourceType match {
-                  case ResourceRef.file => {
-                    p.delete("data", "file", m.attachedTo.id.stringify)
-                    files.index(m.attachedTo.id)
-                  }
-                  case ResourceRef.dataset => {
-                    p.delete("data", "dataset", m.attachedTo.id.stringify)
-                    datasets.index(m.attachedTo.id)
-                  }
-                  case _ => {
-                    Logger.error("unknown attached resource type for metadata - not reindexing")
-                  }
+
+              // Delete existing index entry and re-index
+              m.attachedTo.resourceType match {
+                case ResourceRef.file => {
+                  elasticsearchService.delete("data", "file", m.attachedTo.id.stringify)
+                  files.index(m.attachedTo.id)
+                }
+                case ResourceRef.dataset => {
+                  elasticsearchService.delete("data", "dataset", m.attachedTo.id.stringify)
+                  datasets.index(m.attachedTo.id)
+                }
+                case _ => {
+                  Logger.error("unknown attached resource type for metadata - not reindexing")
                 }
               }
 
@@ -443,7 +440,7 @@ class Metadata @Inject() (
 
     implicit val context = scala.concurrent.ExecutionContext.Implicits.global
     val endpoint = (play.Play.application().configuration().getString("people.uri"))
-    if (play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined && endpoint != null) {
+    if (play.api.Play.current.configuration.getBoolean("stagingarea.enabled").getOrElse(false) && endpoint != null) {
 
       val futureResponse = WS.url(endpoint).get()
       var jsonResponse: play.api.libs.json.JsValue = new JsArray()

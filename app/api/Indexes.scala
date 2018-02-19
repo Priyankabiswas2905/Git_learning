@@ -14,7 +14,8 @@ import services.{ExtractorMessage, _}
  * Index data.
  */
 @Inject
-class Indexes @Inject() (multimediaSearch: MultimediaQueryService, previews: PreviewService) extends Controller with ApiController {
+class Indexes @Inject() (multimediaSearch: MultimediaQueryService, previews: PreviewService, versusService: VersusService)
+  extends Controller with ApiController {
 
   /**
    * Submit section, preview, file for indexing.
@@ -32,7 +33,7 @@ class Indexes @Inject() (multimediaSearch: MultimediaQueryService, previews: Pre
                 // TODO replace null with None
 	              _.extract(ExtractorMessage(id, id, host, key, Map("section_id"->section_id), p.length.toString, null, ""))}
 	            val fileType = p.contentType
-	            current.plugin[VersusPlugin].foreach{ _.indexPreview(id,fileType) }
+	            versusService.indexPreview(id,fileType)
 	            Ok(toJson("success"))
       	      case None => BadRequest(toJson("Missing parameter [preview_id]"))
             }

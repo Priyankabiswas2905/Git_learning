@@ -20,7 +20,8 @@ import scala.concurrent.Future
  * Administration pages.
  */
 @Singleton
-class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: UserService, metadataService: MetadataService) extends SecuredController {
+class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: UserService,
+  metadataService: MetadataService, versusService: VersusService) extends SecuredController {
 
   def customize = ServerAdminAction { implicit request =>
     val theme = AppConfiguration.getTheme
@@ -65,19 +66,15 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
    * Gets the available Adapters from Versus
    */
   def getAdapters() = ServerAdminAction.async { implicit request =>
-    current.plugin[VersusPlugin] match {
-      case Some(plugin) => {
-        val adapterListResponse = plugin.getAdapters()
-        for {
-          adapterList <- adapterListResponse
-        } yield {
-          Ok(adapterList.json)
-        }
+    if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
+      val adapterListResponse = versusService.getAdapters()
+      for {
+        adapterList <- adapterListResponse
+      } yield {
+        Ok(adapterList.json)
       }
-
-      case None => {
-        Future(Ok("No Versus Service"))
-      }
+    } else {
+      Future(Ok("No Versus Service"))
     }
   }
 
@@ -94,19 +91,15 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
    * Gets available extractors from Versus
    */
   def getExtractors() = ServerAdminAction.async { implicit request =>
-    current.plugin[VersusPlugin] match {
-      case Some(plugin) => {
-        val extractorListResponse = plugin.getExtractors()
-        for {
-          extractorList <- extractorListResponse
-        } yield {
-          Ok(extractorList.json)
-        }
+    if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
+      val extractorListResponse = versusService.getExtractors()
+      for {
+        extractorList <- extractorListResponse
+      } yield {
+        Ok(extractorList.json)
       }
-
-      case None => {
-        Future(Ok("No Versus Service"))
-      }
+    } else {
+      Future(Ok("No Versus Service"))
     }
   }
 
@@ -114,19 +107,15 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
    * Gets available Measures from Versus
    */
   def getMeasures() = ServerAdminAction.async { implicit request =>
-    current.plugin[VersusPlugin] match {
-      case Some(plugin) => {
-        val measureListResponse= plugin.getMeasures()
-        for {
-          measureList <- measureListResponse
-        } yield {
-          Ok(measureList.json)
-        }
+    if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
+      val measureListResponse= versusService.getMeasures()
+      for {
+        measureList <- measureListResponse
+      } yield {
+        Ok(measureList.json)
       }
-
-      case None => {
-        Future(Ok("No Versus Service"))
-      }
+    } else {
+      Future(Ok("No Versus Service"))
     }
   }
 
@@ -134,19 +123,15 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
    * Gets available Indexers from Versus
    */
   def getIndexers() = ServerAdminAction.async { implicit request =>
-    current.plugin[VersusPlugin] match {
-      case Some(plugin) => {
-        val indexerListResponse = plugin.getIndexers()
-        for {
-          indexerList <- indexerListResponse
-        } yield {
-          Ok(indexerList.json)
-        }
+    if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
+      val indexerListResponse = versusService.getIndexers()
+      for {
+        indexerList <- indexerListResponse
+      } yield {
+        Ok(indexerList.json)
       }
-
-      case None => {
-        Future(Ok("No Versus Service"))
-      }
+    } else {
+      Future(Ok("No Versus Service"))
     }
   }
 
@@ -155,85 +140,78 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
    * If an index has type and/or name, stores type/name in mongo db.
    */
    def createIndex() = ServerAdminAction.async(parse.json) { implicit request =>
-     current.plugin[VersusPlugin] match {
-       case Some(plugin) => {
-         Logger.trace("Contr.Admin.CreateIndex()")
-         val adapter =    (request.body \ "adapter").as[String]
-         val extractor =  (request.body \ "extractor").as[String]
-         val measure =    (request.body \ "measure").as[String]
-         val indexer =    (request.body \ "indexer").as[String]
-         val indexType =  (request.body \ "indexType").as[String]
-         val indexName =  (request.body \ "name").as[String]
-         //create index and get its id
-         val indexIdFuture: Future[models.UUID] = plugin.createIndex(adapter, extractor, measure, indexer)
-         //save index type (census sections, face sections, etc) to the mongo db
-         if (indexType != null && indexType.length !=0){
-          indexIdFuture.map(sectionIndexInfo.insertType(_, indexType))
-         }
-         //save index name to the mongo db
-         if (indexName != null && indexName.length !=0){
-          indexIdFuture.map(sectionIndexInfo.insertName(_, indexName))
-         }
-          Future(Ok("Index created successfully"))
+     if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
+       Logger.trace("Contr.Admin.CreateIndex()")
+       val adapter =    (request.body \ "adapter").as[String]
+       val extractor =  (request.body \ "extractor").as[String]
+       val measure =    (request.body \ "measure").as[String]
+       val indexer =    (request.body \ "indexer").as[String]
+       val indexType =  (request.body \ "indexType").as[String]
+       val indexName =  (request.body \ "name").as[String]
+       //create index and get its id
+       val indexIdFuture: Future[models.UUID] = versusService.createIndex(adapter, extractor, measure, indexer)
+       //save index type (census sections, face sections, etc) to the mongo db
+       if (indexType != null && indexType.length !=0){
+        indexIdFuture.map(sectionIndexInfo.insertType(_, indexType))
        }
-
-       case None => {
-         Future(Ok("No Versus Service"))
+       //save index name to the mongo db
+       if (indexName != null && indexName.length !=0){
+        indexIdFuture.map(sectionIndexInfo.insertName(_, indexName))
        }
+        Future(Ok("Index created successfully"))
+     } else {
+       Future(Ok("No Versus Service"))
      }
    }
+
 
   /**
    * Gets indexes from Versus, using VersusPlugin. Checks in mongo on clowder side if these indexes
    * have type and/or name. Adds type and/or name to json object and calls view template to display.
    */
   def getIndexes() = ServerAdminAction.async { implicit request =>
-    current.plugin[VersusPlugin] match {
-      case Some(plugin) => {
-        Logger.trace(" Admin.getIndexes()")
-        val indexListResponse = plugin.getIndexes()
-        for {
-          indexList <- indexListResponse
-        } yield {
-          if(indexList.body.isEmpty())
-          {
-            Ok(Json.toJson(""))
-          }
-          else{
-            var finalJson: JsValue=null
-            val jsArray = indexList.json
-            //make sure we got correctly formatted list of values
-            jsArray.validate[List[VersusIndexTypeName]].fold(
-              // Handle the case for invalid incoming JSON.
-              // Note: JSON created in Versus IndexResource.listJson must have the same names as clowder models.VersusIndexTypeName
-              error => {
-                Logger.error("Admin.getIndexes - validation error")
-                InternalServerError("Received invalid JSON response from remote service.")
-                },
+    if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
+      Logger.trace(" Admin.getIndexes()")
+      val indexListResponse = versusService.getIndexes()
+      for {
+        indexList <- indexListResponse
+      } yield {
+        if(indexList.body.isEmpty())
+        {
+          Ok(Json.toJson(""))
+        }
+        else{
+          var finalJson: JsValue=null
+          val jsArray = indexList.json
+          //make sure we got correctly formatted list of values
+          jsArray.validate[List[VersusIndexTypeName]].fold(
+            // Handle the case for invalid incoming JSON.
+            // Note: JSON created in Versus IndexResource.listJson must have the same names as clowder models.VersusIndexTypeName
+            error => {
+              Logger.error("Admin.getIndexes - validation error")
+              InternalServerError("Received invalid JSON response from remote service.")
+              },
 
-                // Handle a deserialized array of List[VersusIndexTypeName]
-                indexes => {
-                  val indexesWithNameType = indexes.map{
-                    index=>
-                        //check in mongo for name/type of each index
-                      val indType = sectionIndexInfo.getType(UUID(index.indexID)).getOrElse("")
-                      val indName = sectionIndexInfo.getName(UUID(index.indexID)).getOrElse("")
-                      //add type/name to index
-                      VersusIndexTypeName.addTypeAndName(index, indType, indName)
-                  }
-                  indexesWithNameType.map(i=> Logger.debug("Admin.getIndexes index with name = " + i))
-                  // Serialize as JSON, requires the implicit `format` defined earlier in VersusIndexTypeName
-                  finalJson = Json.toJson(indexesWithNameType)
+              // Handle a deserialized array of List[VersusIndexTypeName]
+              indexes => {
+                val indexesWithNameType = indexes.map{
+                  index=>
+                      //check in mongo for name/type of each index
+                    val indType = sectionIndexInfo.getType(UUID(index.indexID)).getOrElse("")
+                    val indName = sectionIndexInfo.getName(UUID(index.indexID)).getOrElse("")
+                    //add type/name to index
+                    VersusIndexTypeName.addTypeAndName(index, indType, indName)
                 }
-              ) //end of fold
-              Ok(finalJson)
-          }
+                indexesWithNameType.map(i=> Logger.debug("Admin.getIndexes index with name = " + i))
+                // Serialize as JSON, requires the implicit `format` defined earlier in VersusIndexTypeName
+                finalJson = Json.toJson(indexesWithNameType)
+              }
+            ) //end of fold
+            Ok(finalJson)
         }
       }
-
-      case None => {
-        Future(Ok("No Versus Service"))
-      }
+    } else {
+      Future(Ok("No Versus Service"))
     }
   }
 
@@ -242,59 +220,47 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
    */
   def buildIndex(id: String) = ServerAdminAction.async { implicit request =>
     Logger.trace("Inside Admin.buildIndex(), index = " + id)
-    current.plugin[VersusPlugin] match {
-      case Some(plugin) => {
-      val buildResponse = plugin.buildIndex(UUID(id))
+    if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
+      val buildResponse = versusService.buildIndex(UUID(id))
         for {
           buildRes <- buildResponse
         } yield {
           Ok(buildRes.body)
         }
-      }
-
-      case None => {
+      } else {
         Future(Ok("No Versus Service"))
       }
     }
-  }
 
   /**
    * Deletes a specific index in Versus
    */
   def deleteIndex(id: String) = ServerAdminAction.async { implicit request =>
-    current.plugin[VersusPlugin] match {
-      case Some(plugin) => {
-        val deleteIndexResponse= plugin.deleteIndex(UUID(id))
-        for{
-          deleteIndexRes<-deleteIndexResponse
-        } yield {
-         Ok(deleteIndexRes.body)
-        }
+    if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
+      val deleteIndexResponse= versusService.deleteIndex(UUID(id))
+      for{
+        deleteIndexRes<-deleteIndexResponse
+      } yield {
+       Ok(deleteIndexRes.body)
       }
-
-      case None => {
-        Future(Ok("No Versus Service"))
-      }
-		}
+    } else {
+      Future(Ok("No Versus Service"))
+    }
   }
 
   /**
    * Deletes all indexes in Versus
    */
   def deleteAllIndexes() = ServerAdminAction.async { implicit request =>
-    current.plugin[VersusPlugin] match {
-      case Some(plugin) => {
-        val deleteAllResponse = plugin.deleteAllIndexes()
-        for {
-          deleteAllRes <- deleteAllResponse
-        } yield {
-          Ok(deleteAllRes.body)
-        }
+    if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
+      val deleteAllResponse = versusService.deleteAllIndexes()
+      for {
+        deleteAllRes <- deleteAllResponse
+      } yield {
+        Ok(deleteAllRes.body)
       }
-
-      case None => {
-        Future(Ok("No Versus Service"))
-      }
+    } else {
+      Future(Ok("No Versus Service"))
     }
   }
 

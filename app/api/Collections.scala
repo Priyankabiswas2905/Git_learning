@@ -40,7 +40,8 @@ class Collections @Inject() (datasets: DatasetService,
                              appConfig: AppConfigurationService,
                              folders : FolderService,
                              files: FileService,
-                             metadataService : MetadataService) extends ApiController {
+                             metadataService : MetadataService,
+                             elasticsearchService: ElasticsearchService) extends ApiController {
 
   def createCollection() = PermissionAction(Permission.CreateCollection) (parse.json) { implicit request =>
     Logger.debug("Creating new collection")
@@ -114,9 +115,7 @@ class Collections @Inject() (datasets: DatasetService,
   def reindex(id: UUID, recursive: Boolean) = PermissionAction(Permission.CreateCollection, Some(ResourceRef(ResourceRef.collection, id))) {  implicit request =>
       collections.get(id) match {
         case Some(coll) => {
-          current.plugin[ElasticsearchPlugin].foreach {
-            _.index(coll, recursive)
-          }
+          elasticsearchService.index(coll, recursive)
           Ok(toJson(Map("status" -> "success")))
         }
         case None => {
@@ -156,8 +155,8 @@ class Collections @Inject() (datasets: DatasetService,
         events.addObjectEvent(request.user , collection.id, collection.name, "delete_collection")
         collections.delete(collectionId)
         appConfig.incrementCount('collections, -1)
-        current.plugin[AdminsNotifierPlugin].foreach {
-          _.sendAdminsNotification(Utils.baseUrl(request),"Collection","removed",collection.id.stringify, collection.name)
+        if (current.configuration.getBoolean("clowder.events.notifyadmins").getOrElse(false)) {
+          AdminsNotifier.sendAdminsNotification(Utils.baseUrl(request),"Collection","removed",collection.id.stringify, collection.name)
         }
       }
     }
@@ -177,7 +176,7 @@ class Collections @Inject() (datasets: DatasetService,
     implicit val user = request.user
     var listAll = false
     var collectionList: List[Collection] = List.empty
-    if(play.api.Play.current.plugin[services.SpaceSharingPlugin].isDefined) {
+    if(play.api.Play.current.configuration.getBoolean("clowder.space.sharing").getOrElse(false)) {
       listAll = true
     } else {
       datasets.get(datasetId) match {
@@ -218,7 +217,7 @@ class Collections @Inject() (datasets: DatasetService,
     val descendants = collections.getAllDescendants(UUID(currentCollectionId)).toList
     val allCollections = listCollections(title, date, limit, Set[Permission](Permission.AddResourceToCollection, Permission.EditCollection), false, request.user, request.user.fold(false)(_.superAdminMode))
     val possibleNewParents = allCollections.filter((c: Collection) =>
-      if(play.api.Play.current.plugin[services.SpaceSharingPlugin].isDefined) {
+      if(play.api.Play.current.configuration.getBoolean("clowder.space.sharing").getOrElse(false)) {
         (!selfAndAncestors.contains(c) && !descendants.contains(c))
       } else {
             collections.get(UUID(currentCollectionId)) match {

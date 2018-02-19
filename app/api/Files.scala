@@ -50,7 +50,9 @@ class Files @Inject()(
   folders: FolderService,
   spaces: SpaceService,
   userService: UserService,
-  appConfig: AppConfigurationService) extends ApiController {
+  appConfig: AppConfigurationService,
+  elasticsearchService: ElasticsearchService,
+  versusService: VersusService) extends ApiController {
 
   def get(id: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
     Logger.debug("GET file with id " + id)
@@ -484,9 +486,7 @@ class Files @Inject()(
   def reindex(id: UUID) = PermissionAction(Permission.AddFile, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
     files.get(id) match {
       case Some(file) => {
-        current.plugin[ElasticsearchPlugin].foreach {
-          _.index(file)
-        }
+        elasticsearchService.index(file)
         Ok(toJson(Map("status" -> "success")))
       }
       case None => {
@@ -1534,17 +1534,12 @@ class Files @Inject()(
 
           //this stmt has to be before files.removeFile
           Logger.debug("Deleting file from indexes " + file.filename)
-          current.plugin[VersusPlugin].foreach {        
-            _.removeFromIndexes(id)        
-          }
+          versusService.removeFromIndexes(id)
           Logger.debug("Deleting file: " + file.filename)
           files.removeFile(id)
           appConfig.incrementCount('files, -1)
           appConfig.incrementCount('bytes, -file.length)
-
-          current.plugin[ElasticsearchPlugin].foreach {
-            _.delete("data", "file", id.stringify)
-          }
+          elasticsearchService.delete("data", "file", id.stringify)
           //remove file from RDF triple store if triple store is used
           configuration.getString("userdfSPARQLStore").getOrElse("no") match {
             case "yes" => {
@@ -1555,8 +1550,9 @@ class Files @Inject()(
             }
             case _ => {}
           }
-          current.plugin[AdminsNotifierPlugin].foreach{
-            _.sendAdminsNotification(Utils.baseUrl(request), "File","removed",id.stringify, file.filename)}
+          if (current.configuration.getBoolean("clowder.events.notifyadmins").getOrElse(false)) {
+            AdminsNotifier.sendAdminsNotification(Utils.baseUrl(request), "File","removed",id.stringify, file.filename)
+          }
           Ok(toJson(Map("status"->"success")))
         }
         case None => Ok(toJson(Map("status" -> "success")))
@@ -1633,9 +1629,7 @@ class Files @Inject()(
   def index(id: UUID) {
     files.get(id) match {
       case Some(file) => {
-        current.plugin[ElasticsearchPlugin].foreach {
-          _.index(SearchUtils.getElasticsearchObject(file))
-        }
+        elasticsearchService.index(SearchUtils.getElasticsearchObject(file))
       }
       case None => Logger.error("File not found: " + id)
     }

@@ -2,6 +2,7 @@ package services
 
 import java.util.{Calendar, Date}
 import java.text.SimpleDateFormat
+import javax.inject.Inject
 
 import scala.collection.mutable.Map
 import scala.concurrent.Future
@@ -13,6 +14,7 @@ import play.api.libs.ws.WS._
 import play.api.{Application, Logger, Plugin}
 import models.UUID
 import play.api.Play.current
+import play.api.inject.ApplicationLifecycle
 
 /**
   * ToolSession describes an active analysis environment. Each instance keeps a history of datasets that were
@@ -78,12 +80,38 @@ class ToolInstance() {
   }
 }
 
+trait ToolManagerService {
+  var toolList: JsObject
+
+  var instanceMap: Map[UUID, ToolInstance]
+
+  def enabled: Boolean
+
+  def refreshActiveInstanceListFromServer(): Unit
+
+  def getInstancesWithDataset(datasetID: UUID): Map[UUID, ToolInstance]
+
+  def launchTool(hostURL: String, instanceName: String, toolPath: String, datasetId: UUID, datasetName: String,
+    ownerId: Option[UUID]): UUID
+
+  def getLaunchableTools(): JsObject
+
+  def uploadDatasetToInstance(hostURL: String, instanceID: UUID, datasetId: UUID, datasetName: String,
+    userId: Option[UUID]): Unit
+
+  def getInstances(): Map[String, String]
+
+  def checkForInstanceURL(instanceID: UUID): String
+
+  def removeInstance(toolPath: String, instanceID: UUID): Unit
+}
+
 /**
   * ToolManager plugin.
   * This manages ToolInstances(), each describing a running tool/analysis environment/VM that was launched
   * from Clowder. Supports launching, stopping, getting info of analysis environment sessions.
   */
-class ToolManagerPlugin(application: Application) extends Plugin {
+class ToolManagerServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends ToolManagerService {
   var toolList: JsObject = JsObject(Seq[(String, JsValue)]()) // ToolAPIEndpoint -> {"name": <>, "description": <>}
   var instanceMap: Map[UUID, ToolInstance] = Map() // ToolManager SessionId -> ToolInstance instance
 
@@ -94,11 +122,12 @@ class ToolManagerPlugin(application: Application) extends Plugin {
 
   //TODO: decide on terminology. API has "tools" and "instances" - should we have Instance Manager? consistent naming!
 
-  override def onStart() {
-    Logger.debug("Initializing ToolManagerPlugin")
-    refreshLaunchableToolsFromServer()
-    refreshActiveInstanceListFromServer()
-  }
+
+  Logger.debug("Initializing ToolManagerPlugin")
+  refreshLaunchableToolsFromServer()
+  refreshActiveInstanceListFromServer()
+
+  def enabled = true
 
   /**
     * Get list of valid endpoints for tool selection.
@@ -339,9 +368,11 @@ class ToolManagerPlugin(application: Application) extends Plugin {
     instanceMap = instanceMap - instanceID
   }
 
-  override def onStop() {
+  lifecycle.addStopHook { () =>
     instanceMap = Map()
     Logger.info("ToolManagerPlugin has stopped")
+    Future.successful(())
   }
+
 
 }

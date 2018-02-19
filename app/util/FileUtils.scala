@@ -39,6 +39,7 @@ object FileUtils {
   lazy val folders: FolderService = DI.injector.instanceOf[FolderService]
   lazy val previews : PreviewService = DI.injector.instanceOf[PreviewService]
   lazy val thumbnails : ThumbnailService = DI.injector.instanceOf[ThumbnailService]
+  lazy val elasticsearchService : ElasticsearchService = DI.injector.instanceOf[ElasticsearchService]
 
 
   def getContentType(filename: Option[String], contentType: Option[String]): String = {
@@ -767,15 +768,13 @@ object FileUtils {
 
     // index the file
     if (index) {
-      current.plugin[ElasticsearchPlugin].foreach {
-        _.index(file)
-      }
+      elasticsearchService.index(file)
     }
 
     // notify admins a new file was added
-    current.plugin[AdminsNotifierPlugin].foreach {
+    if (current.configuration.getBoolean("clowder.events.notifyadmins").getOrElse(false)) {
       // TODO replace with Mail.sendAdmins and use template
-      _.sendAdminsNotification(clowderurl, "File", "added", file.id.stringify, file.filename)
+      AdminsNotifier.sendAdminsNotification(clowderurl, "File", "added", file.id.stringify, file.filename)
     }
   }
 

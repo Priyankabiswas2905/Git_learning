@@ -143,7 +143,7 @@
                     }
                 </div>
             }
-            @if(ownProfile && play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined) {
+            @if(ownProfile && play.api.Play.current.configuration.getBoolean("stagingarea.enabled")) {
                 <div class="profile-disclaimer small">@play.api.i18n.Messages("profile.disclaimer")</div>
             }
             @if(ownProfile) {

@@ -1,11 +1,11 @@
 #9990:services.mongodb.MongoSalatPlugin
 #1500:play.api.libs.mailer.CommonsMailerPlugin
 #9992:services.RabbitmqPlugin
-9994:services.mongodb.MongoDBAuthenticatorStore
+#9994:services.mongodb.MongoDBAuthenticatorStore
 #9995:securesocial.core.DefaultIdGenerator
 #9996:securesocial.core.providers.utils.DefaultPasswordValidator
 #9997:services.SecureSocialTemplatesPlugin
-9998:services.mongodb.MongoDBSecureSocialUserService
+#9998:services.mongodb.MongoDBSecureSocialUserService
 #9999:securesocial.core.providers.utils.BCryptPasswordHasher
 #10000:securesocial.core.providers.TwitterProvider
 #10001:securesocial.core.providers.FacebookProvider

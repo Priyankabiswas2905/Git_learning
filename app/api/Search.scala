@@ -1,18 +1,16 @@
 package api
 
-import services.{RdfSPARQLService, DatasetService, FileService, CollectionService, PreviewService, MultimediaQueryService, ElasticsearchPlugin}
-import play.Logger
-import scala.collection.mutable.{ListBuffer, HashMap}
-import scala.collection.JavaConversions.mapAsScalaMap
-import edu.illinois.ncsa.isda.lsva.ImageMeasures
-import edu.illinois.ncsa.isda.lsva.ImageDescriptors.FeatureType
-import util.{SearchUtils, SearchResult}
-import play.api.libs.json.{JsObject, Json, JsValue}
-import play.api.libs.json.Json.toJson
 import javax.inject.{Inject, Singleton}
-import play.api.Play.current
-import play.api.Play.configuration
+
 import models._
+import play.Logger
+import play.api.Play.{configuration, current}
+import play.api.libs.json.Json.toJson
+import play.api.libs.json.{JsObject, JsValue, Json}
+import services._
+import util.SearchResult
+
+import scala.collection.mutable.{HashMap, ListBuffer}
 
 @Singleton
 class Search @Inject() (
@@ -21,71 +19,66 @@ class Search @Inject() (
    collections: CollectionService,
    previews: PreviewService,
    queries: MultimediaQueryService,
-   sparql: RdfSPARQLService)  extends ApiController {
+   sparql: RdfSPARQLService,
+   elasticsearchService: ElasticsearchService)  extends ApiController {
 
   /** Search using a simple text string */
   def search(query: String) = PermissionAction(Permission.ViewDataset) { implicit request =>
-    current.plugin[ElasticsearchPlugin] match {
-      case Some(plugin) => {
-        var filesFound = ListBuffer.empty[String]
-        var datasetsFound = ListBuffer.empty[String]
-        var collectionsFound = ListBuffer.empty[String]
+    if (current.configuration.getBoolean("elasticsearchSettings.enabled").getOrElse(false)) {
+      var filesFound = ListBuffer.empty[String]
+      var datasetsFound = ListBuffer.empty[String]
+      var collectionsFound = ListBuffer.empty[String]
 
-        val response = plugin.search(query.replaceAll("([:/\\\\])", "\\\\$1"))
+      val response = elasticsearchService.search(query.replaceAll("([:/\\\\])", "\\\\$1"))
 
-        for (resource <- response) {
-          resource.resourceType match {
-            case ResourceRef.file => filesFound += resource.id.stringify
-            case ResourceRef.dataset => datasetsFound += resource.id.stringify
-            case ResourceRef.collection => collectionsFound += resource.id.stringify
-          }
+      for (resource <- response) {
+        resource.resourceType match {
+          case ResourceRef.file => filesFound += resource.id.stringify
+          case ResourceRef.dataset => datasetsFound += resource.id.stringify
+          case ResourceRef.collection => collectionsFound += resource.id.stringify
         }
-
-        Ok(toJson( Map[String,JsValue](
-          "files" -> toJson(filesFound),
-          "datasets" -> toJson(datasetsFound),
-          "collections" -> toJson(collectionsFound)
-        )))
       }
-     case None => {
-       Logger.debug("Search plugin not enabled")
-          Ok(views.html.pluginNotEnabled("Text search"))
-       }
-    }
+
+      Ok(toJson( Map[String,JsValue](
+        "files" -> toJson(filesFound),
+        "datasets" -> toJson(datasetsFound),
+        "collections" -> toJson(collectionsFound)
+      )))
+    } else {
+     Logger.debug("Search plugin not enabled")
+        Ok(views.html.pluginNotEnabled("Text search"))
+     }
   }
 
   /** Search using string-encoded Json object (e.g. built by Advanced Search form) */
   def searchJson(query: String, grouping: String) = PermissionAction(Permission.ViewDataset) {
     implicit request =>
       implicit val user = request.user
+      if (current.configuration.getBoolean("elasticsearchSettings.enabled").getOrElse(false)) {
+        val queryList = Json.parse(query).as[List[JsValue]]
+        val results = elasticsearchService.search(queryList, grouping)
 
-      current.plugin[ElasticsearchPlugin] match {
-        case Some(plugin) => {
-          val queryList = Json.parse(query).as[List[JsValue]]
-          val results = plugin.search(queryList, grouping)
-
-          val collectionsResults = results.flatMap { c =>
-            if (c.resourceType == ResourceRef.collection) collections.get(c.id) else None
-          }
-          val datasetsResults = results.flatMap { d =>
-            if (d.resourceType == ResourceRef.dataset) datasets.get(d.id) else None
-          }
-          val filesResults = results.flatMap { f =>
-            if (f.resourceType == ResourceRef.file) files.get(f.id) else None
-          }
-
-          // Use "distinct" to remove duplicate results.
-          Ok(JsObject(Seq(
-            "datasets" -> toJson(datasetsResults.distinct),
-            "files" -> toJson(filesResults.distinct),
-            "collections" -> toJson(collectionsResults.distinct)
-          )))
+        val collectionsResults = results.flatMap { c =>
+          if (c.resourceType == ResourceRef.collection) collections.get(c.id) else None
         }
-        case None => {
-          BadRequest("Elasticsearch plugin could not be reached")
+        val datasetsResults = results.flatMap { d =>
+          if (d.resourceType == ResourceRef.dataset) datasets.get(d.id) else None
         }
+        val filesResults = results.flatMap { f =>
+          if (f.resourceType == ResourceRef.file) files.get(f.id) else None
+        }
+
+        // Use "distinct" to remove duplicate results.
+        Ok(JsObject(Seq(
+          "datasets" -> toJson(datasetsResults.distinct),
+          "files" -> toJson(filesResults.distinct),
+          "collections" -> toJson(collectionsResults.distinct)
+        )))
+      } else {
+        BadRequest("Elasticsearch plugin could not be reached")
       }
-  }
+    }
+
 
   def querySPARQL() = PermissionAction(Permission.ViewMetadata) { implicit request =>
       configuration.getString("userdfSPARQLStore").getOrElse("no") match {

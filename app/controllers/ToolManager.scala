@@ -1,19 +1,22 @@
 package controllers
 
+import javax.inject.Inject
+
 import api.Permission
-import models.{UUID, ResourceRef}
+import models.{ResourceRef, UUID}
 import play.api.Logger
 import play.api.Play.current
 import play.api.libs.json.{JsObject, JsValue}
 import play.api.libs.json.Json._
-import services.{ToolInstance, ToolManagerPlugin}
+import services.{ToolInstance, ToolManagerService}
+
 import scala.collection.immutable._
 import scala.collection.mutable.{Map => MutableMap}
 
 /**
   * A dataset is a collection of files and streams.
   */
-class ToolManager extends SecuredController {
+class ToolManager @Inject() (toolService: ToolManagerService) extends SecuredController {
 
   /**
     * With permission, prepare Tool Manager page with list of currently running tool instances.
@@ -24,11 +27,9 @@ class ToolManager extends SecuredController {
     var instanceMap = MutableMap[UUID, ToolInstance]()
     var toolList: JsObject = JsObject(Seq[(String, JsValue)]())
     // Get mapping of instanceIDs to URLs API has returned
-    current.plugin[ToolManagerPlugin].map( mgr => {
-      mgr.refreshActiveInstanceListFromServer()
-      toolList = mgr.toolList
-      instanceMap = mgr.instanceMap
-    })
+    toolService.refreshActiveInstanceListFromServer()
+    toolList = toolService.toolList
+    instanceMap = toolService.instanceMap
 
     Ok(views.html.toolManager(toolList, instanceMap.keys.toList, instanceMap))
   }
@@ -44,7 +45,7 @@ class ToolManager extends SecuredController {
     // Get mapping of instanceIDs to returned URLs
     var instanceMap = MutableMap[UUID, ToolInstance]()
     // Get mapping of instanceID -> ToolInstance if datasetID is in uploadHistory
-    current.plugin[ToolManagerPlugin].map( mgr => instanceMap = mgr.getInstancesWithDataset(datasetId))
+    instanceMap = toolService.getInstancesWithDataset(datasetId)
     Ok(views.html.datasets.tools(instanceMap.keys.toList, instanceMap, datasetId, datasetName))
   }
 
@@ -59,14 +60,8 @@ class ToolManager extends SecuredController {
       case Some(u) => Some(u.id)
       case None => None
     }
-
-    current.plugin[ToolManagerPlugin] match {
-      case Some(mgr) => {
-        val instanceID = mgr.launchTool(hostURL, instanceName, tooltype, datasetId, datasetName, userId)
-        Ok(instanceID.toString)
-      }
-      case None => BadRequest("No ToolManagerPlugin found.")
-    }
+    val instanceID = toolService.launchTool(hostURL, instanceName, tooltype, datasetId, datasetName, userId)
+    Ok(instanceID.toString)
   }
 
   /**
@@ -74,20 +69,14 @@ class ToolManager extends SecuredController {
     */
   def getLaunchableTools() = PermissionAction(Permission.ExecuteOnDataset) { implicit request =>
     implicit val user = request.user
-
-    current.plugin[ToolManagerPlugin] match {
-      case Some(mgr) => {
-        val tools = mgr.getLaunchableTools()
-        Ok(tools)
-      }
-      case None => BadRequest("No ToolManagerPlugin found.")
-    }
+    Ok(toolService.getLaunchableTools())
   }
 
   /**
     * Upload a dataset to an existing tool instance. Does not check for or prevent against duplication.
     */
-  def uploadDatasetToTool(instanceID: UUID, datasetID: UUID, datasetName: String) = PermissionAction(Permission.ExecuteOnDataset, Some(ResourceRef(ResourceRef.dataset, datasetID))) { implicit request =>
+  def uploadDatasetToTool(instanceID: UUID, datasetID: UUID, datasetName: String) =
+    PermissionAction(Permission.ExecuteOnDataset, Some(ResourceRef(ResourceRef.dataset, datasetID))) { implicit request =>
     implicit val user = request.user
 
     val hostURL = request.headers.get("Host").getOrElse("")
@@ -95,14 +84,8 @@ class ToolManager extends SecuredController {
       case Some(u) => Some(u.id)
       case None => None
     }
-
-    current.plugin[ToolManagerPlugin] match {
-      case Some(mgr) => {
-        mgr.uploadDatasetToInstance(hostURL, instanceID, datasetID, datasetName, userId)
-        Ok("request sent")
-      }
-      case None => BadRequest("No ToolManagerPlugin found.")
-    }
+    toolService.uploadDatasetToInstance(hostURL, instanceID, datasetID, datasetName, userId)
+    Ok("request sent")
   }
 
   /**
@@ -110,14 +93,8 @@ class ToolManager extends SecuredController {
     */
   def getInstances() = PermissionAction(Permission.ExecuteOnDataset) { implicit request =>
     implicit val user = request.user
-
-    current.plugin[ToolManagerPlugin] match {
-      case Some(mgr) => {
-        val instances = mgr.getInstances()
-        Ok(toJson(instances.toMap))
-      }
-      case None => BadRequest("No ToolManagerPlugin found.")
-    }
+    val instances = toolService.getInstances()
+    Ok(toJson(instances.toMap))
   }
 
   /**
@@ -125,12 +102,7 @@ class ToolManager extends SecuredController {
     */
   def getInstanceURL(instanceID: UUID) = PermissionAction(Permission.ExecuteOnDataset) { implicit request =>
     implicit val user = request.user
-
-    val url = current.plugin[ToolManagerPlugin] match {
-      case Some(mgr) => mgr.checkForInstanceURL(instanceID)
-      case None => ""
-    }
-    Ok(url)
+    Ok(toolService.checkForInstanceURL(instanceID))
   }
 
   /**
@@ -138,13 +110,7 @@ class ToolManager extends SecuredController {
     */
   def removeInstance(toolPath: String, instanceID: UUID) = PermissionAction(Permission.ExecuteOnDataset) { implicit request =>
     implicit val user = request.user
-
-    current.plugin[ToolManagerPlugin] match {
-      case Some(mgr) => {
-        mgr.removeInstance(toolPath, instanceID)
-        Ok(instanceID.toString)
-      }
-      case None => BadRequest("No ToolManagerPlugin found.")
-    }
+    toolService.removeInstance(toolPath, instanceID)
+    Ok(instanceID.toString)
   }
 }

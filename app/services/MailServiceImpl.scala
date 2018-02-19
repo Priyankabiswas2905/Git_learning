@@ -1,13 +1,20 @@
 package services
 
-import play.api.{ Plugin, Logger, Application }
+import play.api.{Application, Logger, Plugin}
 import play.api.Play.current
 import javax.mail._
 import javax.mail.internet._
 import javax.activation._
+import javax.inject.Inject
 
-class MailerPlugin (application: Application) extends Plugin {
+import play.api.inject.ApplicationLifecycle
 
+import scala.concurrent.Future
+
+trait MailService
+
+class MailServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends MailService {
+  Logger.debug("Starting Mailer Plugin")
    val from = play.Play.application().configuration().getString("smtp.from")  
    val host =  play.Play.application().configuration().getString("smtp.host")
    val properties = System.getProperties()
@@ -33,18 +40,15 @@ class MailerPlugin (application: Application) extends Plugin {
       if(!user.equals("")){
         properties.setProperty("mail.smtp.auth", "true")
       }
-      
-      
-  override def onStart() {
-    Logger.debug("Starting Mailer Plugin")
 
-  }
-  override def onStop() {
+  lifecycle.addStopHook { () =>
     Logger.debug("Shutting down Mailer Plugin")
+    Future.successful(())
   }
 
-  override lazy val enabled = {
-    !application.configuration.getString("mailservice").filter(_ == "disabled").isDefined
+  lazy val enabled = {
+    import play.api.Play.current
+    !current.configuration.getString("mailservice").filter(_ == "disabled").isDefined
   }
   
   def sendMail(subscriberMail : String, html: String, subject: String): Boolean = {

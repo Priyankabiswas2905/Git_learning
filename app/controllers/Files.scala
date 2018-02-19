@@ -53,7 +53,10 @@ class Files @Inject() (
   contextLDService: ContextLDService,
   spaces: SpaceService,
   folders: FolderService,
-  appConfig: AppConfigurationService) extends SecuredController {
+  appConfig: AppConfigurationService,
+  polyglotService: PolyglotService,
+  elasticsearchService: ElasticsearchService,
+  versusService: VersusService) extends SecuredController {
 
   /**
    * Upload form.
@@ -117,7 +120,7 @@ class Files @Inject() (
         val mds = metadata.getMetadataByAttachTo(ResourceRef(ResourceRef.file, file.id))
         // TODO use to provide contextual definitions directly in the GUI
         val contexts = (for (md <- mds;
-          cId <- md.contextId;
+                             cId <- md.contextId;
                              c <- contextLDService.getContextById(cId))
           yield cId -> c).toMap
 
@@ -184,7 +187,8 @@ class Files @Inject() (
           val dDataset = Utils.decodeDatasetElements(aDataset)
           allDecodedDatasets += dDataset
           aDataset.spaces.map {
-            sp => spaces.get(sp) match {
+            sp =>
+              spaces.get(sp) match {
                 case Some(s) => {
                   decodedSpacesContaining += Utils.decodeSpaceElements(s)
                 }
@@ -214,29 +218,20 @@ class Files @Inject() (
         }
 
         //call Polyglot to get all possible output formats for this file's content type
-        current.plugin[PolyglotPlugin] match {
-          case Some(plugin) => {
-            Logger.debug("Polyglot plugin found")
 
-            val fname = file.filename
-            //use name of the file to get the extension (pdf or txt or jpg) to use an input type for Polyglot
-            val lastDividerIndex = (fname.replace("/", ".").lastIndexOf(".")) + 1
-            //drop all elements left of last divider index
-            val contentTypeEnding = fname.drop(lastDividerIndex)
-            Logger.debug("file name ends in " + contentTypeEnding)
-            //get output formats from Polyglot plugin and pass as the last parameter to view
-            plugin.getOutputFormats(contentTypeEnding).map(outputFormats =>
-              Ok(views.html.file(file, id.stringify, commentsByFile, previewsWithPreviewer, sectionsWithPreviews,
-                extractorsActive, decodedDatasetsContaining.toList, foldersContainingFile,
-                mds, isRDFExportEnabled, extractionsByFile, outputFormats, space, access, folderHierarchy.reverse.toList, decodedSpacesContaining.toList, allDecodedDatasets.toList)))
-          }
-          case None =>
-            Logger.debug("Polyglot plugin not found")
-            //passing None as the last parameter (list of output formats)
-            Future(Ok(views.html.file(file, id.stringify, commentsByFile, previewsWithPreviewer, sectionsWithPreviews,
-              extractorsActive, decodedDatasetsContaining.toList, foldersContainingFile,
-              mds, isRDFExportEnabled, extractionsByFile, None, space, access, folderHierarchy.reverse.toList, decodedSpacesContaining.toList, allDecodedDatasets.toList)))
-        }
+
+        val fname = file.filename
+        //use name of the file to get the extension (pdf or txt or jpg) to use an input type for Polyglot
+        val lastDividerIndex = (fname.replace("/", ".").lastIndexOf(".")) + 1
+        //drop all elements left of last divider index
+        val contentTypeEnding = fname.drop(lastDividerIndex)
+        Logger.debug("file name ends in " + contentTypeEnding)
+        //get output formats from Polyglot plugin and pass as the last parameter to view
+        polyglotService.getOutputFormats(contentTypeEnding).map(outputFormats =>
+          Ok(views.html.file(file, id.stringify, commentsByFile, previewsWithPreviewer, sectionsWithPreviews,
+            extractorsActive, decodedDatasetsContaining.toList, foldersContainingFile,
+            mds, isRDFExportEnabled, extractionsByFile, outputFormats, space, access, folderHierarchy.reverse.toList, decodedSpacesContaining.toList, allDecodedDatasets.toList)))
+
       }
 
       case None => {
@@ -460,19 +455,11 @@ class Files @Inject() (
                 if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
                   val xmlToJSON = FilesUtils.readXMLgetJSON(uploadedFile.ref.file)
                   files.addXMLMetadata(id, xmlToJSON)
-
-                  current.plugin[ElasticsearchPlugin].foreach {
-                    _.index(SearchUtils.getElasticsearchObject(f))
-                  }
+                  elasticsearchService.index(SearchUtils.getElasticsearchObject(f))
+                } else {
+                  elasticsearchService.index(SearchUtils.getElasticsearchObject(f))
                 }
-                else {
-                  current.plugin[ElasticsearchPlugin].foreach {
-                    _.index(SearchUtils.getElasticsearchObject(f))
-                  }
-                }
-                current.plugin[VersusPlugin].foreach {
-                  _.index(f.id.toString, fileType)
-                }
+                versusService.index(f.id.toString, fileType)
 
                 // redirect to extract page
                 Ok(views.html.extract(f.id))
@@ -597,18 +584,12 @@ class Files @Inject() (
 	            if(fileType.equals("application/xml") || fileType.equals("text/xml")){
 	              val xmlToJSON = FilesUtils.readXMLgetJSON(uploadedFile.ref.file)
 	              files.addXMLMetadata(id, xmlToJSON)
-	              
-	              current.plugin[ElasticsearchPlugin].foreach{
-		              _.index(SearchUtils.getElasticsearchObject(f))
-                }
-	            }
-	            else{
-		            current.plugin[ElasticsearchPlugin].foreach{
-		              _.index(SearchUtils.getElasticsearchObject(f))
-                }
+	              elasticsearchService.index(SearchUtils.getElasticsearchObject(f))
+	            } else {
+		            elasticsearchService.index(SearchUtils.getElasticsearchObject(f))
 	            }
 
-              current.plugin[VersusPlugin].foreach { _.indexFile(f.id, fileType) }
+              versusService.indexFile(f.id, fileType)
 
               //add file to RDF triple store if triple store is used
               if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
@@ -618,8 +599,9 @@ class Files @Inject() (
                 }
               }
 
-              current.plugin[AdminsNotifierPlugin].foreach {
-                _.sendAdminsNotification(Utils.baseUrl(request), "File","added",f.id.stringify, nameOfFile)}
+              if (current.configuration.getBoolean("clowder.events.notifyadmins").getOrElse(false)) {
+                AdminsNotifier.sendAdminsNotification(Utils.baseUrl(request), "File","added",f.id.stringify, nameOfFile)
+              }
 
               //Correctly set the updated URLs and data that is needed for the interface to correctly 
               //update the display after a successful upload.
@@ -770,8 +752,7 @@ class Files @Inject() (
    *
    */
   def downloadAsFormat(id: UUID, outputFormat: String) = PermissionAction(Permission.DownloadFiles, Some(ResourceRef(ResourceRef.file, id))).async { implicit request =>
-    current.plugin[PolyglotPlugin] match {
-      case Some(plugin) => {
+
         if (UUID.isValid(id.stringify)) {
           files.get(id) match {
             case Some(file) => {
@@ -797,14 +778,14 @@ class Files @Inject() (
                   if (polyglotConvertURL.isDefined && polyglotUser.isDefined && polyglotPassword.isDefined) {
 
                     //first call to Polyglot to get url of converted file
-                    plugin.getConvertedFileURL(filename, inputStream, outputFormat)
+                    polyglotService.getConvertedFileURL(filename, inputStream, outputFormat)
                       .flatMap {
                         convertedFileURL =>
                           val triesLeft = 30
                           //Cponverted file is initially empty. Have to wait for Polyglot to finish conversion.
                           //keep checking until file exists or until too many tries
                           //returns future success only if file is found and downloaded
-                          plugin.checkForFileAndDownload(triesLeft, convertedFileURL, outputStream)
+                          polyglotService.checkForFileAndDownload(triesLeft, convertedFileURL, outputStream)
                       }.map {
                         x =>
                           //successfuly completed future - get here only after polyglotPlugin.getConvertedFileURL is done executing
@@ -839,11 +820,6 @@ class Files @Inject() (
           Logger.error(s"The given id $id is not a valid ObjectId.")
           Future(BadRequest(toJson(s"The given id $id is not a valid ObjectId.")))
         }
-      } //end of case Some(plugin)
-      case None =>
-        Logger.debug("Polyglot plugin not found")
-        Future(Ok("Plugin not found"))
-    }
   }
 
   def thumbnail(id: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.thumbnail, id))) { implicit request =>
@@ -1070,15 +1046,9 @@ class Files @Inject() (
             if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
               val xmlToJSON = FilesUtils.readXMLgetJSON(uploadedFile.ref.file)
               files.addXMLMetadata(id, xmlToJSON)
-
-              current.plugin[ElasticsearchPlugin].foreach {
-                _.index(SearchUtils.getElasticsearchObject(f))
-              }
-            }
-            else {
-              current.plugin[ElasticsearchPlugin].foreach {
-                _.index(SearchUtils.getElasticsearchObject(f))
-              }
+              elasticsearchService.index(SearchUtils.getElasticsearchObject(f))
+            } else {
+              elasticsearchService.index(SearchUtils.getElasticsearchObject(f))
             }
             //add file to RDF triple store if triple store is used
             if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
@@ -1198,15 +1168,9 @@ class Files @Inject() (
                     if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
                       val xmlToJSON = FilesUtils.readXMLgetJSON(uploadedFile.ref.file)
                       files.addXMLMetadata(id, xmlToJSON)
-
-                      current.plugin[ElasticsearchPlugin].foreach {
-                        _.index(SearchUtils.getElasticsearchObject(f))
-                      }
-                    }
-                    else {
-                      current.plugin[ElasticsearchPlugin].foreach {
-                        _.index(SearchUtils.getElasticsearchObject(f))
-                      }
+                      elasticsearchService.index(SearchUtils.getElasticsearchObject(f))
+                    } else {
+                      elasticsearchService.index(SearchUtils.getElasticsearchObject(f))
                     }
 
                     // add file to dataset

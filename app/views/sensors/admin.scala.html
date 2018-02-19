@@ -14,31 +14,28 @@
         <div class="col-md-4">
             <form class="form-horizontal" role="form" id="sensors-admin">
                 <div class="form-group">
-                    @play.api.Play.current.plugin[services.PostgresPlugin] match {
-                        case Some(db) if db.isEnabled => {
-                            <label for="sensorsTitle">Sensors title (plural form)</label>
-                            <input class="form-control" id="sensorsTitle" name="sensorsTitle" type="text" value="@(sensors)" required />
-                            <span id="sensorsTitle_error" style="display:none;">Sensors must have a value.</span>
-                            <br />
+                    @if(play.api.Play.current.configuration.getBoolean("geostream.enabled").getOrElse(false)) {
+                        <label for="sensorsTitle">Sensors title (plural form)</label>
+                        <input class="form-control" id="sensorsTitle" name="sensorsTitle" type="text" value="@(sensors)" required />
+                        <span id="sensorsTitle_error" style="display:none;">Sensors must have a value.</span>
+                        <br />
 
-                            <label for="sensorTitle">Sensor title (singular form)</label>
-                            <input class="form-control" id="sensorTitle" name="sensorTitle" type="text" value="@(sensor)" required />
-                            <span id="sensorTitle_error" style="display:none;">Sensor must have a value.</span>
+                        <label for="sensorTitle">Sensor title (singular form)</label>
+                        <input class="form-control" id="sensorTitle" name="sensorTitle" type="text" value="@(sensor)" required />
+                        <span id="sensorTitle_error" style="display:none;">Sensor must have a value.</span>
 
-                            <br /><br />
+                        <br /><br />
 
-                            <label for="parametersTitle">Parameters title (plural form)</label>
-                            <input id="parametersTitle" name="parametersTitle" type="text" class="form-control" value="@(parameters)" required />
-                            <span id="parametersTitle_error" style="display:none;">Parameters must have a title.</span>
-                            <br />
+                        <label for="parametersTitle">Parameters title (plural form)</label>
+                        <input id="parametersTitle" name="parametersTitle" type="text" class="form-control" value="@(parameters)" required />
+                        <span id="parametersTitle_error" style="display:none;">Parameters must have a title.</span>
+                        <br />
 
-                            <label for="parameterTitle">Parameter title (singular form)</label>
-                            <input id="parameterTitle" name="parameterTitle" type="text" class="form-control" value="@(parameter)" required />
-                            <span id="parameterTitle_error" style="display:none;">Parameter must have a title.</span>
+                        <label for="parameterTitle">Parameter title (singular form)</label>
+                        <input id="parameterTitle" name="parameterTitle" type="text" class="form-control" value="@(parameter)" required />
+                        <span id="parameterTitle_error" style="display:none;">Parameter must have a title.</span>
 
-                            <br /><br />
-                        }
-                        case _ => {}
+                        <br /><br />
                     }
 
                     <button class="btn btn-primary" id="sensors-admin-submit"><span class="glyphicon glyphicon-saved"></span> Submit</button>

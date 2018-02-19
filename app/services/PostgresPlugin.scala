@@ -5,39 +5,112 @@ package services
 
 import java.text.SimpleDateFormat
 
-import play.api.{ Plugin, Logger, Application }
+import play.api.{Application, Logger, Plugin}
 import play.api.Play.current
 import java.sql.DriverManager
 import java.util.Properties
 import java.sql.Timestamp
 import java.sql.Statement
+import javax.inject.{Inject, Singleton}
+
+import play.api.inject.ApplicationLifecycle
 import util.Parsers
 import play.api.libs.json._
 
+import scala.collection.mutable.Map
+import scala.concurrent.Future
+
+trait GeostreamsService {
+  var conn: java.sql.Connection
+
+  def addDatapoint(start: java.util.Date, end: Option[java.util.Date], geoType: String, data: String, geojson: JsValue,
+    stream_id: String): Option[String]
+
+  def addDatapoints(datapoints: List[(String, Option[String], String, JsValue, JsValue)], stream_id: String): Option[String]
+
+  def createSensor(name: String, geoType: String, geojson: JsValue, metadata: String): Option[String]
+
+  def searchSensors(geocode: Option[String], sensor_name: Option[String]): Option[String]
+
+  def searchSensorsGeoJson(geojson: Option[String], sensor_name: Option[String]): Option[String]
+
+  def getSensor(id: String): Option[String]
+
+  def updateSensorMetadata(id: String, data: String): Option[String]
+
+  def updateSensorGeometry(id: String, geom: String): Option[String]
+
+  def patchStreamMetadata(id: String, data: String): Option[String]
+
+  def getDashboardSensorURLs(ids: List[String]): List[(String, String)]
+
+  def getSensorStreams(id: String): Option[String]
+
+  def getSensorStats(id: String): Option[String]
+
+  def createStream(name: String, geotype: String, geojson: JsValue, metadata: String, sensor_id: String): Option[String]
+
+  def searchStreams(geocode: Option[String], stream_name: Option[String]): Option[String]
+
+  def searchStreamsGeoJson(geojson: Option[String], stream_name: Option[String]): Option[String]
+
+  def getStream(id: String): Option[String]
+
+  def deleteStream(id: Integer): Boolean
+
+  def deleteSensor(id: Integer): Boolean
+
+  def deleteDatapoint(gid: Integer): Boolean
+
+  def dropAll(): Boolean
+
+  def counts(): (Int, Int, Int)
+
+  def searchDatapoints(since: Option[String], until: Option[String], geocode: Option[String], stream_id: Option[String],
+    sensor_id: Option[String], source: List[String], attributes: List[String], sortByStation: Boolean): Iterator[JsObject]
+
+  def searchDatapointsGeoJson(since: Option[String], until: Option[String], geojson: Option[String],
+    stream_id: Option[String], sensor_id: Option[String], source: List[String], attributes: List[String],
+    sortByStation: Boolean): Iterator[JsObject]
+
+  def filterProperties(obj: JsObject, attributes: List[String]): JsObject
+
+  def getDatapoint(id: String): Option[String]
+
+  def listSensors()
+
+  def updateSensorStats(sensor_id: Option[String])
+
+  def updateStreamStats(stream_id: Option[String])
+
+  def updateEmptyStats()
+
+  def updateDatabase()
+}
 
 /**
  * Postgres connection and simple geoindex methods.
  *
  *
  */
-class PostgresPlugin(application: Application) extends Plugin {
+@Singleton
+class GeostreamsServicePostgresImpl @Inject() (lifecycle: ApplicationLifecycle) extends GeostreamsService {
 
   var conn: java.sql.Connection = null
 
-  override def onStart() {
-    Logger.debug("Starting Postgres Plugin")
+  Logger.debug("Starting Postgres Plugin")
 
-    connect()
-    if (verifyConnection(false))
-      updateDatabase()
-  }
+  connect()
+  if (verifyConnection(false))
+    updateDatabase()
 
-  override def onStop() {
+  lifecycle.addStopHook { () =>
     Logger.debug("Shutting down Postgres Plugin")
+    Future.successful(())
   }
 
-  override lazy val enabled = {
-    !application.configuration.getString("postgresplugin").filter(_ == "disabled").isDefined
+  lazy val enabled = {
+    !current.configuration.getString("postgresplugin").filter(_ == "disabled").isDefined
   }
 
   def connect() = {
@@ -987,7 +1060,7 @@ class PostgresPlugin(application: Application) extends Plugin {
     }
   }
   
-  def filterProperties(obj: JsObject, attributes: List[String]) = {
+  def filterProperties(obj: JsObject, attributes: List[String]): JsObject = {
     var props = JsObject(Seq.empty)
     (obj \ "properties").asOpt[JsObject] match {
 	  case Some(x) => {

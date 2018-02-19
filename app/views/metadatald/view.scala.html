@@ -125,7 +125,7 @@
     @printPerson(agent: Agent, content: JsValue, contextId: Option[UUID], contextURL: Option[URL], resourceId: UUID) = {
     	@content match {
     		case s: JsString => {
-    			@if(play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined) {
+    			@if(play.api.Play.current.configuration.getBoolean("stagingarea.enabled")) {
     				<span class='person'>@s.value</span>
     			} else {
     				@if(s.value.startsWith("http")) {
@@ -194,7 +194,7 @@
     }
 
     <script src="@routes.Assets.at("javascripts/errorRedirect.js")" type="text/javascript"></script>
-    @if(play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined) {
+    @if(play.api.Play.current.configuration.getBoolean("stagingarea.enabled")) {
     <script src="@routes.Assets.at("javascripts/people.js")" type="text/javascript"></script>
     }
        

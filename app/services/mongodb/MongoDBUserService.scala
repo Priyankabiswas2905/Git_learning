@@ -22,6 +22,8 @@ import services.mongodb.MongoContext.context
 import _root_.util.Direction._
 import javax.inject.Inject
 
+import play.api.inject.ApplicationLifecycle
+
 /**
  * Wrapper around SecureSocial to get access to the users. There is
  * no save option since all saves should be done through securesocial
@@ -616,7 +618,9 @@ class MongoDBUserService @Inject() (
   }
 }
 
-class MongoDBSecureSocialUserService @Inject() (application: Application) extends Plugin {
+trait SecureSocialUserService
+
+class MongoDBSecureSocialUserService @Inject() (lifecycle: ApplicationLifecycle) extends SecureSocialUserService {
   def find(id: IdentityId): Option[User] = {
     // Convert userpass to lowercase so emails aren't case sensitive
     if (id.providerId == "userpass")

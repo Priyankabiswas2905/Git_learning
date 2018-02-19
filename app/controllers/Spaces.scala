@@ -195,7 +195,7 @@ class Spaces @Inject()(spaces: SpaceService, users: UserService, events: EventSe
             else List.empty[String]
           Logger.debug("User selection " + userSelections)
 
-          if (play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined) {
+          if (play.api.Play.current.configuration.getBoolean("stagingarea.enabled").getOrElse(false)) {
             curationObjectsInSpace = curationService.listSpace(Some(size),Some(id.stringify))
           }
 	        Ok(views.html.spaces.space(Utils.decodeSpaceElements(s), collectionsInSpace, publicDatasetsInSpace, datasetsInSpace, curationObjectsInSpace, userRoleMap, userSelections))

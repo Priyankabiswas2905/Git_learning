@@ -60,14 +60,15 @@ class Spaces @Inject()(spaces: SpaceService,
   def removeSpace(spaceId: UUID) = PermissionAction(Permission.DeleteSpace, Some(ResourceRef(ResourceRef.space, spaceId))) { implicit request =>
     spaces.get(spaceId) match {
       case Some(space) => {
-        removeContentsFromSpace(spaceId,request.user)
+        removeContentsFromSpace(spaceId, request.user)
         spaces.delete(spaceId)
         appConfig.incrementCount('spaces, -1)
-        events.addObjectEvent(request.user , space.id, space.name, "delete_space")
-        current.plugin[AdminsNotifierPlugin].foreach {
-          _.sendAdminsNotification(Utils.baseUrl(request), "Space", "removed", space.id.stringify, space.name)
+        events.addObjectEvent(request.user, space.id, space.name, "delete_space")
+        if (current.configuration.getBoolean("clowder.events.notifyadmins").getOrElse(false)) {
+          AdminsNotifier.sendAdminsNotification(Utils.baseUrl(request), "Space", "removed", space.id.stringify, space.name)
         }
       }
+      case None => Logger.error(s"Space ${spaceId} not found")
     }
     //Success anyway, as if space is not found it is most probably deleted already
     Ok(toJson(Map("status" -> "success")))

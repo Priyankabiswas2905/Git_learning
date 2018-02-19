@@ -1,57 +1,66 @@
 package services
 
+import java.net.InetAddress
+import javax.inject.Inject
+
+import _root_.util.SearchUtils
+import models._
+import org.elasticsearch.ElasticsearchException
 import org.elasticsearch.action.admin.indices.mapping.get.GetMappingsRequest
+import org.elasticsearch.action.search.{SearchResponse, SearchType}
+import org.elasticsearch.client.transport.{NoNodeAvailableException, TransportClient}
+import org.elasticsearch.common.settings.Settings
+import org.elasticsearch.common.transport.InetSocketTransportAddress
 import org.elasticsearch.common.xcontent.XContentBuilder
+import org.elasticsearch.common.xcontent.XContentFactory._
 import org.elasticsearch.search.aggregations.AggregationBuilders
 import org.elasticsearch.search.aggregations.bucket.terms.StringTerms.Bucket
-import scala.util.Try
-import scala.collection.mutable.{MutableList, ListBuffer}
-import scala.collection.immutable.List
-import play.api.libs.concurrent.Execution.Implicits._
-import play.api.{Plugin, Logger, Application}
-import org.elasticsearch.common.settings.Settings
-import org.elasticsearch.client.transport.TransportClient
-import org.elasticsearch.common.transport.InetSocketTransportAddress
-import java.net.InetAddress
-
-import org.elasticsearch.common.xcontent.XContentFactory._
-import org.elasticsearch.action.search.SearchType
-import org.elasticsearch.client.transport.NoNodeAvailableException
-import org.elasticsearch.action.search.SearchResponse
-
-import models.{Collection, Dataset, File, UUID, ResourceRef, Section}
+import play.api.Logger
 import play.api.Play.current
+import play.api.inject.ApplicationLifecycle
 import play.api.libs.json._
-import _root_.util.SearchUtils
 
-import org.elasticsearch.index.query.QueryBuilders
+import scala.collection.immutable.List
+import scala.collection.mutable.{ListBuffer, MutableList}
+import scala.concurrent.Future
+import scala.util.Try
 
-import org.elasticsearch.ElasticsearchException
-
+trait ElasticsearchService {
+  val nameOfCluster = play.api.Play.configuration.getString("elasticsearchSettings.clusterName").getOrElse("clowder")
+  val serverAddress = play.api.Play.configuration.getString("elasticsearchSettings.serverAddress").getOrElse("localhost")
+  val serverPort = play.api.Play.configuration.getInt("elasticsearchSettings.serverPort").getOrElse(9300)
+  val nameOfIndex = play.api.Play.configuration.getString("elasticsearchSettings.indexNamePrefix").getOrElse("clowder")
+  def index(dataset: Dataset, recursive: Boolean)
+  def index(collection: Collection, recursive: Boolean)
+  def index(file: File)
+  def index(section: Section)
+  def search(query: List[JsValue], grouping: String): List[ResourceRef]
+  def search(query: String, index: String = nameOfIndex): List[ResourceRef]
+  def getAutocompleteMetadataFields(query: String, index: String = nameOfIndex): List[String]
+  def listTags(resourceType: String = "", index: String = nameOfIndex): Map[String, Long]
+  def delete(index: String, docType: String, id: String)
+  def deleteAll
+  def index(esObj: Option[models.ElasticsearchObject], index: String = nameOfIndex)
+  def isEnabled(): Boolean
+  def createIndex(index: String = nameOfIndex): Unit
+}
 
 /**
  * Elasticsearch plugin.
  *
  */
-class ElasticsearchPlugin(application: Application) extends Plugin {
+class ElasticsearchServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends ElasticsearchService {
   val comments: CommentService = DI.injector.instanceOf[CommentService]
   val files: FileService = DI.injector.instanceOf[FileService]
   val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
   val collections: CollectionService = DI.injector.instanceOf[CollectionService]
   var client: Option[TransportClient] = None
-  val nameOfCluster = play.api.Play.configuration.getString("elasticsearchSettings.clusterName").getOrElse("clowder")
-  val serverAddress = play.api.Play.configuration.getString("elasticsearchSettings.serverAddress").getOrElse("localhost")
-  val serverPort = play.api.Play.configuration.getInt("elasticsearchSettings.serverPort").getOrElse(9300)
-  val nameOfIndex = play.api.Play.configuration.getString("elasticsearchSettings.indexNamePrefix").getOrElse("clowder")
 
   val mustOperators = List("==", "<", ">")
   val mustNotOperators = List("!=")
 
-
-  override def onStart() {
-    Logger.debug("ElasticsearchPlugin started but not yet connected")
-    connect()
-  }
+  Logger.debug("ElasticsearchPlugin started but not yet connected")
+  connect()
 
   def connect(force:Boolean = false): Boolean = {
     if (!force && isEnabled()) {
@@ -782,10 +791,10 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
     builder
   }
 
-  override def onStop() {
+  lifecycle.addStopHook { () =>
     client.map(_.close())
     client = None
     Logger.info("ElasticsearchPlugin has stopped")
+    Future.successful(())
   }
-
 }

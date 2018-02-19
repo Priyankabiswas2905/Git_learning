@@ -20,7 +20,9 @@ class Status @Inject()(spaces: SpaceService,
                        files: FileService,
                        users: UserService,
                        appConfig: AppConfigurationService,
-                       extractors: ExtractorService) extends ApiController {
+                       extractors: ExtractorService,
+                       geostreamsService: GeostreamsService,
+                       elasticsearchService: ElasticsearchService) extends ApiController {
   val jsontrue = Json.toJson(true)
   val jsonfalse = Json.toJson(false)
 
@@ -39,6 +41,50 @@ class Status @Inject()(spaces: SpaceService,
   def getPlugins(user: Option[User]): JsValue = {
     val result = new mutable.HashMap[String, JsValue]()
 
+    // geostream
+    if (current.configuration.getBoolean("geostream.enabled").getOrElse(false)) {
+      val conn = geostreamsService.conn
+      val status = if (conn != null) {
+        "connected"
+      } else {
+        "disconnected"
+      }
+      result.put("postgres", if (Permission.checkServerAdmin(user)) {
+        Json.obj("catalog" -> conn.getCatalog,
+          "schema" -> conn.getSchema,
+          "updates" -> appConfig.getProperty[List[String]]("postgres.updates", List.empty[String]),
+          "status" -> status)
+      } else {
+        Json.obj("status" -> status)
+      })
+    }
+
+    // elasticsearch
+    if (current.configuration.getBoolean("geostream.enabled").getOrElse(false)) {
+      val status = if (elasticsearchService.isEnabled()) {
+        "connected"
+      } else {
+        "disconnected"
+      }
+      result.put("elasticsearch", if (Permission.checkServerAdmin(user)) {
+        Json.obj("server" -> elasticsearchService.serverAddress,
+          "clustername" -> elasticsearchService.nameOfCluster,
+          "status" -> status)
+      } else {
+        Json.obj("status" -> status)
+      })
+    }
+
+    // versus
+    if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
+      result.put("versus", if (Permission.checkServerAdmin(user)) {
+        Json.obj("host" -> configuration.getString("versus.host").getOrElse("").toString)
+      } else {
+        jsontrue
+      })
+    }
+
+    // FIXME replace with query of configuration
     current.plugins foreach {
       // mongo
       case p: MongoSalatPlugin => {
@@ -48,22 +94,6 @@ class Status @Inject()(spaces: SpaceService,
             } else {
               jsontrue
             })
-      }
-
-      // elasticsearch
-      case p: ElasticsearchPlugin => {
-        val status = if (p.isEnabled()) {
-          "connected"
-        } else {
-          "disconnected"
-        }
-        result.put("elasticsearch", if (Permission.checkServerAdmin(user)) {
-          Json.obj("server" -> p.serverAddress,
-            "clustername" -> p.nameOfCluster,
-            "status" -> status)
-        } else {
-          Json.obj("status" -> status)
-        })
       }
 
       // rabbitmq
@@ -82,33 +112,7 @@ class Status @Inject()(spaces: SpaceService,
         })
       }
 
-      // geostream
-      case p: PostgresPlugin => {
-        val status = if (p.conn != null) {
-          "connected"
-        } else {
-          "disconnected"
-        }
-        result.put("postgres", if (Permission.checkServerAdmin(user)) {
-          Json.obj("catalog" -> p.conn.getCatalog,
-            "schema" -> p.conn.getSchema,
-            "updates" -> appConfig.getProperty[List[String]]("postgres.updates", List.empty[String]),
-            "status" -> status)
-        } else {
-          Json.obj("status" -> status)
-        })
-      }
-
-      // versus
-      case p: VersusPlugin => {
-        result.put("versus", if (Permission.checkServerAdmin(user)) {
-          Json.obj("host" -> configuration.getString("versus.host").getOrElse("").toString)
-        } else {
-          jsontrue
-        })
-      }
-
-      case p: ToolManagerPlugin => {
+      case p: ToolManagerServiceImpl => {
         val status = if (p.enabled) {
           "enabled"
         } else {

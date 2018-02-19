@@ -15,7 +15,8 @@ import play.api.i18n.Messages.Implicits._
  * Comments on datasets.
  *
  */
-class Comments @Inject()(datasets: DatasetService, comments: CommentService, events: EventService, users: UserService) extends ApiController {
+class Comments @Inject()(datasets: DatasetService, comments: CommentService, events: EventService, users: UserService,
+  elasticsearchService: ElasticsearchService) extends ApiController {
 
   def comment(id: UUID) = PermissionAction(Permission.AddComment, Some(ResourceRef(ResourceRef.comment, id)))(parse.json) { implicit request =>
       Logger.trace("Adding comment")
@@ -36,9 +37,7 @@ class Comments @Inject()(datasets: DatasetService, comments: CommentService, eve
                   if (parent.dataset_id.isDefined) {
                     datasets.get(parent.dataset_id.get) match {
                       case Some(dataset) => {
-                        current.plugin[ElasticsearchPlugin].foreach {
-                          _.index(dataset, false)
-                        }
+                        elasticsearchService.index(dataset, false)
                       }
                       case None => Logger.error("Dataset not found: " + id)
                     }

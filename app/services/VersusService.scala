@@ -1,22 +1,51 @@
 package services
 
-import models.{ SearchResultFile, SearchResultPreview, PreviewFilesSearchResult, UUID }
+import models.{PreviewFilesSearchResult, SearchResultFile, SearchResultPreview, UUID}
 import play.api.mvc.Request
-import play.api.{ Plugin, Logger, Application }
-import play.api.libs.json.{ Json, JsValue }
-import play.api.libs.ws.{ WS, WSResponse }
+import play.api.{Application, Logger, Plugin}
+import play.api.libs.json.{JsValue, Json}
+import play.api.libs.ws.{WS, WSResponse}
 import play.api.Play.current
 import play.api.libs.concurrent.Execution.Implicits._
+
 import scala.concurrent.Future
 import java.text.DecimalFormat
+import javax.inject.Inject
+
+import play.api.inject.ApplicationLifecycle
+
 import scala.collection.mutable.ListBuffer
-import scala.collection.immutable.Map
+import scala.collection.immutable.{HashMap, Map}
+
+trait VersusService {
+  def index(url: String, fileType: String)
+  def indexFile(fileId: UUID, fileType: String)(implicit request: Request[Any])
+  def getIndexesAsFutureList(): Future[List[models.VersusIndex]]
+  def queryIndexForURL(fileURL: String, indexId: String): Future[List[PreviewFilesSearchResult]]
+  def getIndexesForContentTypeAsFutureList(contentType: String): Future[List[models.VersusIndex]]
+  def getIndexesForType(typeToSearch: String, sectionsSelected: List[String]): Future[List[models.VersusIndex]]
+  def queryIndexForNewFile(newFileId: UUID, indexId: String)(implicit request: Request[Any]): Future[List[PreviewFilesSearchResult]]
+  def queryIndexForExistingFile(inputFileId: UUID, indexId: String)(implicit request: Request[Any]): Future[List[PreviewFilesSearchResult]]
+  def getIdFromVersusURL(url: String): String
+  def queryIndexSorted(inputFileId: String, indexId: String)(implicit request: Request[Any]): Future[HashMap[String, Double]]
+  def getAdapters(): Future[WSResponse]
+  def getExtractors(): Future[WSResponse]
+  def getMeasures(): Future[WSResponse]
+  def getIndexers(): Future[WSResponse]
+  def getIndexes(): Future[WSResponse]
+  def createIndex(adapter: String, extractor: String, measure: String, indexer: String): Future[UUID]
+  def buildIndex(indexId: UUID): Future[WSResponse]
+  def deleteIndex(indexId: UUID): Future[WSResponse]
+  def deleteAllIndexes(): Future[WSResponse]
+  def removeFromIndexes(fileId: UUID)
+  def indexPreview(previewId: UUID, fileType: String)(implicit request: Request[Any])
+}
 
 /**
  * Versus Plugin
  *
  */
-class VersusPlugin(application: Application) extends Plugin {
+class VersusServiceImpl @Inject() (lifecycle: ApplicationLifecycle)  extends VersusService {
 
   val files: FileService = DI.injector.instanceOf[FileService]
   val previews: PreviewService = DI.injector.instanceOf[PreviewService]
@@ -25,9 +54,7 @@ class VersusPlugin(application: Application) extends Plugin {
   val queries: MultimediaQueryService = DI.injector.instanceOf[MultimediaQueryService]
   val sectionIndexInfo: SectionIndexInfoService = DI.injector.instanceOf[SectionIndexInfoService]
 
-  override def onStart() {
-    Logger.debug("Starting Versus Plugin")
-  }
+  Logger.debug("Starting Versus Plugin")
 
   /*
  * This method sends the file's url to Versus for the extraction of descriptors from the file
@@ -594,7 +621,7 @@ class VersusPlugin(application: Application) extends Plugin {
    * the results are reorganized as a hash map of (file url, proximity) touples.
    * Note: might be reorganized in the future to use queryIndex method
    */
-  def queryIndexSorted(inputFileId: String, indexId: String)(implicit request: Request[Any]): Future[scala.collection.immutable.HashMap[String, Double]] = {
+  def queryIndexSorted(inputFileId: String, indexId: String)(implicit request: Request[Any]): Future[HashMap[String, Double]] = {
     Logger.trace("VersusPlugin.queryIndexSorted, indexId = " + indexId)
     val configuration = play.api.Play.configuration
     val host = configuration.getString("versus.host").getOrElse("")
@@ -708,8 +735,8 @@ class VersusPlugin(application: Application) extends Plugin {
       } //END OF : previews.get(preview_id) match        
     }
 
-  override def onStop() {
+  lifecycle.addStopHook { () =>
     Logger.debug("Shutting down Versus Plugin")
+    Future.successful(())
   }
-
 }

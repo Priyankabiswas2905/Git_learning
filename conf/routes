@@ -643,15 +643,6 @@ GET            /api/thumbnails                                                  
 DELETE         /api/thumbnails/:id                                                      @api.Thumbnails.removeThumbnail(id: UUID)
 
 # ----------------------------------------------------------------------
-# SENSORS ENDPOINT
-# ----------------------------------------------------------------------
-GET            /api/sensors                                                             @api.Sensors.list
-POST           /api/sensors                                                             @api.Sensors.add
-GET            /api/sensors/:id                                                         @api.Sensors.get(id)
-GET            /api/sensors/search                                                      @api.Sensors.search
-DELETE         /api/sensors/:id                                                         @api.Sensors.delete(id)
-
-# ----------------------------------------------------------------------
 # COMMENTS ENDPOINT
 # ----------------------------------------------------------------------
 POST           /api/comment/mention                                                     @api.Comments.mentionInComment(userID: UUID, resourceID: UUID, resourceName: String, resourceType: String, commenterId: UUID)

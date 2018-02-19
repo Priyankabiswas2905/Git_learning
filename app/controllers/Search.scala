@@ -24,87 +24,86 @@ class Search @Inject() (
   files: FileService,
   collections: CollectionService,
   queries: MultimediaQueryService,
-  previews: PreviewService) extends SecuredController {
+  previews: PreviewService,
+  versusService: VersusService,
+  elasticsearchService: ElasticsearchService) extends SecuredController {
 
   /** Search using a simple text string */
   def search(query: String) = PermissionAction(Permission.ViewDataset) { implicit request =>
     implicit val user = request.user
-    current.plugin[ElasticsearchPlugin] match {
-      case Some(plugin) => {
-        var listOfFiles = ListBuffer.empty[models.File]
-        var listOfdatasets = ListBuffer.empty[models.Dataset]
-        var listOfcollections = ListBuffer.empty[models.Collection]
-        val mapdatasetIds = new HashMap[String, ListBuffer[(String, String)]]
-        val mapcollectionIds = new HashMap[String, ListBuffer[(String, String)]]
+    if (current.configuration.getBoolean("elasticsearchSettings.enabled").getOrElse(false)) {
+      var listOfFiles = ListBuffer.empty[models.File]
+      var listOfdatasets = ListBuffer.empty[models.Dataset]
+      var listOfcollections = ListBuffer.empty[models.Collection]
+      val mapdatasetIds = new HashMap[String, ListBuffer[(String, String)]]
+      val mapcollectionIds = new HashMap[String, ListBuffer[(String, String)]]
 
-        if (query != "") {
-          // Execute query
-          val response = plugin.search(query)
-          for (resource <- response) {
+      if (query != "") {
+        // Execute query
+        val response = elasticsearchService.search(query)
+        for (resource <- response) {
 
-            // Parse File results
-            if (resource.resourceType == ResourceRef.file) {
-              files.get(resource.id) match {
-                case Some(f) => {
-                  if (Permission.checkPermission(Permission.ViewFile, resource)) {
-                    var fileDatasets = ListBuffer(): ListBuffer[(String, String)]
-                    datasets.findByFileId(f.id).map(ds => {
-                      fileDatasets = fileDatasets :+ (ds.id.toString, ds.name)
-                    })
-                    mapdatasetIds.put(f.id.toString, fileDatasets)
-                    listOfFiles += f
-                  }
-                }
-                case None => Logger.debug("Search result file not found: "+resource.id.toString)
-              }
-            }
-
-            // Parse Dataset results
-            else if (resource.resourceType == ResourceRef.dataset) {
-              datasets.get(resource.id) match {
-                case Some(ds) => {
-                  if (Permission.checkPermission(Permission.ViewDataset, resource)) {
-                    var dsCollections = ListBuffer(): ListBuffer[(String, String)]
-                    for (coll_id <- ds.collections) {
-                      collections.get(coll_id) match {
-                        case Some(c) => dsCollections = dsCollections :+ (coll_id.toString, c.name)
-                        case None => {}
-                      }
-                    }
-                    mapcollectionIds.put(ds.id.toString, dsCollections)
-                    listOfdatasets += ds
-                  }
-                }
-                case None => Logger.debug("Search result dataset not found: "+resource.id.toString)
-              }
-            }
-
-            // Parse Collection results
-            else if (resource.resourceType == ResourceRef.collection) {
-              collections.get(resource.id) match {
-                case Some(c) => {
-                  if (Permission.checkPermission(Permission.ViewCollection, resource)) {
-                    val collectionThumbnail = datasets.listCollection(c.id.toString).find(_.thumbnail_id.isDefined).flatMap(_.thumbnail_id)
-                    val collectionWithThumbnail = c.copy(thumbnail_id = collectionThumbnail)
-                    listOfcollections += collectionWithThumbnail
-                  }
-                }
-                case None => {
-                  Logger.debug("Search result collection not found: " + resource.id.toString)
-                  Redirect(routes.Collections.collection(resource.id))
+          // Parse File results
+          if (resource.resourceType == ResourceRef.file) {
+            files.get(resource.id) match {
+              case Some(f) => {
+                if (Permission.checkPermission(Permission.ViewFile, resource)) {
+                  var fileDatasets = ListBuffer(): ListBuffer[(String, String)]
+                  datasets.findByFileId(f.id).map(ds => {
+                    fileDatasets = fileDatasets :+ (ds.id.toString, ds.name)
+                  })
+                  mapdatasetIds.put(f.id.toString, fileDatasets)
+                  listOfFiles += f
                 }
               }
+              case None => Logger.debug("Search result file not found: "+resource.id.toString)
             }
-
           }
-        }
 
-        Ok(views.html.searchResults(query, listOfFiles.toArray, listOfdatasets.toArray, listOfcollections.toArray, mapdatasetIds, mapcollectionIds))
+          // Parse Dataset results
+          else if (resource.resourceType == ResourceRef.dataset) {
+            datasets.get(resource.id) match {
+              case Some(ds) => {
+                if (Permission.checkPermission(Permission.ViewDataset, resource)) {
+                  var dsCollections = ListBuffer(): ListBuffer[(String, String)]
+                  for (coll_id <- ds.collections) {
+                    collections.get(coll_id) match {
+                      case Some(c) => dsCollections = dsCollections :+ (coll_id.toString, c.name)
+                      case None => {}
+                    }
+                  }
+                  mapcollectionIds.put(ds.id.toString, dsCollections)
+                  listOfdatasets += ds
+                }
+              }
+              case None => Logger.debug("Search result dataset not found: "+resource.id.toString)
+            }
+          }
+
+          // Parse Collection results
+          else if (resource.resourceType == ResourceRef.collection) {
+            collections.get(resource.id) match {
+              case Some(c) => {
+                if (Permission.checkPermission(Permission.ViewCollection, resource)) {
+                  val collectionThumbnail = datasets.listCollection(c.id.toString).find(_.thumbnail_id.isDefined).flatMap(_.thumbnail_id)
+                  val collectionWithThumbnail = c.copy(thumbnail_id = collectionThumbnail)
+                  listOfcollections += collectionWithThumbnail
+                }
+              }
+              case None => {
+                Logger.debug("Search result collection not found: " + resource.id.toString)
+                Redirect(routes.Collections.collection(resource.id))
+              }
+            }
+          }
+
+        }
       }
-      case None => {
-        Logger.debug("Search plugin not enabled")
-        Ok(views.html.pluginNotEnabled("Text search"))
-      }
+
+      Ok(views.html.searchResults(query, listOfFiles.toArray, listOfdatasets.toArray, listOfcollections.toArray, mapdatasetIds, mapcollectionIds))
+    } else {
+      Logger.debug("Search plugin not enabled")
+      Ok(views.html.pluginNotEnabled("Text search"))
     }
   }
 
@@ -140,37 +139,34 @@ class Search @Inject() (
    * GET the query file from a URL and compare within the database and show the result   
    * */
   def searchbyURL(queryURL: String) = PermissionAction(Permission.ViewDataset).async { implicit request =>
-      implicit val user = request.user
-      current.plugin[VersusPlugin] match {
-        case Some(plugin) => {
-          val futureFutureListResults = for {
-            indexList <- plugin.getIndexesAsFutureList()
-          } yield {
-            val resultListOfFutures = indexList.map {
-              index =>
-                plugin.queryIndexForURL(queryURL, index.id).map {
-                  queryResult =>
-                    (index, queryResult)
-                }
+    implicit val user = request.user
+    if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
+      val futureFutureListResults = for {
+        indexList <- versusService.getIndexesAsFutureList()
+      } yield {
+        val resultListOfFutures = indexList.map {
+          index =>
+            versusService.queryIndexForURL(queryURL, index.id).map {
+              queryResult =>
+                (index, queryResult)
             }
-            //convert list of futures into a Future[list]
-            scala.concurrent.Future.sequence(resultListOfFutures)
-          } //End yield- outer for    	           
-          for {
-            futureListResults <- futureFutureListResults
-            listOfResults <- futureListResults
-          } yield {
-            //get the last part of the image url, send it to the view
-            val lastSlash = queryURL.lastIndexOf("/")
-            val fileName = queryURL.substring(lastSlash + 1)
-            Ok(views.html.multimediaSearchResults(fileName, None, None, listOfResults))
-          }
-        } //case some
-
-        case None => {
-          Future(Ok("No Versus Service"))
         }
-      } //match
+        //convert list of futures into a Future[list]
+        scala.concurrent.Future.sequence(resultListOfFutures)
+      } //End yield- outer for
+      for {
+        futureListResults <- futureFutureListResults
+        listOfResults <- futureListResults
+      } yield {
+        //get the last part of the image url, send it to the view
+        val lastSlash = queryURL.lastIndexOf("/")
+        val fileName = queryURL.substring(lastSlash + 1)
+        Ok(views.html.multimediaSearchResults(fileName, None, None, listOfResults))
+      }
+    } else {
+      Logger.debug("Versus plugin not enabled")
+      Future(Ok(views.html.pluginNotEnabled("Versus")))
+    }
   }
 
   /**
@@ -183,18 +179,17 @@ class Search @Inject() (
       //in controllers/Files -> uploadSelectQuery
       queries.get(fileID) match {
         case Some((inputStream, filename, contentType, length)) => {
-          current.plugin[VersusPlugin] match {
-            case Some(plugin) => {
+          if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
               val indexesToSearchFuture = for {
-                indexesForContent <- plugin.getIndexesForContentTypeAsFutureList(contentType)
-                indexesForType <- plugin.getIndexesForType(typeToSearch, sectionsSelected)
+                indexesForContent <- versusService.getIndexesForContentTypeAsFutureList(contentType)
+                indexesForType <- versusService.getIndexesForType(typeToSearch, sectionsSelected)
               } yield indexesForContent.intersect(indexesForType)
 
               val futureFutureListResults = for {
                 indexesToSearch <- indexesToSearchFuture
               } yield {
                 val resultListOfFutures = indexesToSearch.map(
-                    index => plugin.queryIndexForNewFile(fileID, index.id).map(queryResult => (index, queryResult))
+                    index => versusService.queryIndexForNewFile(fileID, index.id).map(queryResult => (index, queryResult))
                 )
 
                 //convert list of futures into a Future[list]
@@ -210,14 +205,11 @@ class Search @Inject() (
                 val thumb_id: String = queries.getFile(fileID).flatMap(_.thumbnail_id).map(_.stringify).getOrElse("")
                 Ok(views.html.multimediaSearchResults(filename, Some(fileID), Some(thumb_id), listOfResults))
               }
-            } //end of case Some(plugin)   
-
-            case None => {
-              Future(Ok("No Versus Service"))
+            } else {
+              Logger.debug("Versus plugin not enabled")
+              Future(Ok(views.html.pluginNotEnabled("Versus")))
             }
-          } //current.plugin[VersusPlugin] match  
         } //case Some((inputStream...
-
         case None => {
           Logger.debug("File with id " + fileID + " not found")
           Future(Ok("File with id " + fileID + " not found"))
@@ -234,14 +226,13 @@ class Search @Inject() (
       //file will be stored in FileService
       files.getBytes(inputFileId) match {
         case Some((inputStream, filename, contentType, length)) => {
-          current.plugin[VersusPlugin] match {
-            case Some(plugin) => {
+          if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
               val futureFutureListResults = for {
-                indexList <- plugin.getIndexesForContentTypeAsFutureList(contentType)
+                indexList <- versusService.getIndexesForContentTypeAsFutureList(contentType)
               } yield {
                 val resultListOfFutures = indexList.map {
                   index =>
-                    plugin.queryIndexForExistingFile(inputFileId, index.id).map {
+                    versusService.queryIndexForExistingFile(inputFileId, index.id).map {
                       queryResult => (index, queryResult)
                     }
                 }
@@ -257,12 +248,10 @@ class Search @Inject() (
                 val thumb_id = files.get(inputFileId).flatMap(_.thumbnail_id).getOrElse("")
                 Ok(views.html.multimediaSearchResults(filename, Some(inputFileId), Some(thumb_id), listOfResults))
               }
-            } //end of case Some(plugin)                   
-
-            case None => {
-              Future(Ok("No Versus Service"))
+            } else {
+            Logger.debug("Versus plugin not enabled")
+            Future(Ok(views.html.pluginNotEnabled("Versus")))
             }
-          } //current.plugin[VersusPlugin] match  
         } //case Some((inputStream...
 
         case None => {
@@ -369,10 +358,9 @@ class Search @Inject() (
               queries.get(fileId) match {
                 case Some(fileInfo) => {
                   val filename = fileInfo._2
-                  current.plugin[VersusPlugin] match {
-                    case Some(plugin) => {
+                  if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
                       //get file and a list of indexes from request, query this file against each of these indexes 
-                      val queryResults = indexIDs.map(indId => plugin.queryIndexSorted(fileId.stringify, indId.stringify))
+                      val queryResults = indexIDs.map(indId => versusService.queryIndexSorted(fileId.stringify, indId.stringify))
                       //change a list of futures into a future list
                       val futureListResults = scala.concurrent.Future.sequence(queryResults)
 
@@ -387,7 +375,7 @@ class Search @Inject() (
                         } yield {
                           //fileURL = http://localhost:9000/api/files/54bebcb919aff1ea8c8145ac/blob?key=r1ek3rs
                           //get id of the result
-                          val result_id = UUID(plugin.getIdFromVersusURL(fileURL))
+                          val result_id = UUID(versusService.getIdFromVersusURL(fileURL))
 
                           //find file name and thumbnail id for the result
                           //TODO: add processing in case results are not whole files but _sections_ of files
@@ -401,11 +389,10 @@ class Search @Inject() (
                         val thumb_id = queries.getFile(fileId).flatMap(_.thumbnail_id)
                         Ok(views.html.multimediaSearchResultsCombined(filename, thumb_id, sortedMergedResults))
                       } //end of yield   					
-                    } //end of case Some(plugin)   
-                    case None => {
-                      Future(Ok("No Versus Service"))
+                    } else {
+                    Logger.debug("Versus plugin not enabled")
+                    Future(Ok(views.html.pluginNotEnabled("Versus")))
                     }
-                  } //current.plugin[VersusPlugin] match  
                 } //case Some((inputStream...
 
                 case None => {

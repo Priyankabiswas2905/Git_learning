@@ -176,8 +176,7 @@ class MongoSalatPlugin @Inject() (lifecycle: ApplicationLifecycle) extends Mongo
   collection("multimedia.distances").ensureIndex(MongoDBObject("source_section" -> 1, "representation" -> 1, "distance" -> 1, "target_spaces" -> 1))
 
   lifecycle.addStopHook { () =>
-    if (mongoConnection != null)
-      mongoConnection.close()
+    if (mongoConnection != null) mongoConnection.close()
     mongoConnection = null
     Future.successful(())
   }

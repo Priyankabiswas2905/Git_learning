@@ -35,7 +35,8 @@ class MongoDBCollectionService @Inject() (
   userService: UserService,
   spaceService: SpaceService,
   events:EventService,
-  spaces:SpaceService )  extends CollectionService {
+  spaces:SpaceService,
+  elasticsearchService: ElasticsearchService)  extends CollectionService {
   /**
    * Count all collections
    */
@@ -775,32 +776,23 @@ class MongoDBCollectionService @Inject() (
           datasets.removeCollection(dataset.id, collection.id)
           datasets.index(dataset.id)
         }
-
         for(space <- collection.spaces){
           spaceService.removeCollection(collection.id,space)
         }
-
         for(space <- collection.root_spaces) {
           spaceService.decrementCollectionCounter(collectionId, space, 1)
         }
-
         for(follower <- collection.followers) {
           userService.unfollowCollection(follower, collectionId)
         }
         for(subCollection <- collection.child_collection_ids) {
           removeSubCollection(collectionId, subCollection)
         }
-
         for(parentCollection <- collection.parent_collection_ids) {
           removeSubCollection(parentCollection, collection.id)
         }
-
         Collection.remove(MongoDBObject("_id" -> new ObjectId(collection.id.stringify)))
-
-        current.plugin[ElasticsearchPlugin].foreach {
-          _.delete("data", "collection", collection.id.stringify)
-        }
-
+        elasticsearchService.delete("data", "collection", collection.id.stringify)
         Success
       }
       case None => Success
@@ -851,9 +843,7 @@ class MongoDBCollectionService @Inject() (
   def index(id: UUID) {
     Collection.findOneById(new ObjectId(id.stringify)) match {
       case Some(collection) => {
-        current.plugin[ElasticsearchPlugin].foreach {
-          _.index(collection, false)
-        }
+        elasticsearchService.index(collection, false)
       }
       case None => Logger.error("Collection not found: " + id.stringify)
     }

@@ -6,14 +6,14 @@
     <div class="row">
         <div class="col-md-12">
         @if(resourceType == ResourceRef.collection) {
-            @if(play.api.Play.current.plugin[services.SpaceSharingPlugin].isDefined) {
+            @if(play.api.Play.current.configuration.getBoolean("clowder.space.sharing")) {
                 <h4> @Messages("a.contains.b", Messages("space.title"), Messages("collection.title"))</h4>
             } else {
                 <h4>@Messages("a.contains.b", Messages("spaces.title"), Messages("collection.title"))</h4>
             }
 
         } else {
-            @if(play.api.Play.current.plugin[services.SpaceSharingPlugin].isDefined) {
+            @if(play.api.Play.current.configuration.getBoolean("clowder.space.sharing")) {
                 <h4>@Messages("a.contains.b", Messages("space.title"), Messages("dataset.title"))</h4>
             } else {
                 <h4>@Messages("a.contains.b", Messages("spaces.title"), Messages("dataset.title"))</h4>
@@ -105,20 +105,13 @@
     }
     @if(Permission.checkPermission(user, Permission.DownloadFiles, ResourceRef(resourceType, resourceId)) &&
         Permission.checkPermission(user, Permission.ViewDataset, ResourceRef(resourceType, resourceId))) {
-        @if(current.plugin[services.SpaceCopyPlugin].isDefined) {
+        @if(current.configuration.getBoolean("clowder.space.datasetCopy").getOrElse(false)) {
             @if(resourceType == ResourceRef.dataset) {
                 <h4 class="bottom-padding">Copy Dataset to @Messages("spaces.title")</h4>
                 @spaces.spaceSelect(resourceId, resourceType, "spaceCopySelect", "copyDatasetToSpace('" + resourceId + "')", "Copy", "Copy dataset to " + Messages("space.title"), "copy-to-space-widget")
-            } @* else {
-              <h4>Copy Collection to Space</h4>
-              @spaces.spaceSelect(resourceId, resourceType, "spaceCopySelect", "copyCollectionToSpace('"+resourceId+"')", "Copy", "Copy collection to Space", "copy-to-space-widget")
-
-              }*@
+            }
         }
-
     }
-
-
 
 <link rel="stylesheet" href="@routes.Assets.at("stylesheets/chosen.css")">
 <script src="@routes.Assets.at("javascripts/chosen.jquery.js")" type="text/javascript"></script>
@@ -127,8 +120,9 @@
 
 
 <script language = "javascript">
-    var isSharingEnabled= @play.api.Play.current.plugin[services.SpaceSharingPlugin].isDefined;
-    @if(!play.api.Play.current.plugin[services.SpaceSharingPlugin].isDefined && resourceSpaces_canRemove.size > 0 ) {
+    var isSharingEnabled= @play.api.Play.current.configuration.getBoolean("clowder.space.sharing");
+    var isSharingEnabled= @play.api.Play.current.configuration.getBoolean("clowder.space.sharing")
+    @if(!play.api.Play.current.configuration.getBoolean("clowder.space.sharing") && resourceSpaces_canRemove.size > 0 ) {
     $("#add-to-space-widget").addClass("hidden");
     }
     function getCollection(id) {

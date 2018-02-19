@@ -49,7 +49,8 @@ class  Datasets @Inject()(
   relations: RelationService,
   userService: UserService,
   thumbnailService : ThumbnailService,
-  appConfig: AppConfigurationService) extends ApiController {
+  appConfig: AppConfigurationService,
+  elasticsearchService: ElasticsearchService) extends ApiController {
 
   def get(id: UUID) = PermissionAction(Permission.ViewDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     datasets.get(id) match {
@@ -223,17 +224,13 @@ class  Datasets @Inject()(
                   if (!file.xmlMetadata.isEmpty) {
                     val xmlToJSON = files.getXMLMetadataJSON(UUID(file_id))
                     datasets.addXMLMetadata(UUID(id), UUID(file_id), xmlToJSON)
-                    current.plugin[ElasticsearchPlugin].foreach {
-                      _.index(SearchUtils.getElasticsearchObject(d))
-                    }
+                    elasticsearchService.index(SearchUtils.getElasticsearchObject(d))
                   } else {
-                    current.plugin[ElasticsearchPlugin].foreach {
-                      _.index(SearchUtils.getElasticsearchObject(d))
-                    }
+                    elasticsearchService.index(SearchUtils.getElasticsearchObject(d))
                   }
 
-                  current.plugin[AdminsNotifierPlugin].foreach {
-                    _.sendAdminsNotification(Utils.baseUrl(request), "Dataset", "added", id, name)
+                  if (current.configuration.getBoolean("clowder.events.notifyadmins").getOrElse(false)) {
+                    AdminsNotifier.sendAdminsNotification(Utils.baseUrl(request), "Dataset", "added", id, name)
                   }
 
 
@@ -393,9 +390,7 @@ class  Datasets @Inject()(
   def reindex(id: UUID, recursive: Boolean) = PermissionAction(Permission.CreateDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     datasets.get(id) match {
       case Some(ds) => {
-        current.plugin[ElasticsearchPlugin].foreach {
-          _.index(ds, recursive)
-        }
+        elasticsearchService.index(ds, recursive)
         Ok(toJson(Map("status" -> "success")))
       }
       case None => {
@@ -1767,14 +1762,15 @@ class  Datasets @Inject()(
         datasets.removeDataset(id)
         appConfig.incrementCount('datasets, -1)
 
-        current.plugin[ElasticsearchPlugin].foreach {
-          _.delete("data", "dataset", id.stringify)
-        }
+        elasticsearchService.delete("data", "dataset", id.stringify)
 
-        for(file <- dataset.files)
+        for (file <- dataset.files)
           files.index(file)
 
-        current.plugin[AdminsNotifierPlugin].foreach{_.sendAdminsNotification(Utils.baseUrl(request), "Dataset","removed",dataset.id.stringify, dataset.name)}
+        if (current.configuration.getBoolean("clowder.events.notifyadmins").getOrElse(false)) {
+          AdminsNotifier.sendAdminsNotification(Utils.baseUrl(request), "Dataset", "removed", dataset.id.stringify, dataset.name)
+        }
+
         Ok(toJson(Map("status"->"success")))
       }
       case None => Ok(toJson(Map("status" -> "success")))

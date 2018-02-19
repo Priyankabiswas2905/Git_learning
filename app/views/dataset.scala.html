@@ -1,3 +1,4 @@
+@import services.ToolManagerService
 @(dataset: models.Dataset,
   comments: List[Comment],
   previewers : List[Previewer],
@@ -15,7 +16,8 @@
   showDownload: Boolean,
   accessData: models.DatasetAccess,
   canAddDatasetToCollection: Boolean,
-  stagingAreaDefined: Boolean)(implicit flash: play.api.mvc.Flash, user: Option[models.User], request: RequestHeader)
+  stagingAreaDefined: Boolean,
+  toolService: ToolManagerService)(implicit flash: play.api.mvc.Flash, user: Option[models.User], request: RequestHeader)
 
 @import api.Permission
 @import play.api.Play.current
@@ -202,7 +204,7 @@
                     @if(user.isDefined) {
                         @datasets.userLink(dataset)
                     }
-                    @if(user.isDefined && play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined) {
+                    @if(user.isDefined && play.api.Play.current.configuration.getBoolean("stagingarea.enabled")) {
                         @if(toPublish && currentSpace.isDefined && Permission.checkPermission(Permission.EditStagingArea, ResourceRef(ResourceRef.space, UUID(currentSpace.getOrElse(""))))) {
                             <a id='publish' href="@(routes.CurationObjects.newCO(dataset.id, currentSpace.get))" class="btn btn-link">
                                 <span class="glyphicon glyphicon-globe"></span> Publish
@@ -303,10 +305,10 @@
             @spaces.spaceAllocation(dataset.id, ResourceRef.dataset,datasetSpaces_canRemove.getOrElse(Map.empty),None)
             @datasets.collections(dataset, collectionsInside, canAddDatasetToCollection)
             @datasets.tags(dataset, fileList, filesTags)
-            @if(play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined) {
+            @if(play.api.Play.current.configuration.getBoolean("stagingarea.enabled")) {
                 @datasets.listCurationObjects(curationObjects)
             }
-            @if(current.plugin[services.PostgresPlugin].isDefined) {
+            @if(current.configuration.getBoolean("geostream.enabled").getOrElse(false)) {
                 @sensors.relatedSensors(relatedSensors, "Dataset", dataset.id.stringify)
             }
             <div id="toolListContainer"></div>
@@ -424,14 +426,8 @@
             var description = $('#ds_description').html().trim();
             $('#ds_description').html(urlify(description));
 
-            @play.api.Play.current.plugin[services.ToolManagerPlugin] match {
-                case Some(p) => {
-                    @if(p.enabled && dataset.files.nonEmpty && Permission.checkPermission(Permission.ExecuteOnDataset, ResourceRef(ResourceRef.dataset, dataset.id))) {
-                        refreshToolSidebar()
-                    }
-                }
-                case None => { }
-
+            @if(toolService.enabled && dataset.files.nonEmpty && Permission.checkPermission(Permission.ExecuteOnDataset, ResourceRef(ResourceRef.dataset, dataset.id))) {
+                refreshToolSidebar()
             }
 
             $("input[value='@dataset.status']").attr("checked", true);

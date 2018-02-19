@@ -34,7 +34,9 @@ class Datasets @Inject() (
     folders: FolderService,
     metadata: MetadataService,
     events: EventService,
-    selections: SelectionService) extends SecuredController {
+    selections: SelectionService,
+    toolService: ToolManagerService,
+    geostreamsService: GeostreamsService) extends SecuredController {
 
   object ActivityFound extends Exception {}
 
@@ -557,21 +559,18 @@ class Datasets @Inject() (
         }
 
         // associated sensors
-        val sensors: List[(String, String, String)] = current.plugin[PostgresPlugin] match {
-          case Some(db) if db.isEnabled => {
-            // findRelationships will return a "Relation" model with all information about the relationship
-            val relationships = relations.findRelationships(id.stringify, ResourceType.dataset, ResourceType.sensor)
+        val sensors: List[(String, String, String)] = {
+          // findRelationships will return a "Relation" model with all information about the relationship
+          val relationships = relations.findRelationships(id.stringify, ResourceType.dataset, ResourceType.sensor)
 
-            // we want to get the name of the sensor and its location on Geodashboard
-            // the "target.id" in a relationship is the Sensor's ID from the geostreaming API (like 117)
-            // we will lookup the name and url using the sensor ID, then return each sensor in a list of tuples:
-            // [(relationship_ID, sensor_name, geodashboard_url), ...]
-            relationships.map { r =>
-              val nameToURLTuple = db.getDashboardSensorURLs(List(r.target.id)).head
-              (r.id.stringify, nameToURLTuple._1, nameToURLTuple._2)
-            }
+          // we want to get the name of the sensor and its location on Geodashboard
+          // the "target.id" in a relationship is the Sensor's ID from the geostreaming API (like 117)
+          // we will lookup the name and url using the sensor ID, then return each sensor in a list of tuples:
+          // [(relationship_ID, sensor_name, geodashboard_url), ...]
+          relationships.map { r =>
+            val nameToURLTuple = geostreamsService.getDashboardSensorURLs(List(r.target.id)).head
+            (r.id.stringify, nameToURLTuple._1, nameToURLTuple._2)
           }
-          case _ => List.empty[(String, String, String)]
         }
 
         var datasetSpaces: List[ProjectSpace] = List.empty[ProjectSpace]
@@ -645,10 +644,11 @@ class Datasets @Inject() (
            }
           )
         }
-        val stagingAreaDefined = play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined
+        val stagingAreaDefined = play.api.Play.current.configuration.getBoolean("stagingarea.enabled").getOrElse(false)
         Ok(views.html.dataset(datasetWithFiles, commentsByDataset, filteredPreviewers.toList, m,
           decodedCollectionsInside.toList, isRDFExportEnabled, sensors, Some(decodedSpaces_canRemove), fileList,
-          filesTags, toPublish, curPubObjects, currentSpace, limit, showDownload, accessData, canAddDatasetToCollection, stagingAreaDefined))
+          filesTags, toPublish, curPubObjects, currentSpace, limit, showDownload, accessData, canAddDatasetToCollection,
+          stagingAreaDefined, toolService))
       }
       case None => {
         Logger.error("Error getting dataset" + id)
