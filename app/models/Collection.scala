@@ -19,6 +19,8 @@ case class Collection(
   child_collection_ids : List[UUID] = List.empty,
   root_spaces: List[UUID] = List.empty,
   metadataCount: Long = 0,
+  trash: Boolean = false,
+  dateMovedToTrash : Option[Date] = None,
   childCollectionsCount: Integer = 0
 )
 
