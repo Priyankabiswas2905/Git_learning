@@ -1,29 +1,38 @@
 package services
 
-import play.api.{Plugin, Application}
+import play.api.{Application, Plugin}
 import models._
 import Transformation.LidoToCidocConvertion
 import play.api.Play.current
 import java.util.ArrayList
+
 import play.api.Logger
 import java.io.BufferedReader
 import java.io.FileReader
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.io.FileInputStream
+
+import javax.inject.Inject
 import org.apache.commons.io.FileUtils
 import org.bson.types.ObjectId
 import org.json.JSONObject
+import play.api.inject.ApplicationLifecycle
 import play.libs.Akka
+
 import scala.concurrent.duration._
 import play.api.libs.concurrent.Execution.Implicits._
+
+import scala.concurrent.Future
+
+trait RDFUpdateService
 
 /**
  * External RDF store update service.
  *
  *
  */
-class RDFUpdateService(application: Application) extends Plugin {
+class RDFUpdateServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends RDFUpdateService {
 
   val files: FileService = DI.injector.instanceOf[FileService]
   val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
@@ -31,22 +40,22 @@ class RDFUpdateService(application: Application) extends Plugin {
 
   object MustBreak extends Exception {}
 
-  override def onStart() {
-    Logger.debug("Starting RDF updater Plugin")
+	Logger.debug("Starting RDF updater Plugin")
 
-    var timeInterval = play.Play.application().configuration().getInt("rdfRepoUpdate.updateEvery")
-    Akka.system().scheduler.schedule(0.hours, timeInterval.intValue().hours) {
-      modifyRDFOfMetadataChangedFiles()
-      modifyRDFOfMetadataChangedDatasets()
-    }
-  }
+	var timeInterval = play.Play.application().configuration().getInt("rdfRepoUpdate.updateEvery")
+	Akka.system().scheduler.schedule(0.hours, timeInterval.intValue().hours) {
+		modifyRDFOfMetadataChangedFiles()
+		modifyRDFOfMetadataChangedDatasets()
+	}
 
-  override def onStop() {
-    Logger.debug("Shutting down RDF updater Plugin")
-  }
+	lifecycle.addStopHook { () =>
+		Logger.debug("Shutting down RDF updater Plugin")
+		Future.successful(())
+	}
 
-  override lazy val enabled = {
-    !application.configuration.getString("rdfupdateservice").filter(_ == "disabled").isDefined
+  lazy val enabled = {
+		import play.api.Play.current
+    !current.configuration.getString("rdfupdateservice").filter(_ == "disabled").isDefined
   }
 
 

@@ -1,33 +1,40 @@
 package services
 
-import play.api.{ Plugin, Logger, Application }
+import javax.inject.Inject
+import play.api.inject.ApplicationLifecycle
+import play.api.{Application, Logger, Plugin}
 import play.libs.Akka
+
 import scala.concurrent.duration._
 import play.api.libs.concurrent.Execution.Implicits._
+
+import scala.concurrent.Future
+
+class FileMetadataAutodumpService
 
 /**
  * File metadata automatic dump service.
  *
  */
-class FileMetadataAutodumpService (application: Application) extends Plugin {
+class FileMetadataAutodumpServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends FileMetadataAutodumpService {
 
   val files: FileService = DI.injector.instanceOf[FileService]
-  
-  override def onStart() {
+
     Logger.debug("Starting file metadata autodumper Plugin")
     //Dump metadata of all files periodically
     val timeInterval = play.Play.application().configuration().getInt("filemetadatadump.dumpEvery") 
 	Akka.system().scheduler.schedule(0.days, timeInterval.intValue().days){
 	      dumpAllFileMetadata
-	}    
-  }
-  
-  override def onStop() {
+	}
+
+  lifecycle.addStopHook { () =>
     Logger.debug("Shutting down file metadata autodumper Plugin")
+    Future.successful(())
   }
 
-  override lazy val enabled = {
-    !application.configuration.getString("filemetadatadumpservice").filter(_ == "disabled").isDefined
+  lazy val enabled = {
+    import play.api.Play.current
+    !current.configuration.getString("filemetadatadumpservice").filter(_ == "disabled").isDefined
   }
   
   def dumpAllFileMetadata() = {

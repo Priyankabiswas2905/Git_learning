@@ -1,27 +1,40 @@
 package services
 
-import play.api.{ Plugin, Logger, Application }
+import play.api.{Application, Logger, Plugin}
 import play.api.Play.current
 import org.bson.types.ObjectId
 import org.json.JSONObject
 import java.io.BufferedWriter
 import java.io.FileWriter
+
 import Transformation.LidoToCidocConvertion
+import javax.inject.Inject
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import models.Dataset
 import models.UUID
 import play.libs.Akka
+
 import scala.concurrent.duration._
 import play.api.libs.concurrent.Execution.Implicits._
 import models.UUID
+import play.api.inject.ApplicationLifecycle
+
+import scala.concurrent.Future
+
+trait RDFExportService {
+	def getRDFUserMetadataFile(id: String, mappingNumber: String="1"): Option[java.io.File]
+	def getRDFURLsForFile(id: String): Option[JsValue]
+	def getRDFURLsForDataset(id: String): Option[JsValue]
+	def getRDFUserMetadataDataset(id: String, mappingNumber: String="1"): Option[java.io.File]
+}
 
 /**
  * Service allowing exporting of community-generated and XML-uploaded metadata of files and datasets as RDF.
  *
  *
  */
-class RDFExportService (application: Application) extends Plugin {
+class RDFExportServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends RDFExportService {
   
   val files: FileService =  DI.injector.instanceOf[FileService]
   val datasets: DatasetService =  DI.injector.instanceOf[DatasetService]
@@ -33,21 +46,22 @@ class RDFExportService (application: Application) extends Plugin {
   
   val hostUrl = "http://" + play.Play.application().configuration().getString("hostIp").replaceAll("/$", "") + ":" + play.Play.application().configuration().getString("http.port")
 
-  override def onStart() {
-    Logger.debug("Starting RDF exporter Plugin")
-    //Clean temporary RDF files
-    var timeInterval = play.Play.application().configuration().getInt("rdfTempCleanup.checkEvery")
-    Akka.system().scheduler.schedule(0.minutes, timeInterval.intValue().minutes){
-    	files.removeTemporaries()
-    }
-  }
-  
-  override def onStop() {
-    Logger.debug("Shutting down RDF exporter Plugin")
-  }
 
-  override lazy val enabled = {
-    !application.configuration.getString("rdfexportservice").filter(_ == "disabled").isDefined
+	Logger.debug("Starting RDF exporter Plugin")
+	//Clean temporary RDF files
+	var timeInterval = play.Play.application().configuration().getInt("rdfTempCleanup.checkEvery")
+	Akka.system().scheduler.schedule(0.minutes, timeInterval.intValue().minutes){
+		files.removeTemporaries()
+	}
+
+	lifecycle.addStopHook { () =>
+		Logger.debug("Shutting down RDF exporter Plugin")
+		Future.successful(())
+	}
+
+  lazy val enabled = {
+		import play.api.Play.current
+    !current.configuration.getString("rdfexportservice").filter(_ == "disabled").isDefined
   }
   
   def getRDFUserMetadataFile(id: String, mappingNumber: String="1"): Option[java.io.File] = {

@@ -61,7 +61,10 @@ object AuthenticatorDAO extends ModelCompanion[LocalAuthenticator, ObjectId] {
   }
 
 }
-class MongoDBAuthenticatorStore @Inject() (app: Application) extends Plugin {
+
+trait MongoDBAuthenticatorStoreService
+
+class MongoDBAuthenticatorStore @Inject() (app: Application) extends MongoDBAuthenticatorStoreService {
   
   def save(authenticator: LocalAuthenticator): Either[Error, Unit] = {
     Logger.trace("Saving Authenticator " + authenticator)

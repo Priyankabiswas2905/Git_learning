@@ -1,34 +1,41 @@
 package services
 
-import play.api.{Logger, Plugin, Application}
+import javax.inject.Inject
+import play.api.{Application, Logger, Plugin}
 import play.libs.Akka
+
 import scala.concurrent.duration._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.Play.current
+import play.api.inject.ApplicationLifecycle
+
+import scala.concurrent.Future
+
+trait RDFExporterService
 
 /**
  * Plugin for RDF Exporter
  */
-class RDFExporterPlugin(application: Application) extends Plugin {
+class RDFExporterPlugin @Inject() (lifecycle: ApplicationLifecycle) extends RDFExporterService {
 
   val files: FileService =  DI.injector.instanceOf[FileService]
 
-  override def onStart() {
-    Logger.debug("Starting up RDF Exporter Plugin")
-    //Clean temporary RDF files if RDF exporter is activated
-    if(current.plugin[RDFExportService].isDefined){
-      var timeInterval = play.Play.application().configuration().getInt("rdfTempCleanup.checkEvery")
-      Akka.system().scheduler.schedule(0.minutes, timeInterval.intValue().minutes){
-        files.removeTemporaries()
-      }
+  Logger.debug("Starting up RDF Exporter Plugin")
+  //Clean temporary RDF files if RDF exporter is activated
+  if(current.plugin[RDFExportService].isDefined){
+    var timeInterval = play.Play.application().configuration().getInt("rdfTempCleanup.checkEvery")
+    Akka.system().scheduler.schedule(0.minutes, timeInterval.intValue().minutes){
+      files.removeTemporaries()
     }
   }
 
-  override def onStop() {
+  lifecycle.addStopHook { () =>
     Logger.debug("Shutting down RDF Exporter Plugin")
+    Future.successful(())
   }
 
-  override lazy val enabled = {
-    !application.configuration.getString("rdfexporter").filter(_ == "no").isDefined
+  lazy val enabled = {
+    import play.api.Play.current
+    !current.configuration.getString("rdfexporter").filter(_ == "no").isDefined
   }
 }
