@@ -419,6 +419,9 @@ class MongoSalatPlugin(app: Application) extends Plugin {
     // Change existing 'In Curation' curation objects/pub requests to 'In Prepaparation'
     updateMongo("change-in-curation-status-to-in-preparation", updateInCurationStatus)
 
+    // Change from User active and serverAdmin flags to single status 
+    updateMongo("change-to-user-status", updateToUserStatus)
+
     // Remove collections for deprecated forms of metadata
     updateMongo("remove-deprecated-metadata-collections", updateMetadataStorage)
   }
@@ -593,6 +596,7 @@ class MongoSalatPlugin(app: Application) extends Plugin {
   private def updateReplaceFilesInDataset() {
     collection("datasets").foreach { ds =>
       val files = ds.getAsOrElse[MongoDBList]("files", MongoDBList.empty)
+      //Following statement fails if datasets with fileIds already exist
       val fileIds = files.map(file => new ObjectId(file.asInstanceOf[BasicDBObject].get("_id").toString)).toList
       ds.put("files", fileIds)
       try {
@@ -1277,15 +1281,13 @@ class MongoSalatPlugin(app: Application) extends Plugin {
                 "identityId" -> MongoDBObject("userId" -> username.toLowerCase, "providerId" -> "userpass")))
 
               if (conflicts == 0) {
-                collection("social.users").update(
-                  MongoDBObject("_id" -> userId),
+                collection("social.users").update(MongoDBObject("_id" -> userId),
                   MongoDBObject("$set" -> MongoDBObject(
                     "email" -> email.toLowerCase,
                     "identityId" -> MongoDBObject("userId" -> username.toLowerCase, "providerId" -> "userpass"))), upsert = false, multi = true)
               } else {
                 // If there's already an account with lowercase email, deactivate this account
-                collection("social.users").update(
-                  MongoDBObject("_id" -> userId),
+                collection("social.users").update(MongoDBObject("_id" -> userId),
                   MongoDBObject("$set" -> MongoDBObject("active" -> false)), upsert = false, multi = true)
               }
             } catch {
@@ -1395,9 +1397,28 @@ class MongoSalatPlugin(app: Application) extends Plugin {
       $set("status" -> "In Preparation"), false, true, WriteConcern.Safe)
   }
 
+  private def updateToUserStatus() {
+    collection("social.users").foreach { su =>
+      val active = su.getAs[Boolean]("active")
+      val admin = su.getAs[Boolean]("serverAdmin")
+      if (!active.getOrElse(false)) {
+        su.put("status", UserStatus.Inactive.toString)
+      } else {
+        if (admin.getOrElse(false)) {
+          su.put("status", UserStatus.Admin.toString)
+        } else {
+          su.put("status", UserStatus.Active.toString)
+        }
+      }
+
+      su.removeField("active")
+      su.removeField("serverAdmin")
+      collection("social.users").save(su, WriteConcern.Safe)
+    }
+  }
+
   private def updateMetadataStorage(): Unit = {
     collection("datasetxmlmetadata").drop()
 
   }
-
 }

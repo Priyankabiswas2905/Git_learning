@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+- Fixed bug where reindex of Elasticsearch would fail if extractors tried to index simultaneously.
+  [CATS-856](https://opensource.ncsa.illinois.edu/jira/browse/CATS-856)
 
 ### Added
 - Add LDAP authorization
@@ -16,12 +18,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   exact matching on the title field instead of regular expression fuzzy matching.
 - Having a temporary trash option. Can be set with useTrash boolean in the configuration file
   [CATS-780](https://opensource.ncsa.illinois.edu/jira/browse/CATS-780)
+- Track last time a user logged in.
   
   
 ### Changed
 - File and dataset GET metadata endpoints to include their corresponding IDs and resource type information. 
   [CATS-718](https://opensource.ncsa.illinois.edu/jira/browse/CATS-718)
 - User Metadata updates to improve semantics, editing, display, and search  
+- Person tracking previewer updated after changes to the associated metadata structure.
+  [CATS-730](https://opensource.ncsa.illinois.edu/jira/browse/CATS-730)
 
 ### Fixed
 - Fixed GreenIndex previewer on clowder dataset page. 
@@ -29,7 +34,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Only show the sort by dropdown in the collection page when the sort in memory flag is false. 
   [CATS-840](https://opensource.ncsa.illinois.edu/jira/browse/CATS-840)
 - Extraction status returns "Done" instead of "Processing" when one of the extractor fails 
-  [CATS-719] (https://opensource.ncsa.illinois.edu/jira/browse/CATS-719) 
+  [CATS-719] (https://opensource.ncsa.illinois.edu/jira/browse/CATS-719)
+- Avoid exception avoid exception in user events when unknown events don't match expected pattern (e.g. metadata events 
+  from another branch).
 
 ## 1.3.4 - 2018-02-05
 
