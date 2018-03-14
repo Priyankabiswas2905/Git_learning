@@ -310,6 +310,13 @@ class MongoSalatPlugin(app: Application) extends Plugin {
   // CODE TO UPDATE THE DATABASE
   // ----------------------------------------------------------------------
   def updateDatabase() {
+
+    //add trash field dataset
+    updateMongo("add-trash-dataset", addDateMovedToTrashDatasets)
+
+    //add trash field collection
+    updateMongo("add-trash-collection", addDateMovedToTrashCollections)
+
     // migrate users to new model
     updateMongo("fixing-typehint-users", updateMongoChangeUserType)
 
@@ -410,9 +417,12 @@ class MongoSalatPlugin(app: Application) extends Plugin {
 
     // Change repository in extractors.info collection into a list
     updateMongo("update-repository-type-in-extractors-info", updateRepositoryType)
-    
+
     // Change existing 'In Curation' curation objects/pub requests to 'In Prepaparation' 
     updateMongo("change-in-curation-status-to-in-preparation", updateInCurationStatus)
+
+    // Change from User active and serverAdmin flags to single status 
+    updateMongo("change-to-user-status", updateToUserStatus)
   }
 
   private def updateMongo(updateKey: String, block: () => Unit): Unit = {
@@ -434,6 +444,18 @@ class MongoSalatPlugin(app: Application) extends Plugin {
         Logger.warn(s"Missing mongo update ${updateKey}. Application might be broken.")
       }
     }
+  }
+
+  private def addDateMovedToTrashCollections() {
+    val q = MongoDBObject()
+    val s = MongoDBObject("$set" -> MongoDBObject("dateMovedToTrash" -> None, "trash"->false))
+    collection("collections").update(q,s, multi=true)
+  }
+
+  private def addDateMovedToTrashDatasets() {
+    val q = MongoDBObject()
+    val s = MongoDBObject("$set" -> MongoDBObject("dateMovedToTrash" -> None, "trash"->false))
+    collection("datasets").update(q,s, multi=true)
   }
 
   private def updateMongoChangeUserType() {
@@ -490,7 +512,8 @@ class MongoSalatPlugin(app: Application) extends Plugin {
     val maxTagLength = play.api.Play.configuration.getInt("clowder.tagLength").getOrElse(100)
     Logger.debug("[MongoDBUpdate] : fixing " + collection("datasets").count(q) + " datasets")
     collection("datasets").find(q).foreach { x =>
-      x.getAsOrElse[MongoDBList]("tags", MongoDBList.empty).foreach { case tag:DBObject =>
+      x.getAsOrElse[MongoDBList]("tags", MongoDBList.empty).foreach {
+        case tag: DBObject =>
           if (tag.getAsOrElse[String]("name", "").length > maxTagLength) {
             Logger.debug(x.get("_id").toString + " : truncating " + tag.getAsOrElse[String]("name", ""))
             tag.put("name", tag.getAsOrElse[String]("name", "").substring(0, maxTagLength))
@@ -505,7 +528,8 @@ class MongoSalatPlugin(app: Application) extends Plugin {
       }
     }
     collection("uploads.files").find(q).foreach { x =>
-      x.getAsOrElse[MongoDBList]("tags", MongoDBList.empty).foreach { case tag:DBObject =>
+      x.getAsOrElse[MongoDBList]("tags", MongoDBList.empty).foreach {
+        case tag: DBObject =>
           if (tag.getAsOrElse[String]("name", "").length > maxTagLength) {
             Logger.debug(x.get("_id").toString + " : truncating " + tag.getAsOrElse[String]("name", ""))
             tag.put("name", tag.getAsOrElse[String]("name", "").substring(0, maxTagLength))
@@ -571,12 +595,12 @@ class MongoSalatPlugin(app: Application) extends Plugin {
   private def updateReplaceFilesInDataset() {
     collection("datasets").foreach { ds =>
       val files = ds.getAsOrElse[MongoDBList]("files", MongoDBList.empty)
+      //Following statement fails if datasets with fileIds already exist
       val fileIds = files.map(file => new ObjectId(file.asInstanceOf[BasicDBObject].get("_id").toString)).toList
       ds.put("files", fileIds)
       try {
         collection("datasets").save(ds, WriteConcern.Safe)
-      }
-      catch {
+      } catch {
         case e: BSONException => Logger.error("Unable to update files in dataset:" + ds.getAsOrElse[ObjectId]("_id", new ObjectId()).toString)
       }
     }
@@ -694,8 +718,7 @@ class MongoSalatPlugin(app: Application) extends Plugin {
       invite.put("expirationTime", afterAddingMins)
       try {
         collection("spaces.invites").save(invite, WriteConcern.Safe)
-      }
-      catch {
+      } catch {
         case e: BSONException => Logger.error("Unable to update invite:" + invite.getAsOrElse[ObjectId]("_id", new ObjectId()).toString)
       }
     }
@@ -759,8 +782,7 @@ class MongoSalatPlugin(app: Application) extends Plugin {
           collection(prefix + ".files").save(file, WriteConcern.Safe)
           if (deletepath)
             collection(prefix + ".files").update(MongoDBObject("_id" -> id), $unset("path"))
-        }
-        catch {
+        } catch {
           case e: Exception => Logger.error("Unable to update file :" + id.toString, e)
         }
       }
@@ -797,8 +819,7 @@ class MongoSalatPlugin(app: Application) extends Plugin {
         }
         try {
           collection(prefix + ".files").save(file, WriteConcern.Safe)
-        }
-        catch {
+        } catch {
           case e: Exception => Logger.error("Unable to update file :" + id.toString, e)
         }
       }
@@ -1071,7 +1092,8 @@ class MongoSalatPlugin(app: Application) extends Plugin {
       val parentCollections = collection("collections").find(MongoDBObject("_id" -> MongoDBObject("$in" -> parents)))
       var parentSpaces = MongoDBList.empty
       parentCollections.foreach { pc =>
-       pc.getAsOrElse[MongoDBList]("spaces", MongoDBList.empty).foreach{ps => parentSpaces += ps} }
+        pc.getAsOrElse[MongoDBList]("spaces", MongoDBList.empty).foreach { ps => parentSpaces += ps }
+      }
       val root_spaces = scala.collection.mutable.ListBuffer.empty[ObjectId]
       spaces.foreach { s =>
 
@@ -1253,15 +1275,13 @@ class MongoSalatPlugin(app: Application) extends Plugin {
               // Find if user exists with lowercase email already
               val conflicts = collection("social.users").count(MongoDBObject(
                 "_id" -> MongoDBObject("$ne" -> userId),
-              "identityId" -> MongoDBObject("userId" -> username.toLowerCase, "providerId" -> "userpass")
-            ))
+                "identityId" -> MongoDBObject("userId" -> username.toLowerCase, "providerId" -> "userpass")))
 
               if (conflicts == 0) {
                 collection("social.users").update(MongoDBObject("_id" -> userId),
                   MongoDBObject("$set" -> MongoDBObject(
                     "email" -> email.toLowerCase,
-                  "identityId" -> MongoDBObject("userId" -> username.toLowerCase, "providerId" -> "userpass")
-                )), upsert = false, multi = true)
+                    "identityId" -> MongoDBObject("userId" -> username.toLowerCase, "providerId" -> "userpass"))), upsert = false, multi = true)
               } else {
                 // If there's already an account with lowercase email, deactivate this account
                 collection("social.users").update(MongoDBObject("_id" -> userId),
@@ -1321,8 +1341,7 @@ class MongoSalatPlugin(app: Application) extends Plugin {
               try {
                 val mdCount = file.getOrElse("metadataCount", "0").toString.toLong
                 file.put("metadataCount", mdCount + 1)
-              }
-              catch {
+              } catch {
                 case e: Exception => {
                   // If we can't get metadataCount from file correctly, just set to 1 for newly added md
                   Logger.error("Unable to update metadataCount; setting to 1", e)
@@ -1339,22 +1358,19 @@ class MongoSalatPlugin(app: Application) extends Plugin {
 
         try {
           collection(colln).save(file, WriteConcern.Safe)
-        }
-        catch {
+        } catch {
           case e: Exception => Logger.error("Unable to update file :" + id.toString, e)
-        }  
+        }
       }
     }
   }
 
-
-
   /**
-    * In order to support adding multiple repositories for an extractor in extractors.info collection, changing the
-    * existing repository type from Repository to List[Repository] in those records that have not been updated yet.
-    */
+   * In order to support adding multiple repositories for an extractor in extractors.info collection, changing the
+   * existing repository type from Repository to List[Repository] in those records that have not been updated yet.
+   */
   private def updateRepositoryType(): Unit = {
-    val extractorsInfoCollection  = collection("extractors.info")
+    val extractorsInfoCollection = collection("extractors.info")
 
     extractorsInfoCollection.foreach { extractor =>
 
@@ -1371,9 +1387,30 @@ class MongoSalatPlugin(app: Application) extends Plugin {
       }
     }
   }
-  
+
   private def updateInCurationStatus(): Unit = {
     CurationDAO.update(MongoDBObject("status" -> "In Curation"),
       $set("status" -> "In Preparation"), false, true, WriteConcern.Safe)
   }
+
+  private def updateToUserStatus() {
+    collection("social.users").foreach { su =>
+      val active = su.getAs[Boolean]("active")
+      val admin = su.getAs[Boolean]("serverAdmin")
+      if (!active.getOrElse(false)) {
+        su.put("status", UserStatus.Inactive.toString)
+      } else {
+        if (admin.getOrElse(false)) {
+          su.put("status", UserStatus.Admin.toString)
+        } else {
+          su.put("status", UserStatus.Active.toString)
+        }
+      }
+
+      su.removeField("active")
+      su.removeField("serverAdmin")
+      collection("social.users").save(su, WriteConcern.Safe)
+    }
+  }
+
 }

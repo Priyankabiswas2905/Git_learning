@@ -27,6 +27,7 @@ import _root_.util.SearchUtils
 import org.elasticsearch.index.query.QueryBuilders
 
 import org.elasticsearch.ElasticsearchException
+import org.elasticsearch.indices.IndexAlreadyExistsException
 
 
 /**
@@ -212,10 +213,16 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
     client match {
       case Some(x) => {
         Logger.debug("Index \""+index+"\" does not exist; creating now ---")
-        x.admin().indices().prepareCreate(index)
-          .setSettings(indexSettings)
-          .addMapping("clowder_object", getElasticsearchObjectMappings())
-          .execute().actionGet()
+        try {
+          x.admin().indices().prepareCreate(index)
+            .setSettings(indexSettings)
+            .addMapping("clowder_object", getElasticsearchObjectMappings())
+            .execute().actionGet()
+        } catch {
+          case e: IndexAlreadyExistsException => {
+            Logger.debug("Index already exists; skipping creation.")
+          }
+        }
       }
       case None =>
     }
@@ -429,7 +436,7 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
       case Some(x) => {
         val searcher = x.prepareSearch(index)
           .setSearchType(SearchType.DFS_QUERY_THEN_FETCH)
-            .addAggregation(AggregationBuilders.terms("by_tag").field("tags.name"))
+            .addAggregation(AggregationBuilders.terms("by_tag").field("tags.name").size(10000))
             // Don't return actual documents; we only care about aggregation here
             .setSize(0)
         // Filter to tags on a particular type of resource if given

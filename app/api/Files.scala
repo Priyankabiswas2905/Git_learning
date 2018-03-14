@@ -1,11 +1,12 @@
 package api
 
+import scala.annotation.tailrec
 import java.io.FileInputStream
 import java.net.{URL, URLEncoder}
 import javax.inject.Inject
 import javax.mail.internet.MimeUtility
 
-import _root_.util.{FileUtils, Parsers, JSONLD, SearchUtils}
+import _root_.util.{FileUtils, Parsers, JSONLD, SearchUtils, RequestUtils}
 
 import com.mongodb.casbah.Imports._
 import controllers.Previewers
@@ -59,7 +60,7 @@ class Files @Inject()(
     files.get(id) match {
       case Some(file) => {
         val serveradmin = request.user match {
-          case Some(u) => u.serverAdmin
+          case Some(u) => (u.status==UserStatus.Admin)
           case None => false
         }
         Ok(jsonFile(file, serveradmin))
@@ -76,7 +77,7 @@ class Files @Inject()(
    */
   def list = DisabledAction { implicit request =>
     val serveradmin = request.user match {
-      case Some(u) => u.serverAdmin
+      case Some(u) => (u.status==UserStatus.Admin)
       case None => false
     }
     val list = for (f <- files.listFilesNotIntermediate()) yield jsonFile(f, serveradmin)
@@ -372,14 +373,15 @@ class Files @Inject()(
     }
 
   def getMetadataJsonLD(id: UUID, extFilter: Option[String]) = PermissionAction(Permission.ViewMetadata, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
+    val (baseUrlExcludingContext, isHttps) = RequestUtils.getBaseUrlAndProtocol(request, false)
     files.get(id) match {
       case Some(file) => {
         //get metadata and also fetch context information
         val listOfMetadata = extFilter match {
           case Some(f) => metadataService.getExtractedMetadataByAttachTo(ResourceRef(ResourceRef.file, id), f)
-            .map(JSONLD.jsonMetadataWithContext(_))
+            .map(JSONLD.jsonMetadataWithContext(_, baseUrlExcludingContext, isHttps))
           case None => metadataService.getMetadataByAttachTo(ResourceRef(ResourceRef.file, id))
-            .map(JSONLD.jsonMetadataWithContext(_))
+            .map(JSONLD.jsonMetadataWithContext(_, baseUrlExcludingContext, isHttps))
         }
         Ok(toJson(listOfMetadata))
       }
@@ -1247,6 +1249,64 @@ class Files @Inject()(
   * Returns metadata extracted so far for a file with id
   * 
   */
+
+
+  /**
+    * get the hierarchical path from dataset to the given folder.
+    * @param folder a Folder object
+    * @param path a list name of folder/dataset
+    * @return the list of names on the hierarchical path from dataset to the given folder
+    */
+  @tailrec final def folderPath(folder: Folder, path: List[String]) : List[String]= {
+    folder.parentType match {
+      case "folder" => {
+        folders.get(folder.parentId) match {
+          case Some(fparent) => folderPath(fparent, folder.name :: path)
+          case _ => folder.name :: path
+        }
+      }
+      case "dataset" => {
+        datasets.get(folder.parentId) match {
+          case Some(dataset) => dataset.name.trim :: folder.name :: path
+          case _ => folder.name :: path
+        }
+      }
+      case _ => folder.name :: path
+    }
+  }
+
+  /**
+    * Rest endpoint,
+    * given a file id, get a list of traversing path from datasets to the parent folder containing this file.
+    * @param id a file id in dataset.
+    * @return a list of paths
+    */
+  def paths(id: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
+    Logger.debug("get a list of path from dataset to the parent folder containing the file with id " + id)
+
+    if (UUID.isValid(id.stringify)) {
+      files.get(id) match {
+        case Some(file) =>
+          // 1. get name of dataset directorly containing this file.
+          val datasetList = datasets.findByFileId(file.id)
+          val datasetNames = for(dataset <- datasetList) yield(dataset.name)
+          //2. get paths from datasets to the parent folders containing this file.
+          val foldersContainingFile = folders.findByFileId(file.id)
+          val allPaths : List[List[String]] = datasetNames +: (for(folder <- foldersContainingFile) yield (folderPath(folder, List())))
+          Ok(Json.obj("paths" -> allPaths.filterNot(_.forall(_.isEmpty))))
+        case None => {
+          val error_str = "The file with id " + id + " is not found."
+          Logger.error(error_str)
+          NotFound(toJson(error_str))
+        }
+      }
+    } else {
+      val error_str ="The given id " + id + " is not a valid ObjectId."
+      Logger.error(error_str)
+      BadRequest(toJson(error_str))
+    }
+  }
+
   def extract(id: UUID) = PermissionAction(Permission.ViewMetadata, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
     Logger.debug("Getting extract info for file with id " + id)
     if (UUID.isValid(id.stringify)) {
@@ -1429,7 +1489,7 @@ class Files @Inject()(
         files.get(id) match {
           case Some(file) => {
             val listOfMetadata = metadataService.getMetadataByAttachTo(ResourceRef(ResourceRef.file, id))
-              .filter(_.creator.typeOfAgent == "extractor")
+              .filter(metadata => metadata.creator.typeOfAgent == "extractor" || metadata.creator.typeOfAgent == "cat:extractor")
               .map(JSONLD.jsonMetadataWithContext(_) \ "content")
             Ok(toJson(listOfMetadata))
           }
