@@ -22,8 +22,8 @@ class RDFExporterPlugin @Inject() (lifecycle: ApplicationLifecycle) extends RDFE
 
   Logger.debug("Starting up RDF Exporter Plugin")
   //Clean temporary RDF files if RDF exporter is activated
-  if(current.plugin[RDFExportService].isDefined){
-    var timeInterval = play.Play.application().configuration().getInt("rdfTempCleanup.checkEvery")
+  if(current.configuration.getBoolean("isRDFExportEnabled").getOrElse(false)){
+    val timeInterval = play.Play.application().configuration().getInt("rdfTempCleanup.checkEvery")
     Akka.system().scheduler.schedule(0.minutes, timeInterval.intValue().minutes){
       files.removeTemporaries()
     }

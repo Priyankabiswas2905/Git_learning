@@ -57,7 +57,8 @@ class Files @Inject() (
   polyglotService: PolyglotService,
   elasticsearchService: ElasticsearchService,
   versusService: VersusService,
-  rabbitMQService: RabbitMQService) extends SecuredController {
+  rabbitMQService: RabbitMQService,
+  fileDumpService: FileDumpService) extends SecuredController {
 
   /**
    * Upload form.
@@ -199,7 +200,7 @@ class Files @Inject() (
         }
 
         val foldersContainingFile = folders.findByFileId(file.id).sortBy(_.name)
-        val isRDFExportEnabled = current.plugin[RDFExportService].isDefined
+        val isRDFExportEnabled = current.configuration.getBoolean("isRDFExportEnabled").getOrElse(false)
 
         val extractionsByFile = extractions.findByFileId(id)
 
@@ -415,9 +416,7 @@ class Files @Inject() (
                   appConfig.incrementCount('files, 1)
                   appConfig.incrementCount('bytes, f.length)
 
-                  current.plugin[FileDumpService].foreach {
-                    _.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
-                  }
+                  fileDumpService.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
 
                 if (showPreviews.equals("FileLevel"))
                   flags = flags + "+filelevelshowpreviews"
@@ -551,7 +550,7 @@ class Files @Inject() (
                 }
               }
 
-              current.plugin[FileDumpService].foreach { _.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile)) }
+              fileDumpService.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
 
               // TODO RK need to replace unknown with the server name
               val key = "unknown." + "file." + fileType.replace(".", "_").replace("/", ".")
@@ -932,9 +931,7 @@ class Files @Inject() (
               }
             }
 
-            current.plugin[FileDumpService].foreach {
-              _.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
-            }
+            fileDumpService.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
 
             // TODO RK need to replace unknown with the server name
             //key needs to contain 'query' when uploading a query
@@ -1023,9 +1020,7 @@ class Files @Inject() (
               }
             }
 
-            current.plugin[FileDumpService].foreach {
-              _.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
-            }
+            fileDumpService.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
 
             // TODO RK need to replace unknown with the server name
             val key = "unknown." + "file." + fileType.replace(".", "_").replace("/", ".")
@@ -1127,9 +1122,7 @@ class Files @Inject() (
                       }
                     }
 
-                    current.plugin[FileDumpService].foreach {
-                      _.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
-                    }
+                    fileDumpService.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
 
                     // TODO RK need to replace unknown with the server name
                     val key = "unknown." + "file." + fileType.replace(".", "_").replace("/", ".")

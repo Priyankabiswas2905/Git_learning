@@ -547,11 +547,9 @@ class Datasets @Inject() (
           decodedCommentsByDataset += dComment
         }
 
-        val isRDFExportEnabled = current.plugin[RDFExportService].isDefined
+        val isRDFExportEnabled = current.configuration.getBoolean("isRDFExportEnabled").getOrElse(false)
 
-
-          filesInDataset.map
-          {
+        filesInDataset.map {
           file =>
             file.tags.map {
               tag => filesTags += tag.name

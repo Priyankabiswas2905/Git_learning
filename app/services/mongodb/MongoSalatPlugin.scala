@@ -31,6 +31,7 @@ trait MongoService {
   def dropAllData(resetAll: Boolean)
   def gridFS(prefix: String = "fs"): GridFS
   def getDB: MongoDB
+  var mongoURI: MongoURI
 }
 
 /**

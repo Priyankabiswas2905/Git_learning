@@ -16,12 +16,11 @@ import play.api.libs.Files
 import play.api.libs.json._
 import play.api.mvc.MultipartFormData
 import play.libs.Akka
-import services._
+import services.{FileDumpService, _}
 
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
-
 import javax.mail.internet.MimeUtility
 import java.net.URLEncoder
 
@@ -41,6 +40,7 @@ object FileUtils {
   lazy val thumbnails : ThumbnailService = DI.injector.instanceOf[ThumbnailService]
   lazy val elasticsearchService : ElasticsearchService = DI.injector.instanceOf[ElasticsearchService]
   lazy val rabbitmqService: RabbitMQService = DI.injector.instanceOf[RabbitMQService]
+  lazy val fileDumpService: FileDumpService = DI.injector.instanceOf[FileDumpServiceImpl]
 
   def getContentType(filename: Option[String], contentType: Option[String]): String = {
     getContentType(filename.getOrElse(""), contentType)
@@ -685,9 +685,7 @@ object FileUtils {
   private def processFileBytes(file: File, fp: java.io.File, dataset: Option[Dataset]): Unit = {
     if (!file.isIntermediate) {
       // store the file
-      current.plugin[FileDumpService].foreach {
-        _.dump(DumpOfFile(fp, file.id.toString(), file.filename))
-      }
+      fileDumpService.dump(DumpOfFile(fp, file.id.toString(), file.filename))
 
       // for metadata files
       if (file.contentType.equals("application/xml") || file.contentType.equals("text/xml")) {

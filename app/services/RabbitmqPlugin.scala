@@ -38,11 +38,13 @@ case class ExtractorMessage(
 
 trait RabbitMQService {
   var exchange: String = ""
+  var rabbitmquri: String = ""
   def extract(message: ExtractorMessage)
   def getBindings: Future[WSResponse]
   def getQueuesNamesForAnExchange(exchange: String): Future[WSResponse]
   def getQueueDetails(qname: String): Future[WSResponse]
   def getQueueBindings(qname: String): Future[WSResponse]
+  def connect: Boolean
   def close()
 }
 
@@ -62,7 +64,6 @@ class RabbitmqPlugin @Inject() (lifecycle: ApplicationLifecycle) extends RabbitM
   var vhost: String = ""
   var username: String = ""
   var password: String = ""
-  var rabbitmquri: String = ""
   var mgmtPort: String = ""
 
 

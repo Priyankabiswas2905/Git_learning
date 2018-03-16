@@ -62,6 +62,7 @@ class ConfigurationModule() extends Module {
       bind(classOf[ElasticsearchService]).to(classOf[services.ElasticsearchServiceImpl]),
       bind(classOf[VersusService]).to(classOf[services.VersusServiceImpl]),
       bind(classOf[RabbitMQService]).to(classOf[services.RabbitmqPlugin]),
+      bind(classOf[RDFExportService]).to(classOf[services.RDFExportServiceImpl]),
       bind(classOf[DatasetsAutodumpService]).to(classOf[services.DatasetsAutodumpServiceImpl])
     )
   }

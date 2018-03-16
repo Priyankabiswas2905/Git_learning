@@ -1,13 +1,12 @@
 package api
 
 import javax.inject.Inject
-
 import play.api.Logger
 import models.User
 import play.api.Play._
 import play.api.libs.json.{JsValue, Json}
 import services._
-import services.mongodb.MongoSalatPlugin
+import services.mongodb.{MongoSalatPlugin, MongoService}
 
 import scala.collection.mutable
 
@@ -15,14 +14,18 @@ import scala.collection.mutable
  * class that contains all status/version information about clowder.
  */
 class Status @Inject()(spaces: SpaceService,
-                       collections: CollectionService,
-                       datasets: DatasetService,
-                       files: FileService,
-                       users: UserService,
-                       appConfig: AppConfigurationService,
-                       extractors: ExtractorService,
-                       geostreamsService: GeostreamsService,
-                       elasticsearchService: ElasticsearchService) extends ApiController {
+  collections: CollectionService,
+  datasets: DatasetService,
+  files: FileService,
+  users: UserService,
+  appConfig: AppConfigurationService,
+  extractors: ExtractorService,
+  geostreamsService: GeostreamsService,
+  elasticsearchService: ElasticsearchService,
+  mongoService: MongoService,
+  rabbitMQService: RabbitMQService,
+  toolManagerService: ToolManagerService) extends ApiController {
+
   val jsontrue = Json.toJson(true)
   val jsonfalse = Json.toJson(false)
 
@@ -84,64 +87,44 @@ class Status @Inject()(spaces: SpaceService,
       })
     }
 
-    // FIXME replace with query of configuration
-    current.plugins foreach {
       // mongo
-      case p: MongoSalatPlugin => {
-        result.put("mongo", if (Permission.checkServerAdmin(user)) {
-              Json.obj("uri" -> p.mongoURI.toString(),
-                "updates" -> appConfig.getProperty[List[String]]("mongodb.updates", List.empty[String]))
-            } else {
-              jsontrue
-            })
-      }
+      result.put("mongo", if (Permission.checkServerAdmin(user)) {
+        Json.obj("uri" -> mongoService.mongoURI.toString(),
+          "updates" -> appConfig.getProperty[List[String]]("mongodb.updates", List.empty[String]))
+      } else {
+        jsontrue
+      })
 
       // rabbitmq
-      case p: RabbitmqPlugin => {
-        val status = if (p.connect) {
+    if (current.configuration.getBoolean("clowder.rabbitmq.enabled").getOrElse(false)) {
+        val status = if (rabbitMQService.connect) {
           "connected"
         } else {
           "disconnected"
         }
         result.put("rabbitmq", if (Permission.checkServerAdmin(user)) {
-          Json.obj("uri" -> p.rabbitmquri,
-            "exchange" -> p.exchange,
+          Json.obj("uri" -> rabbitMQService.rabbitmquri,
+            "exchange" -> rabbitMQService.exchange,
             "status" -> status)
         } else {
           Json.obj("status" -> status)
         })
       }
 
-      case p: ToolManagerServiceImpl => {
-        val status = if (p.enabled) {
+    if (current.configuration.getBoolean("clowder.toolmanager.enabled").getOrElse(false)) {
+        val status = if (toolManagerService.enabled) {
           "enabled"
         } else {
           "disabled"
         }
         result.put("toolmanager", if (Permission.checkServerAdmin(user)) {
           Json.obj("host" -> configuration.getString("toolmanagerURI").getOrElse("").toString,
-            "tools" -> p.getLaunchableTools(),
+            "tools" -> toolManagerService.getLaunchableTools(),
             "status" -> status)
         } else {
           Json.obj("status" -> status)
         })
       }
-
-      case p => {
-        val name = p.getClass.getName
-        if (name.startsWith("services.")) {
-          val status = if (p.enabled) {
-            "enabled"
-          } else {
-            "disabled"
-          }
-          result.put(p.getClass.getName, Json.obj("status" -> status))
-        } else {
-          Logger.debug(s"Ignoring ${name} plugin")
-        }
-      }
-    }
-
     Json.toJson(result.toMap[String, JsValue])
   }
 

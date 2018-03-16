@@ -53,7 +53,8 @@ class Files @Inject()(
   appConfig: AppConfigurationService,
   elasticsearchService: ElasticsearchService,
   versusService: VersusService,
-  rabbitMQService: RabbitMQService) extends ApiController {
+  rabbitMQService: RabbitMQService,
+  rdfExportService: RDFExportService) extends ApiController {
 
   def get(id: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
     Logger.debug("GET file with id " + id)
@@ -578,36 +579,22 @@ class Files @Inject()(
   }
 
   def getRDFUserMetadata(id: UUID, mappingNumber: String="1") = PermissionAction(Permission.ViewMetadata, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
-   current.plugin[RDFExportService].isDefined match{
-    case true => {
-      current.plugin[RDFExportService].get.getRDFUserMetadataFile(id.stringify, mappingNumber) match{
-        case Some(resultFile) =>{
-          Ok.chunked(Enumerator.fromStream(new FileInputStream(resultFile)))
-			            	.withHeaders(CONTENT_TYPE -> "application/rdf+xml")
-			            	.withHeaders(CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(resultFile.getName(), request.headers.get("user-agent").getOrElse(""))))
-        }
-        case None => BadRequest(toJson("File not found " + id))
+    rdfExportService.getRDFUserMetadataFile(id.stringify, mappingNumber) match {
+      case Some(resultFile) => {
+        Ok.chunked(Enumerator.fromStream(new FileInputStream(resultFile)))
+          .withHeaders(CONTENT_TYPE -> "application/rdf+xml")
+          .withHeaders(CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(resultFile.getName(), request.headers.get("user-agent").getOrElse(""))))
       }
+      case None => BadRequest(toJson("File not found " + id))
     }
-    case false=>{
-      Ok("RDF export plugin not enabled")
-    }      
-   }
   }
   
   def getRDFURLsForFile(id: UUID) = PermissionAction(Permission.ViewMetadata, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
-    current.plugin[RDFExportService].isDefined match{
-      case true =>{
-	    current.plugin[RDFExportService].get.getRDFURLsForFile(id.stringify)  match {
-	      case Some(listJson) => {
-	        Ok(listJson) 
-	      }
-	      case None => {Logger.error("Error getting file" + id); InternalServerError}
-	    }
+    rdfExportService.getRDFURLsForFile(id.stringify)  match {
+      case Some(listJson) => {
+        Ok(listJson)
       }
-      case false => {
-        Ok("RDF export plugin not enabled")
-      }
+      case None => {Logger.error("Error getting file" + id); InternalServerError}
     }
   }
   

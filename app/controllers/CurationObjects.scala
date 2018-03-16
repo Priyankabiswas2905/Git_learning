@@ -353,7 +353,7 @@ class CurationObjects @Inject()(
             }
             // metadata of curation files are getting from getUpdatedFilesAndFolders
             val m = metadatas.getMetadataByAttachTo(ResourceRef(ResourceRef.curationObject, c.id))
-            val isRDFExportEnabled = current.plugin[RDFExportService].isDefined
+            val isRDFExportEnabled = current.configuration.getBoolean("isRDFExportEnabled").getOrElse(false)
             val fileByDataset = curations.getCurationFiles(curations.getAllCurationFileIds(c.id))
             if (c.status != "In Preparation") {
               Ok(views.html.spaces.submittedCurationObject(c, fileByDataset, m, limit, s.name ))

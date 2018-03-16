@@ -324,7 +324,7 @@
 							</button>
 						}
                         @if(Permission.checkPermission(Permission.EditFile, ResourceRef(ResourceRef.file, file.id))
-                                && play.api.Play.current.plugin[services.RabbitmqPlugin].isDefined) {
+                                && current.configuration.getBoolean("clowder.rabbitmq.enabled").getOrElse(false) == true) {
                             <a href="@routes.Extractors.submitFileExtraction(UUID(id))" class="btn btn-link" >
                                 <span class="glyphicon glyphicon-send"></span>
                                 Submit for extraction

@@ -51,7 +51,8 @@ class  Datasets @Inject()(
   thumbnailService : ThumbnailService,
   appConfig: AppConfigurationService,
   elasticsearchService: ElasticsearchService,
-  rabbitMQService: RabbitMQService) extends ApiController {
+  rabbitMQService: RabbitMQService,
+  rdfExportService: RDFExportService) extends ApiController {
 
   def get(id: UUID) = PermissionAction(Permission.ViewDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     datasets.get(id) match {
@@ -1780,18 +1781,13 @@ class  Datasets @Inject()(
   }
 
   def getRDFUserMetadata(id: UUID, mappingNumber: String="1") = PermissionAction(Permission.ViewMetadata, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
-    current.plugin[RDFExportService].isDefined match{
-      case true => {
-        current.plugin[RDFExportService].get.getRDFUserMetadataDataset(id.toString, mappingNumber) match{
-          case Some(resultFile) =>{
-            Ok.chunked(Enumerator.fromStream(new FileInputStream(resultFile)))
-              .withHeaders(CONTENT_TYPE -> "application/rdf+xml")
-              .withHeaders(CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(resultFile.getName(),request.headers.get("user-agent").getOrElse(""))))
-          }
-          case None => BadRequest(toJson("Dataset not found " + id))
-        }
+    rdfExportService.getRDFUserMetadataDataset(id.toString, mappingNumber) match{
+      case Some(resultFile) =>{
+        Ok.chunked(Enumerator.fromStream(new FileInputStream(resultFile)))
+          .withHeaders(CONTENT_TYPE -> "application/rdf+xml")
+          .withHeaders(CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(resultFile.getName(),request.headers.get("user-agent").getOrElse(""))))
       }
-      case _ => Ok("RDF export plugin not enabled")
+      case None => BadRequest(toJson("Dataset not found " + id))
     }
   }
 
@@ -1823,18 +1819,11 @@ class  Datasets @Inject()(
   }
 
   def getRDFURLsForDataset(id: UUID) = PermissionAction(Permission.ViewMetadata, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
-    current.plugin[RDFExportService].isDefined match{
-      case true =>{
-        current.plugin[RDFExportService].get.getRDFURLsForDataset(id.toString)  match {
-          case Some(listJson) => {
-            Ok(listJson)
-          }
-          case None => Logger.error(s"Error getting dataset $id"); InternalServerError
-        }
+    rdfExportService.getRDFURLsForDataset(id.toString)  match {
+      case Some(listJson) => {
+        Ok(listJson)
       }
-      case false => {
-        Ok("RDF export plugin not enabled")
-      }
+      case None => Logger.error(s"Error getting dataset $id"); InternalServerError
     }
   }
 
