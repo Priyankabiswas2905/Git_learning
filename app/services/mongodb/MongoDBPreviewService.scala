@@ -2,9 +2,10 @@ package services.mongodb
 
 import java.util.Date
 
-import services.{ByteStorageService, TileService, FileService, PreviewService}
+import services._
 import com.mongodb.casbah.commons.MongoDBObject
-import java.io.{InputStreamReader, BufferedReader, InputStream}
+import java.io.{BufferedReader, InputStream, InputStreamReader}
+
 import play.api.Logger
 import models._
 import org.apache.http.impl.client.DefaultHttpClient
@@ -12,6 +13,7 @@ import org.apache.http.client.methods.HttpPost
 import org.apache.http.entity.mime.{HttpMultipartMode, MultipartEntity}
 import org.apache.http.entity.mime.content.StringBody
 import java.nio.charset.Charset
+
 import org.apache.http.util.EntityUtils
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
@@ -24,6 +26,7 @@ import play.api.libs.json.JsObject
 import com.mongodb.casbah.commons.TypeImports.ObjectId
 import com.mongodb.casbah.WriteConcern
 import util.FileUtils
+
 import collection.JavaConverters._
 
 /**
@@ -299,10 +302,7 @@ class MongoDBPreviewService @Inject()(files: FileService, tiles: TileService, st
 
 object PreviewDAO extends ModelCompanion[Preview, ObjectId] {
   val COLLECTION = "previews"
-
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Preview, ObjectId](collection = x.collection(COLLECTION)) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Preview, ObjectId](collection = mongoService.collection(COLLECTION)) {}
 }
 

@@ -27,7 +27,8 @@ class MongoDBMetadataService @Inject() (
   files: FileService,
   folders: FolderService,
   curations: CurationService,
-  rabbitMQService: RabbitMQService) extends MetadataService {
+  rabbitMQService: RabbitMQService,
+  mongoService: MongoService) extends MetadataService {
 
   /**
    * Add metadata to the metadata collection and attach to a section /file/dataset/collection
@@ -35,15 +36,13 @@ class MongoDBMetadataService @Inject() (
   def addMetadata(metadata: Metadata): UUID = {
     // TODO: Update context
     val mid = MetadataDAO.insert(metadata, WriteConcern.Safe)
-    current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("No MongoSalatPlugin")
-      case Some(x) => x.collection(metadata.attachedTo) match {
-        case Some(c) => {
-          c.update(MongoDBObject("_id" -> new ObjectId(metadata.attachedTo.id.stringify)), $inc("metadataCount" -> +1))
-        }
-        case None => {
-          Logger.error(s"Could not increase counter for ${metadata.attachedTo}")
-        }
+    val mongoService = DI.injector.instanceOf[MongoService]
+    mongoService.collection(metadata.attachedTo) match {
+      case Some(c) => {
+        c.update(MongoDBObject("_id" -> new ObjectId(metadata.attachedTo.id.stringify)), $inc("metadataCount" -> +1))
+      }
+      case None => {
+        Logger.error(s"Could not increase counter for ${metadata.attachedTo}")
       }
     }
     UUID(mid.get.toString())
@@ -114,15 +113,12 @@ class MongoDBMetadataService @Inject() (
           "resourceId" -> md.attachedTo.id.toString)
 
         //update metadata count for resource
-        current.plugin[MongoSalatPlugin] match {
-          case None => throw new RuntimeException("No MongoSalatPlugin")
-          case Some(x) => x.collection(md.attachedTo) match {
-            case Some(c) => {
-              c.update(MongoDBObject("_id" -> new ObjectId(md.attachedTo.id.stringify)), $inc("metadataCount" -> -1))
-            }
-            case None => {
-              Logger.error(s"Could not decrease counter for ${md.attachedTo}")
-            }
+        mongoService.collection(md.attachedTo) match {
+          case Some(c) => {
+            c.update(MongoDBObject("_id" -> new ObjectId(md.attachedTo.id.stringify)), $inc("metadataCount" -> -1))
+          }
+          case None => {
+            Logger.error(s"Could not decrease counter for ${md.attachedTo}")
           }
         }
       }

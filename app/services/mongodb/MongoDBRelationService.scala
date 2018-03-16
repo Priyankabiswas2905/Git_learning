@@ -1,9 +1,8 @@
 package services.mongodb
 
-import models.{ResourceType, UUID, Relation}
+import models.{Relation, ResourceType, UUID}
 import org.bson.types.ObjectId
-import services.RelationService
-
+import services.{DI, RelationService}
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
 import play.api.Play.current
@@ -62,9 +61,7 @@ class MongoDBRelationService extends RelationService {
   }
 
   object RelationDAO extends ModelCompanion[Relation, ObjectId] {
-    val dao = current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("No MongoSalatPlugin");
-      case Some(x) => new SalatDAO[Relation, ObjectId](collection = x.collection("relations")) {}
-    }
+    val mongoService = DI.injector.instanceOf[MongoService]
+    val dao = new SalatDAO[Relation, ObjectId](collection = mongoService.collection("relations")) {}
   }
 }

@@ -717,17 +717,13 @@ class MongoDBSecureSocialUserService @Inject() (lifecycle: ApplicationLifecycle)
   }
 
   object TokenDAO extends ModelCompanion[Token, ObjectId] {
-    val dao = current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("No MongoSalatPlugin");
-      case Some(x) => new SalatDAO[Token, ObjectId](collection = x.collection("social.token")) {}
-    }
+    val mongoService = DI.injector.instanceOf[MongoService]
+    val dao = new SalatDAO[Token, ObjectId](collection = mongoService.collection("social.token")) {}
   }
 
   object UserDAO extends ModelCompanion[User, ObjectId] {
-    val dao = current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("No MongoSalatPlugin");
-      case Some(x) => new SalatDAO[User, ObjectId](collection = x.collection("social.users")) {}
-    }
+    val mongoService = DI.injector.instanceOf[MongoService]
+    val dao = new SalatDAO[User, ObjectId](collection = mongoService.collection("social.users")) {}
   }
 }
 
@@ -756,20 +752,16 @@ object RoleDAO extends ModelCompanion[Role, ObjectId] {
  * services classes that utilize it.
  */
 object UserSpaceAndRoleData extends ModelCompanion[UserSpaceAndRole, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[UserSpaceAndRole, ObjectId](collection = x.collection("spaceandrole")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[UserSpaceAndRole, ObjectId](collection = mongoService.collection("spaceandrole")) {}
 }
 
 /**
   * Used to store Mini users in MongoDB.
   */
 object MiniUserDAO extends ModelCompanion[MiniUser, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[MiniUser, ObjectId](collection = x.collection("social.miniusers")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[MiniUser, ObjectId](collection = mongoService.collection("social.miniusers")) {}
 }
 
 

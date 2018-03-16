@@ -1,8 +1,8 @@
 package api
 
 import java.util.Date
-import javax.inject.Inject
 
+import javax.inject.Inject
 import models.{ClowderUser, Event, UUID}
 import org.apache.commons.lang3.StringEscapeUtils
 import play.api.libs.concurrent.Akka
@@ -11,7 +11,7 @@ import play.api.Play.current
 import play.api.libs.json.Json.toJson
 import play.twirl.api.Html
 import services._
-import services.mongodb.MongoSalatPlugin
+import services.mongodb.{MongoSalatPlugin, MongoService}
 import play.api.Logger
 import util.Mail
 
@@ -28,13 +28,14 @@ class Admin @Inject()(userService: UserService,
   collections:CollectionService,
   files:FileService,
   events:EventService,
-  elasticsearchService: ElasticsearchService) extends Controller with ApiController {
+  elasticsearchService: ElasticsearchService,
+  mongoService: MongoService) extends Controller with ApiController {
 
   /**
    * DANGER: deletes all data, keep users.
    */
   def deleteAllData(resetAll: Boolean) = ServerAdminAction { implicit request =>
-    current.plugin[MongoSalatPlugin].map(_.dropAllData(resetAll))
+    mongoService.dropAllData(resetAll)
     elasticsearchService.deleteAll
 
     Ok(toJson("done"))

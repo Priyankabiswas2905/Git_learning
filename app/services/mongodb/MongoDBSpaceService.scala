@@ -672,36 +672,28 @@ class MongoDBSpaceService @Inject() (
 
 }
 /**
-   * Salat ProjectSpace model companion.
-   */
-  object ProjectSpaceDAO extends ModelCompanion[ProjectSpace, ObjectId] {
-    val dao = current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("No MongoSalatPlugin");
-      case Some(x) => new SalatDAO[ProjectSpace, ObjectId](collection = x.collection("spaces.projects")) {}
-    }
-  }
+ * Salat ProjectSpace model companion.
+ */
+object ProjectSpaceDAO extends ModelCompanion[ProjectSpace, ObjectId] {
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[ProjectSpace, ObjectId](collection = mongoService.collection("spaces.projects")) {}
+}
 
-  /**
-   * Salat UserSpace model companion.
-   */
-  object UserSpaceDAO extends ModelCompanion[UserSpace, ObjectId] {
-    val dao = current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("No MongoSalatPlugin");
-      case Some(x) => new SalatDAO[UserSpace, ObjectId](collection = x.collection("spaces.users")) {}
-    }
-  }
+/**
+ * Salat UserSpace model companion.
+ */
+object UserSpaceDAO extends ModelCompanion[UserSpace, ObjectId] {
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[UserSpace, ObjectId](collection = mongoService.collection("spaces.users")) {}
+}
 
 
-  object SpaceInviteDAO extends ModelCompanion[SpaceInvite, ObjectId] {
-    val dao = current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("No mongoSalatPlugin");
-      case Some(x) => new SalatDAO[SpaceInvite, ObjectId](collection = x.collection("spaces.invites")) {}
-    }
-  }
+object SpaceInviteDAO extends ModelCompanion[SpaceInvite, ObjectId] {
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[SpaceInvite, ObjectId](collection = mongoService.collection("spaces.invites")) {}
+}
 
-  object ExtractorsForSpaceDAO extends ModelCompanion[ExtractorsForSpace, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[ExtractorsForSpace, ObjectId](collection = x.collection("spaces.extractors")) {}
-  }
+object ExtractorsForSpaceDAO extends ModelCompanion[ExtractorsForSpace, ObjectId] {
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[ExtractorsForSpace, ObjectId](collection = mongoService.collection("spaces.extractors")) {}
 }

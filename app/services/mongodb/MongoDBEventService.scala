@@ -218,8 +218,6 @@ class MongoDBEventService @Inject() (
 }
 
 object Event extends ModelCompanion[Event, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Event, ObjectId](collection = x.collection("events")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Event, ObjectId](collection = mongoService.collection("events")) {}
 }

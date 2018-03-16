@@ -1,7 +1,7 @@
 package services.mongodb
 
 import models.Project
-import services.ProjectService
+import services.{DI, ProjectService}
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
 import play.api.Play.current
@@ -26,8 +26,6 @@ class MongoDBProjectService extends ProjectService {
 
 
 object Project extends ModelCompanion[Project, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Project, ObjectId](collection = x.collection("projects")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Project, ObjectId](collection = mongoService.collection("projects")) {}
 }

@@ -13,6 +13,7 @@ import play.api.Play._
 import scala.Some
 import MongoContext.context
 import models.{ClowderUser, IdentityId, MailToken, UUID}
+import services.DI
 
 import scala.concurrent.Future
 
@@ -31,11 +32,8 @@ case class MongoToken(
 }
 
 object TokenDAO extends ModelCompanion[MongoToken, ObjectId] {
-
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[MongoToken, ObjectId](collection = x.collection("social.token")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[MongoToken, ObjectId](collection = mongoService.collection("social.token")) {}
 
   def findByUUID(uuid: String): Option[MongoToken] = {
     dao.findOne(MongoDBObject("uuid" -> uuid))

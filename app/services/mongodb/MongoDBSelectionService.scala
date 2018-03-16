@@ -1,16 +1,16 @@
 package services.mongodb
 
 import javax.inject.{Inject, Singleton}
-import services.DatasetService
-import com.novus.salat.dao.{SalatDAO, ModelCompanion}
+import services.{DI, DatasetService, SelectionService}
+import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import com.mongodb.casbah.Imports._
 import play.api.Play._
+
 import scala.Some
 import com.mongodb.casbah.commons.MongoDBObject
 import play.api.Logger
-import models.{UUID, Dataset, Selected}
+import models.{Dataset, Selected, UUID}
 import org.bson.types.ObjectId
-import services.SelectionService
 import services.mongodb.MongoContext.context
 
 /**
@@ -55,8 +55,6 @@ class MongoDBSelectionService @Inject() (datasets: DatasetService)  extends Sele
 }
 
 object SelectedDAO extends ModelCompanion[Selected, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None    => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) =>  new SalatDAO[Selected, ObjectId](collection = x.collection("selected")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Selected, ObjectId](collection = mongoService.collection("selected")) {}
 }

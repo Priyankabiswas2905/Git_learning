@@ -1,19 +1,16 @@
 package services.mongodb
 
 import com.mongodb.casbah.Imports._
-
 import services.mongodb.MongoContext.context
 import com.mongodb.casbah.commons.MongoDBObject
-
-import com.novus.salat.dao.{SalatMongoCursor, ModelCompanion, SalatDAO}
+import com.novus.salat.dao.{ModelCompanion, SalatDAO, SalatMongoCursor}
 import org.bson.types.ObjectId
 import models._
-import javax.inject.{Singleton, Inject}
-
-
+import javax.inject.{Inject, Singleton}
 import com.mongodb.casbah.WriteConcern
-import services.{VocabularyTermService, VocabularyService, UserService}
+import services.{DI, UserService, VocabularyService, VocabularyTermService}
 import play.api.Play._
+
 import scala.util.{Success, Try}
 
 
@@ -48,8 +45,6 @@ class MongoDBVocabularyTermService @Inject() (userService: UserService) extends 
 }
 
 object VocabularyTerm extends ModelCompanion[VocabularyTerm, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[VocabularyTerm, ObjectId](collection = x.collection("vocabularyterms")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[VocabularyTerm, ObjectId](collection = mongoService.collection("vocabularyterms")) {}
 }

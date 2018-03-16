@@ -534,10 +534,8 @@ object FileUtils {
       val mdMap = metadata.getExtractionSummary
 
       //send RabbitMQ message
-      current.plugin[RabbitmqPlugin].foreach { p =>
-        val dtkey = s"${p.exchange}.metadata.added"
-        p.extract(ExtractorMessage(metadata.attachedTo.id, UUID(""), requestHost, dtkey, mdMap, "", UUID(""), ""))
-      }
+      val dtkey = s"${rabbitmqService.exchange}.metadata.added"
+      rabbitmqService.extract(ExtractorMessage(metadata.attachedTo.id, UUID(""), requestHost, dtkey, mdMap, "", UUID(""), ""))
     }
   }
 

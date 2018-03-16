@@ -27,6 +27,10 @@ import scala.concurrent.Future
 
 trait MongoService {
   def collection(collection: String): MongoCollection
+  def collection(resourceRef: ResourceRef): Option[MongoCollection]
+  def dropAllData(resetAll: Boolean)
+  def gridFS(prefix: String = "fs"): GridFS
+  def getDB: MongoDB
 }
 
 /**

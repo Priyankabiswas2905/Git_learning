@@ -1,7 +1,7 @@
 package services.mongodb
 
-import services.ExtractionService
-import models.{UUID, Extraction}
+import services.{DI, ExtractionService}
+import models.{Extraction, UUID}
 import org.bson.types.ObjectId
 import play.api.Play.current
 import com.novus.salat.dao.ModelCompanion
@@ -9,6 +9,7 @@ import com.novus.salat.dao.SalatDAO
 import MongoContext.context
 import com.mongodb.casbah.commons.MongoDBObject
 import java.util.Date
+
 import play.api.Logger
 import models.WebPageResource
 import com.mongodb.casbah.Imports._
@@ -78,16 +79,12 @@ class MongoDBExtractionService extends ExtractionService {
 }
 
 object Extraction extends ModelCompanion[Extraction, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Extraction, ObjectId](collection = x.collection("extractions")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Extraction, ObjectId](collection = mongoService.collection("extractions")) {}
 }
 
-object WebPageResource extends ModelCompanion[WebPageResource,ObjectId]{
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[WebPageResource, ObjectId](collection = x.collection("webpage.resources")) {}
-  }
+object WebPageResource extends ModelCompanion[WebPageResource,ObjectId] {
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[WebPageResource, ObjectId](collection = mongoService.collection("webpage.resources")) {}
 }
 

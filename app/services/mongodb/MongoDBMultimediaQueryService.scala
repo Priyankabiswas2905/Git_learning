@@ -13,7 +13,7 @@ import models.{MultimediaDistance, MultimediaFeatures, TempFile, UUID}
 import play.api.Logger
 import play.api.Play.current
 import play.api.libs.json.JsObject
-import services.{MultimediaQueryService, SectionService, SpaceService}
+import services.{DI, MultimediaQueryService, SectionService, SpaceService}
 import services.mongodb.MongoContext.context
 import util.FileUtils
 import javax.inject.Inject
@@ -31,10 +31,8 @@ class MongoDBMultimediaQueryService @Inject() (sections: SectionService, spaces:
 
 
   def save(inputStream: InputStream, filename: String, contentType: Option[String]): Option[TempFile] = {
-    val files = current.plugin[MongoSalatPlugin] match {
-      case None    => throw new RuntimeException("No MongoSalatPlugin");
-      case Some(x) =>  x.gridFS("uploadquery")
-    }
+    val mongoService = DI.injector.instanceOf[MongoService]
+    val files = mongoService.gridFS("uploadquery")
 
     // required to avoid race condition on save
     files.db.setWriteConcern(WriteConcern.Safe)
@@ -82,10 +80,8 @@ def getFile(id: UUID): Option[TempFile] = {
    * Store file metadata.
    */
   def storeFileMD(id: UUID, filename: String, contentType: Option[String]): Option[TempFile]={
-     val files = current.plugin[MongoSalatPlugin] match {
-      case None    => throw new RuntimeException("No MongoSalatPlugin");
-      case Some(x) =>  x.gridFS("uploadquery")
-    }
+    val mongoService = DI.injector.instanceOf[MongoService]
+    val files =  mongoService.gridFS("uploadquery")
 
     // required to avoid race condition on save
     files.db.setWriteConcern(WriteConcern.Safe)
@@ -242,15 +238,11 @@ def getFile(id: UUID): Option[TempFile] = {
 }
 
 object MultimediaFeaturesDAO extends ModelCompanion[MultimediaFeatures, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[MultimediaFeatures, ObjectId](collection = x.collection("multimedia.features")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[MultimediaFeatures, ObjectId](collection = mongoService.collection("multimedia.features")) {}
 }
 
 object MultimediaDistanceDAO extends ModelCompanion[MultimediaDistance, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[MultimediaDistance, ObjectId](collection = x.collection("multimedia.distances")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[MultimediaDistance, ObjectId](collection = mongoService.collection("multimedia.distances")) {}
 }

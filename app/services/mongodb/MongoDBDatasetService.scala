@@ -1480,17 +1480,13 @@ class MongoDBDatasetService @Inject() (
 }
 
 object Dataset extends ModelCompanion[Dataset, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Dataset, ObjectId](collection = x.collection("datasets")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Dataset, ObjectId](collection = mongoService.collection("datasets")) {}
 }
 
 object DatasetXMLMetadata extends ModelCompanion[DatasetXMLMetadata, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[DatasetXMLMetadata, ObjectId](collection = x.collection("datasetxmlmetadata")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[DatasetXMLMetadata, ObjectId](collection = mongoService.collection("datasetxmlmetadata")) {}
 }
 
 /**
@@ -1499,11 +1495,7 @@ object DatasetXMLMetadata extends ModelCompanion[DatasetXMLMetadata, ObjectId] {
  * services classes that utilize it.
  */
 object LicenseData extends ModelCompanion[LicenseData, ObjectId] {
-//  val collection = MongoConnection()("test-alt")("licensedata")
-//  val dao = new SalatDAO[LicenseData, ObjectId](collection = collection) {}
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[LicenseData, ObjectId](collection = x.collection("licensedata")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[LicenseData, ObjectId](collection = mongoService.collection("licensedata")) {}
 }
 

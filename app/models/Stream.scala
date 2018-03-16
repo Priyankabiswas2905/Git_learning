@@ -2,11 +2,13 @@ package models
 
 import org.bson.types.ObjectId
 import java.util.Date
+
 import com.novus.salat.dao.ModelCompanion
 import services.mongodb.MongoContext.context
 import play.api.Play.current
 import com.novus.salat.dao.SalatDAO
-import services.mongodb.MongoSalatPlugin
+import services.DI
+import services.mongodb.{MongoSalatPlugin, MongoService}
 
 /**
  * A stream is a sequence of objects with potentially no beginning and no end.
@@ -35,9 +37,7 @@ case class Datapoint(
   source: Option[String])
 
 object Stream extends ModelCompanion[Stream, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Stream, ObjectId](collection = x.collection("streams")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Stream, ObjectId](collection = mongoService.collection("streams")) {}
 }
 

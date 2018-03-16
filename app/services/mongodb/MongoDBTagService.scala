@@ -162,8 +162,6 @@ class MongoDBTagService @Inject()(files: FileService, datasets: DatasetService, 
 }
 
 object Tag extends ModelCompanion[Tag, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Tag, ObjectId](collection = x.collection("tags")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Tag, ObjectId](collection = mongoService.collection("tags")) {}
 }

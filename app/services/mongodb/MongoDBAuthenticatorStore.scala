@@ -5,8 +5,8 @@ package services.mongodb
 
 import play.api.{Application, Logger, Plugin}
 import java.util.Date
-import javax.inject.Inject
 
+import javax.inject.Inject
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import com.mongodb.casbah.Imports._
 import play.api.Play._
@@ -15,6 +15,7 @@ import scala.Some
 import org.joda.time.DateTime
 import MongoContext.context
 import models.{Authenticator, IdentityId}
+import services.DI
 
 /**
  * Track securesocial authenticated users in MongoDB.
@@ -29,11 +30,8 @@ case class LocalAuthenticator(
                                expirationDate: Date)
 
 object AuthenticatorDAO extends ModelCompanion[LocalAuthenticator, ObjectId] {
-
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[LocalAuthenticator, ObjectId](collection = x.collection("social.authenticator")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[LocalAuthenticator, ObjectId](collection = mongoService.collection("social.authenticator")) {}
 
   def saveLocal(authenticator: LocalAuthenticator) {
     val localAuth = LocalAuthenticator(authenticator.authenticatorId, authenticator.identityId,

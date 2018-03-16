@@ -166,38 +166,28 @@ class Extractions @Inject()(
    * returns: a list of status of all extractors responsible for extractions on the file and the final status of extraction job
    */
   def checkExtractorsStatus(id: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, id))).async { implicit request =>
-      current.plugin[RabbitmqPlugin] match {
-
-        case Some(plugin) => {
-          files.get(id) match {
-            case Some(file) => {
-              //Get the list of extractors processing the file 
-              val l = extractions.getExtractorList(file.id) map {
-                elist =>
-                  (elist._1, elist._2)
-              }
-              //Get the bindings
-              var blist = plugin.getBindings
-              for {
-                rkeyResponse <- blist
-              } yield {
-                val status = computeStatus(rkeyResponse, file, l)
-                l += "Status" -> status
-                Logger.debug(" CheckStatus: l.toString : " + l.toString)
-                Ok(toJson(l.toMap))
-              } //end of yield
-
-            } //end of some file
-            case None => {
-              Future(Ok("no file"))
-            }
-          } //end of match file
+    files.get(id) match {
+      case Some(file) => {
+        //Get the list of extractors processing the file
+        val l = extractions.getExtractorList(file.id) map {
+          elist =>
+            (elist._1, elist._2)
         }
-
-        case None => {
-          Future(Ok("No Rabbitmq Service"))
-        }
+        //Get the bindings
+        var blist = rabbitMQService.getBindings
+        for {
+          rkeyResponse <- blist
+        } yield {
+          val status = computeStatus(rkeyResponse, file, l)
+          l += "Status" -> status
+          Logger.debug(" CheckStatus: l.toString : " + l.toString)
+          Ok(toJson(l.toMap))
+        } //end of yield
+      } //end of some file
+      case None => {
+        Future(Ok("no file"))
       }
+    } //end of match file
   }
 
   /**

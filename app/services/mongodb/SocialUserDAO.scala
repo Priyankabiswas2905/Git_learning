@@ -5,14 +5,13 @@ import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
 import models.{ClowderUser, Identity}
 import play.api.Play.current
+import services.DI
 
 /**
  * Used to store securesocial users in MongoDB.
  *
  */
 object SocialUserDAO extends ModelCompanion[ClowderUser, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[ClowderUser, ObjectId](collection = x.collection("social.users")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[ClowderUser, ObjectId](collection = mongoService.collection("social.users")) {}
 }

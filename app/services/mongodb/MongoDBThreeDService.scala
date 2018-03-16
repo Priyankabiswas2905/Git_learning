@@ -1,6 +1,6 @@
 package services.mongodb
 
-import services.{ByteStorageService, ThreeDService}
+import services.{ByteStorageService, DI, ThreeDService}
 import models._
 import com.mongodb.casbah.Imports._
 import com.mongodb.WriteConcern
@@ -10,6 +10,7 @@ import org.bson.types.ObjectId
 import MongoContext.context
 import play.api.Play.current
 import java.io.InputStream
+
 import com.mongodb.casbah.commons.MongoDBObject
 import models.ThreeDGeometry
 import models.ThreeDTexture
@@ -112,27 +113,18 @@ class MongoDBThreeDService extends ThreeDService {
 
 object ThreeDTextureDAO extends ModelCompanion[ThreeDTexture, ObjectId] {
   val COLLECTION = "textures"
-
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[ThreeDTexture, ObjectId](collection = x.collection(COLLECTION)) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[ThreeDTexture, ObjectId](collection = mongoService.collection(COLLECTION)) {}
 }
 
 object GeometryDAO extends ModelCompanion[ThreeDGeometry, ObjectId] {
   val COLLECTION = "geometries"
-
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[ThreeDGeometry, ObjectId](collection = x.collection(COLLECTION)) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[ThreeDGeometry, ObjectId](collection = mongoService.collection(COLLECTION)) {}
 }
 
 object ThreeDAnnotation extends ModelCompanion[ThreeDAnnotation, ObjectId] {
   val COLLECTION = "previews.files.annotations"
-
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[ThreeDAnnotation, ObjectId](collection = x.collection(COLLECTION)) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[ThreeDAnnotation, ObjectId](collection = mongoService.collection(COLLECTION)) {}
 }
