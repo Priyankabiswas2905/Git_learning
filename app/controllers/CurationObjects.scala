@@ -45,7 +45,8 @@ class CurationObjects @Inject()(
   events: EventService,
   userService: UserService,
   metadatas: MetadataService,
-  contextService: ContextLDService) extends SecuredController {
+  contextService: ContextLDService,
+  rabbitMQService: RabbitMQService) extends SecuredController {
 
   /**
     * String name of the Space such as 'Project space' etc., parsed from conf/messages
@@ -176,10 +177,8 @@ class CurationObjects @Inject()(
                       val mdMap = m.getExtractionSummary
 
                       //send RabbitMQ message
-                      current.plugin[RabbitmqPlugin].foreach { p =>
-                        val dtkey = s"${p.exchange}.metadata.added"
-                        p.extract(ExtractorMessage(cf.id, UUID(""), controllers.Utils.baseUrl(request), dtkey, mdMap, "", UUID(""), ""))
-                      }
+                      val dtkey = s"${rabbitMQService.exchange}.metadata.added"
+                      rabbitMQService.extract(ExtractorMessage(cf.id, UUID(""), controllers.Utils.baseUrl(request), dtkey, mdMap, "", UUID(""), ""))
                     })
                   }
                 }
@@ -213,10 +212,8 @@ class CurationObjects @Inject()(
                     val mdMap = m.getExtractionSummary
 
                     //send RabbitMQ message
-                    current.plugin[RabbitmqPlugin].foreach { p =>
-                      val dtkey = s"${p.exchange}.metadata.added"
-                      p.extract(ExtractorMessage(newCuration.id, UUID(""), controllers.Utils.baseUrl(request), dtkey, mdMap, "", UUID(""), ""))
-                    }
+                    val dtkey = s"${rabbitMQService.exchange}.metadata.added"
+                    rabbitMQService.extract(ExtractorMessage(newCuration.id, UUID(""), controllers.Utils.baseUrl(request), dtkey, mdMap, "", UUID(""), ""))
                   }
                 })
               Redirect(routes.CurationObjects.getCurationObject(newCuration.id))
@@ -258,10 +255,8 @@ class CurationObjects @Inject()(
                   val mdMap = m.getExtractionSummary
 
                   //send RabbitMQ message
-                  current.plugin[RabbitmqPlugin].foreach { p =>
-                    val dtkey = s"${p.exchange}.metadata.added"
-                    p.extract(ExtractorMessage(cf.id, UUID(""), requestHost, dtkey, mdMap, "", UUID(""), ""))
-                  }
+                  val dtkey = s"${rabbitMQService.exchange}.metadata.added"
+                  rabbitMQService.extract(ExtractorMessage(cf.id, UUID(""), requestHost, dtkey, mdMap, "", UUID(""), ""))
                 })
             }
           }

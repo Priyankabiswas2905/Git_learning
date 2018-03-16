@@ -52,7 +52,8 @@ class Files @Inject()(
   userService: UserService,
   appConfig: AppConfigurationService,
   elasticsearchService: ElasticsearchService,
-  versusService: VersusService) extends ApiController {
+  versusService: VersusService,
+  rabbitMQService: RabbitMQService) extends ApiController {
 
   def get(id: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
     Logger.debug("GET file with id " + id)
@@ -284,10 +285,8 @@ class Files @Inject()(
             val mdMap = metadata.getExtractionSummary
 
             //send RabbitMQ message
-            current.plugin[RabbitmqPlugin].foreach { p =>
-              val dtkey = s"${p.exchange}.metadata.added"
-              p.extract(ExtractorMessage(metadata.attachedTo.id, UUID(""), controllers.Utils.baseUrl(request), dtkey, mdMap, "", UUID(""), ""))
-            }
+            val dtkey = s"${rabbitMQService.exchange}.metadata.added"
+            rabbitMQService.extract(ExtractorMessage(metadata.attachedTo.id, UUID(""), controllers.Utils.baseUrl(request), dtkey, mdMap, "", UUID(""), ""))
 
             files.index(id)
             Ok(toJson(Map("status" -> "success")))
@@ -351,10 +350,9 @@ class Files @Inject()(
                   val mdMap = metadata.getExtractionSummary
     
                   //send RabbitMQ message
-                  current.plugin[RabbitmqPlugin].foreach { p =>
-                    val dtkey = s"${p.exchange}.metadata.added"
-                    p.extract(ExtractorMessage(metadata.attachedTo.id, UUID(""), controllers.Utils.baseUrl(request), dtkey, mdMap, "", UUID(""), ""))
-                  }
+                  val dtkey = s"${rabbitMQService.exchange}.metadata.added"
+                  rabbitMQService.extract(ExtractorMessage(metadata.attachedTo.id, UUID(""), controllers.Utils.baseUrl(request), dtkey, mdMap, "", UUID(""), ""))
+
                   
                   files.index(id)
                   Ok(toJson("Metadata successfully added to db"))
@@ -399,12 +397,11 @@ class Files @Inject()(
           case None => metadataService.removeMetadataByAttachTo(ResourceRef(ResourceRef.file, id))
         }
         // send extractor message after attached to resource
-        current.plugin[RabbitmqPlugin].foreach { p =>
-          val dtkey = s"${p.exchange}.metadata.removed"
-          p.extract(ExtractorMessage(UUID(""), UUID(""), "", dtkey, Map[String, Any](
-            "resourceType"->ResourceRef.file,
-            "resourceId"->id.toString), "", id, ""))
-        }
+        val dtkey = s"${rabbitMQService.exchange}.metadata.removed"
+        rabbitMQService.extract(ExtractorMessage(UUID(""), UUID(""), "", dtkey, Map[String, Any](
+          "resourceType"->ResourceRef.file,
+          "resourceId"->id.toString), "", id, ""))
+
         Ok(toJson(Map("status" -> "success", "count" -> num_removed.toString)))
       }
       case None => {
@@ -528,9 +525,7 @@ class Files @Inject()(
         val extra = Map("filename" -> theFile.filename)
 
         // TODO replace null with None
-        current.plugin[RabbitmqPlugin].foreach {
-          _.extract(ExtractorMessage(id, id, host, key, extra, theFile.length.toString, null, flags))
-        }
+        rabbitMQService.extract(ExtractorMessage(id, id, host, key, extra, theFile.length.toString, null, flags))
 
         Ok(toJson(Map("id" -> id.stringify)))
 
@@ -1524,12 +1519,10 @@ class Files @Inject()(
         case Some(file) => {
           events.addObjectEvent(request.user, file.id, file.filename, "delete_file")
           // notify rabbitmq
-          current.plugin[RabbitmqPlugin].foreach { p =>
-            val clowderurl = Utils.baseUrl(request)
-            datasets.findByFileId(file.id).foreach{ds =>
-              val dtkey = s"${p.exchange}.dataset.file.removed"
-              p.extract(ExtractorMessage(file.id, file.id, clowderurl, dtkey, Map.empty, file.length.toString, ds.id, ""))
-            }
+          val clowderurl = Utils.baseUrl(request)
+          datasets.findByFileId(file.id).foreach{ds =>
+            val dtkey = s"${rabbitMQService.exchange}.dataset.file.removed"
+            rabbitMQService.extract(ExtractorMessage(file.id, file.id, clowderurl, dtkey, Map.empty, file.length.toString, ds.id, ""))
           }
 
           //this stmt has to be before files.removeFile

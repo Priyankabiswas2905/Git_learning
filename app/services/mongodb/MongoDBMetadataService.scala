@@ -21,8 +21,13 @@ import api.{Permission, UserRequest}
  * MongoDB Metadata Service Implementation
  */
 @Singleton
-class MongoDBMetadataService @Inject() (contextService: ContextLDService, datasets: DatasetService, files: FileService,
-  folders: FolderService, curations: CurationService) extends MetadataService {
+class MongoDBMetadataService @Inject() (
+  contextService: ContextLDService,
+  datasets: DatasetService,
+  files: FileService,
+  folders: FolderService,
+  curations: CurationService,
+  rabbitMQService: RabbitMQService) extends MetadataService {
 
   /**
    * Add metadata to the metadata collection and attach to a section /file/dataset/collection
@@ -143,12 +148,10 @@ class MongoDBMetadataService @Inject() (contextService: ContextLDService, datase
     }
 
     // send extractor message after attached to resource
-    current.plugin[RabbitmqPlugin].foreach { p =>
-      val dtkey = s"${p.exchange}.metadata.removed"
-      p.extract(ExtractorMessage(UUID(""), UUID(""), "", dtkey, Map[String, Any](
-        "resourceType"->resourceRef.resourceType.name,
-        "resourceId"->resourceRef.id.toString), "", resourceRef.id, ""))
-    }
+    val dtkey = s"${rabbitMQService.exchange}.metadata.removed"
+    rabbitMQService.extract(ExtractorMessage(UUID(""), UUID(""), "", dtkey, Map[String, Any](
+      "resourceType"->resourceRef.resourceType.name,
+      "resourceId"->resourceRef.id.toString), "", resourceRef.id, ""))
 
     return num_removed
   }
@@ -171,12 +174,10 @@ class MongoDBMetadataService @Inject() (contextService: ContextLDService, datase
     }
 
     // send extractor message after attached to resource
-    current.plugin[RabbitmqPlugin].foreach { p =>
-      val dtkey = s"${p.exchange}.metadata.removed"
-      p.extract(ExtractorMessage(UUID(""), UUID(""), "", dtkey, Map[String, Any](
-        "resourceType"->resourceRef.resourceType.name,
-        "resourceId"->resourceRef.id.toString), "", resourceRef.id, ""))
-    }
+    val dtkey = s"${rabbitMQService.exchange}.metadata.removed"
+    rabbitMQService.extract(ExtractorMessage(UUID(""), UUID(""), "", dtkey, Map[String, Any](
+      "resourceType"->resourceRef.resourceType.name,
+      "resourceId"->resourceRef.id.toString), "", resourceRef.id, ""))
 
     return num_removed
   }

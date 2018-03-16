@@ -1,15 +1,14 @@
 package models
 
 import play.api.Play.current
-import services.RabbitmqPlugin
+import services._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json.JsObject
 import play.api.Logger
-import services.ExtractorService
-import services.DI
+
 import scala.concurrent.Future
-import services.ExtractionRequestsService
 import java.net.InetAddress
+
 import play.api.libs.ws.WSResponse
 
 /**
@@ -17,17 +16,18 @@ import play.api.libs.ws.WSResponse
  */
 
 object ExtractionInfoSetUp {
-val extractors: ExtractorService =  DI.injector.instanceOf[ExtractorService]
-val dtsrequests:ExtractionRequestsService=DI.injector.instanceOf[ExtractionRequestsService]
+  val extractors: ExtractorService =  DI.injector.instanceOf[ExtractorService]
+  val dtsrequests: ExtractionRequestsService = DI.injector.instanceOf[ExtractionRequestsService]
+  val rabbitmqService: RabbitMQService = DI.injector.instanceOf[RabbitMQService]
 
-/*
- * Updates DTS extraction request
- * 
- */
-def updateDTSRequests(file_id:UUID,extractor_id:String)={
- 
-  dtsrequests.updateRequest(file_id,extractor_id)
-}
+  /*
+   * Updates DTS extraction request
+   *
+   */
+  def updateDTSRequests(file_id:UUID,extractor_id:String)={
+
+    dtsrequests.updateRequest(file_id,extractor_id)
+  }
 
   /**
    * Updates Extractors information:
@@ -37,29 +37,21 @@ def updateDTSRequests(file_id:UUID,extractor_id:String)={
    */
   def updateExtractorsInfo() = {
     Logger.trace("updateExtractorsInfo[invoked]")
-    val updateStatus = current.plugin[RabbitmqPlugin] match {
-      case Some(plugin) => {
-        val configuration = play.api.Play.configuration
-        val exchange = configuration.getString("clowder.rabbitmq.exchange").getOrElse("clowder")
-        if (exchange != "") {
-          Logger.debug("Exchange is not an empty string: " + exchange)
-          updateAndGetStatus(plugin, exchange)
-        } else {
-          Future(Future("DONE"))
-        }
-      } //end of case match
-      case None => {
-        Future(Future("DONE"))
-      }
-    } //end of match
-    updateStatus
+    val configuration = play.api.Play.configuration
+    val exchange = configuration.getString("clowder.rabbitmq.exchange").getOrElse("clowder")
+    if (exchange != "") {
+      Logger.debug("Exchange is not an empty string: " + exchange)
+      updateAndGetStatus(rabbitmqService, exchange)
+    } else {
+      Future(Future("DONE"))
+    }
   }
 
   /**
    * Obtains the queues' details attached to an exchange
    * updates the currently running extractors list, ips of the extractors, supported input types, number of extractors instances running
    */
-  def updateAndGetStatus(plugin: services.RabbitmqPlugin, exchange: String) = {
+  def updateAndGetStatus(plugin: RabbitMQService, exchange: String) = {
     var qDetailsFuture = getQDetailsFutures(plugin, exchange) /* Obtains queues's details as Futures of the List of responses*/
     extractors.dropAllExtractorStatusCollection()
     var status = for {
@@ -95,7 +87,7 @@ def updateDTSRequests(file_id:UUID,extractor_id:String)={
   /**
    *  Obtains the queues' names attached to an exchange where source is the exchange and destination is the queue
    */ 
-  def getQDetailsFutures(plugin: services.RabbitmqPlugin, exchange: String) = {
+  def getQDetailsFutures(plugin: RabbitMQService, exchange: String) = {
     for {
       qNamesResponse <- plugin.getQueuesNamesForAnExchange(exchange)
     } yield {
@@ -125,7 +117,7 @@ def updateDTSRequests(file_id:UUID,extractor_id:String)={
    *           currently running extractors list
    *           servers IPs where extractors are running
    */
-  def updateInfoAndGetQueuesList(plugin: services.RabbitmqPlugin, qDetailsResponses: List[WSResponse]) = {
+  def updateInfoAndGetQueuesList(plugin: RabbitMQService, qDetailsResponses: List[WSResponse]) = {
     var exDetails = List[ExtractorDetail]()
     var qlistResult = List[String]()
     var ipsList = List[String]()
@@ -179,7 +171,7 @@ def updateDTSRequests(file_id:UUID,extractor_id:String)={
   /**
    * Gets all routing keys for a given queue
    */
-  def getAllRoutingKeysForQueue(plugin: services.RabbitmqPlugin, qname: String, exchange: String) = {
+  def getAllRoutingKeysForQueue(plugin: RabbitMQService, qname: String, exchange: String) = {
     for {
       qbindingResponse <- plugin.getQueueBindings(qname)
     } yield {

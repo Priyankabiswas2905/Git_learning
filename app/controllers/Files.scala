@@ -56,7 +56,8 @@ class Files @Inject() (
   appConfig: AppConfigurationService,
   polyglotService: PolyglotService,
   elasticsearchService: ElasticsearchService,
-  versusService: VersusService) extends SecuredController {
+  versusService: VersusService,
+  rabbitMQService: RabbitMQService) extends SecuredController {
 
   /**
    * Upload form.
@@ -437,9 +438,7 @@ class Files @Inject() (
                 val host = Utils.baseUrl(request)
                 val id = f.id
                 val extra = Map("filename" -> f.filename)
-                current.plugin[RabbitmqPlugin].foreach {
-                  _.extract(ExtractorMessage(id, id, host, key, extra, f.length.toString, null, flags))
-                }
+                rabbitMQService.extract(ExtractorMessage(id, id, host, key, extra, f.length.toString, null, flags))
                 /** *** Inserting DTS Requests   **/
                 val clientIP = request.remoteAddress
                 val domain = request.domain
@@ -578,7 +577,7 @@ class Files @Inject() (
               dtsrequests.insertRequest(serverIP, clientIP, f.filename, id, fileType, f.length, f.uploadDate)
               /****************************/
               // TODO replace null with None
-	            current.plugin[RabbitmqPlugin].foreach{_.extract(ExtractorMessage(id, id, host, key, extra, f.length.toString, null, flags))}
+	            rabbitMQService.extract(ExtractorMessage(id, id, host, key, extra, f.length.toString, null, flags))
 	            
 	            //for metadata files
 	            if(fileType.equals("application/xml") || fileType.equals("text/xml")){
@@ -945,9 +944,7 @@ class Files @Inject() (
             val id = f.id
 
             // TODO replace null with None
-            current.plugin[RabbitmqPlugin].foreach {
-              _.extract(ExtractorMessage(id, id, host, key, Map.empty, f.length.toString, null, flags))
-            }
+            rabbitMQService.extract(ExtractorMessage(id, id, host, key, Map.empty, f.length.toString, null, flags))
 
             //for metadata files
             if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
@@ -1038,9 +1035,7 @@ class Files @Inject() (
             val extra = Map("filename" -> f.filename, "action" -> "upload")
 
             // TODO replace null with None
-            current.plugin[RabbitmqPlugin].foreach {
-              _.extract(ExtractorMessage(id, id, host, key, extra, f.length.toString, null, flags))
-            }
+            rabbitMQService.extract(ExtractorMessage(id, id, host, key, extra, f.length.toString, null, flags))
 
             //for metadata files
             if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
@@ -1160,9 +1155,7 @@ class Files @Inject() (
                     /** **************************/
 
                     val extra = Map("filename" -> f.filename)
-                    current.plugin[RabbitmqPlugin].foreach {
-                      _.extract(ExtractorMessage(id, id, host, key, extra, f.length.toString, dataset_id, flags))
-                    }
+                    rabbitMQService.extract(ExtractorMessage(id, id, host, key, extra, f.length.toString, dataset_id, flags))
 
                     //for metadata files
                     if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
@@ -1184,9 +1177,7 @@ class Files @Inject() (
                     // TODO RK need to replace unknown with the server name and dataset type
                     val dtkey = "unknown." + "dataset." + "unknown"
 
-                    current.plugin[RabbitmqPlugin].foreach {
-                      _.extract(ExtractorMessage(dataset_id, dataset_id, host, dtkey, Map.empty, f.length.toString, dataset_id, ""))
-                    }
+                    rabbitMQService.extract(ExtractorMessage(dataset_id, dataset_id, host, dtkey, Map.empty, f.length.toString, dataset_id, ""))
 
                     //add file to RDF triple store if triple store is used
                     if (fileType.equals("application/xml") || fileType.equals("text/xml")) {

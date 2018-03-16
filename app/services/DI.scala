@@ -61,6 +61,7 @@ class ConfigurationModule() extends Module {
       bind(classOf[MailService]).to(classOf[services.MailServiceImpl]),
       bind(classOf[ElasticsearchService]).to(classOf[services.ElasticsearchServiceImpl]),
       bind(classOf[VersusService]).to(classOf[services.VersusServiceImpl]),
+      bind(classOf[RabbitMQService]).to(classOf[services.RabbitmqPlugin]),
       bind(classOf[DatasetsAutodumpService]).to(classOf[services.DatasetsAutodumpServiceImpl])
     )
   }

@@ -37,7 +37,8 @@ class Metadata @Inject() (
     curations: CurationService,
     events: EventService,
     spaceService: SpaceService,
-    elasticsearchService: ElasticsearchService) extends ApiController {
+    elasticsearchService: ElasticsearchService,
+    rabbitMQService: RabbitMQService) extends ApiController {
 
   def getDefinitions() = PermissionAction(Permission.ViewDataset) {
     implicit request =>
@@ -330,20 +331,16 @@ class Metadata @Inject() (
                       case ResourceRef.dataset => {
                         datasets.index(resource.id)
                         //send RabbitMQ message
-                        current.plugin[RabbitmqPlugin].foreach { p =>
-                          val dtkey = s"${p.exchange}.metadata.added"
-                          p.extract(ExtractorMessage(UUID(""), UUID(""), controllers.Utils.baseUrl(request),
-                            dtkey, mdMap, "", metadata.attachedTo.id, ""))
-                        }
+                        val dtkey = s"${rabbitMQService.exchange}.metadata.added"
+                        rabbitMQService.extract(ExtractorMessage(UUID(""), UUID(""), controllers.Utils.baseUrl(request),
+                          dtkey, mdMap, "", metadata.attachedTo.id, ""))
                       }
                       case ResourceRef.file => {
                         files.index(resource.id)
                         //send RabbitMQ message
-                        current.plugin[RabbitmqPlugin].foreach { p =>
-                          val dtkey = s"${p.exchange}.metadata.added"
-                          p.extract(ExtractorMessage(metadata.attachedTo.id, UUID(""), controllers.Utils.baseUrl(request),
-                            dtkey, mdMap, "", UUID(""), ""))
-                        }
+                        val dtkey = s"${rabbitMQService.exchange}.metadata.added"
+                        rabbitMQService.extract(ExtractorMessage(metadata.attachedTo.id, UUID(""), controllers.Utils.baseUrl(request),
+                          dtkey, mdMap, "", UUID(""), ""))
                       }
                       case _ => {}
                     }
@@ -373,14 +370,9 @@ class Metadata @Inject() (
             } else {
               metadataService.removeMetadata(id)
               val mdMap = m.getExtractionSummary
-
-              current.plugin[RabbitmqPlugin].foreach { p =>
-                val dtkey = s"${p.exchange}.metadata.removed"
-                p.extract(ExtractorMessage(UUID(""), UUID(""), request.host, dtkey, mdMap, "", id, ""))
-              }
-
+              val dtkey = s"${rabbitMQService.exchange}.metadata.removed"
+              rabbitMQService.extract(ExtractorMessage(UUID(""), UUID(""), request.host, dtkey, mdMap, "", id, ""))
               Logger.debug("re-indexing after metadata removal")
-
               // Delete existing index entry and re-index
               m.attachedTo.resourceType match {
                 case ResourceRef.file => {

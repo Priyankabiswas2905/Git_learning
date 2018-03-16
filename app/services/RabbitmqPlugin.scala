@@ -36,7 +36,15 @@ case class ExtractorMessage(
   flags: String,
   secretKey: String = play.api.Play.configuration.getString("commKey").getOrElse(""))
 
-trait RabbitMQService
+trait RabbitMQService {
+  var exchange: String = ""
+  def extract(message: ExtractorMessage)
+  def getBindings: Future[WSResponse]
+  def getQueuesNamesForAnExchange(exchange: String): Future[WSResponse]
+  def getQueueDetails(qname: String): Future[WSResponse]
+  def getQueueBindings(qname: String): Future[WSResponse]
+  def close()
+}
 
 /**
  * Rabbitmq service.
@@ -55,7 +63,6 @@ class RabbitmqPlugin @Inject() (lifecycle: ApplicationLifecycle) extends RabbitM
   var username: String = ""
   var password: String = ""
   var rabbitmquri: String = ""
-  var exchange: String = ""
   var mgmtPort: String = ""
 
 
@@ -278,6 +285,7 @@ class RabbitmqPlugin @Inject() (lifecycle: ApplicationLifecycle) extends RabbitM
 class SendingActor(channel: Channel, exchange: String, replyQueueName: String) extends Actor {
   val appHttpPort = play.api.Play.configuration.getString("http.port").getOrElse("")
   val appHttpsPort = play.api.Play.configuration.getString("https.port").getOrElse("")
+  val rabbitmqService: RabbitMQService = DI.injector.instanceOf[RabbitMQService]
 
   def receive = {
     case ExtractorMessage(id, intermediateId, host, key, metadata, fileSize, datasetId, flags, secretKey) => {
@@ -324,9 +332,7 @@ class SendingActor(channel: Channel, exchange: String, replyQueueName: String) e
       } catch {
         case e: Exception => {
           Logger.error("Error connecting to rabbitmq broker", e)
-          current.plugin[RabbitmqPlugin].foreach {
-            _.close()
-          }
+          rabbitmqService.close()
         }
       }
     }

@@ -50,7 +50,8 @@ class  Datasets @Inject()(
   userService: UserService,
   thumbnailService : ThumbnailService,
   appConfig: AppConfigurationService,
-  elasticsearchService: ElasticsearchService) extends ApiController {
+  elasticsearchService: ElasticsearchService,
+  rabbitMQService: RabbitMQService) extends ApiController {
 
   def get(id: UUID) = PermissionAction(Permission.ViewDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     datasets.get(id) match {
@@ -607,10 +608,9 @@ class  Datasets @Inject()(
         val mdMap = metadata.getExtractionSummary
 
         //send RabbitMQ message
-        current.plugin[RabbitmqPlugin].foreach { p =>
-          val dtkey = s"${p.exchange}.metadata.added"
-          p.extract(ExtractorMessage(UUID(""), UUID(""), controllers.Utils.baseUrl(request), dtkey, mdMap, "", metadata.attachedTo.id, ""))
-        }
+        val dtkey = s"${rabbitMQService.exchange}.metadata.added"
+        rabbitMQService.extract(ExtractorMessage(UUID(""), UUID(""), controllers.Utils.baseUrl(request), dtkey, mdMap,
+          "", metadata.attachedTo.id, ""))
 
 
         datasets.index(id)
@@ -667,10 +667,10 @@ class  Datasets @Inject()(
                     val mdMap = metadata.getExtractionSummary
 
                     //send RabbitMQ message
-                    current.plugin[RabbitmqPlugin].foreach { p =>
-                      val dtkey = s"${p.exchange}.metadata.added"
-                      p.extract(ExtractorMessage(UUID(""), UUID(""), controllers.Utils.baseUrl(request), dtkey, mdMap, "", metadata.attachedTo.id, ""))
-                    }
+                    val dtkey = s"${rabbitMQService.exchange}.metadata.added"
+                    rabbitMQService.extract(ExtractorMessage(UUID(""), UUID(""), controllers.Utils.baseUrl(request),
+                      dtkey, mdMap, "", metadata.attachedTo.id, ""))
+
 
                     datasets.index(id)
                     Ok(toJson("Metadata successfully added to db"))
@@ -750,12 +750,10 @@ class  Datasets @Inject()(
         }
 
         // send extractor message after attached to resource
-        current.plugin[RabbitmqPlugin].foreach { p =>
-          val dtkey = s"${p.exchange}.metadata.removed"
-          p.extract(ExtractorMessage(UUID(""), UUID(""), "", dtkey, Map[String, Any](
+        val dtkey = s"${rabbitMQService.exchange}.metadata.removed"
+        rabbitMQService.extract(ExtractorMessage(UUID(""), UUID(""), "", dtkey, Map[String, Any](
             "resourceType"->ResourceRef.dataset,
             "resourceId"->id.toString), "", id, ""))
-        }
 
         Ok(toJson(Map("status" -> "success", "count" -> num_removed.toString)))
       }

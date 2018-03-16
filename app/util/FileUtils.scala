@@ -40,7 +40,7 @@ object FileUtils {
   lazy val previews : PreviewService = DI.injector.instanceOf[PreviewService]
   lazy val thumbnails : ThumbnailService = DI.injector.instanceOf[ThumbnailService]
   lazy val elasticsearchService : ElasticsearchService = DI.injector.instanceOf[ElasticsearchService]
-
+  lazy val rabbitmqService: RabbitMQService = DI.injector.instanceOf[RabbitMQService]
 
   def getContentType(filename: Option[String], contentType: Option[String]): String = {
     getContentType(filename.getOrElse(""), contentType)
@@ -759,11 +759,9 @@ object FileUtils {
 
     // send file to rabbitmq for processing
     if (runExtractors) {
-      current.plugin[RabbitmqPlugin].foreach { p =>
-        val key = s"${p.exchange}.file.${file.contentType.replace(".", "_").replace("/", ".")}"
-        val extra = Map("filename" -> file.filename)
-        p.extract(ExtractorMessage(new UUID(originalId), new UUID(file.id.toString()), clowderurl, key, extra, file.length.toString, dataset.fold[UUID](null)(_.id), newFlags))
-      }
+      val key = s"${rabbitmqService.exchange}.file.${file.contentType.replace(".", "_").replace("/", ".")}"
+      val extra = Map("filename" -> file.filename)
+      rabbitmqService.extract(ExtractorMessage(new UUID(originalId), new UUID(file.id.toString()), clowderurl, key, extra, file.length.toString, dataset.fold[UUID](null)(_.id), newFlags))
     }
 
     // index the file
@@ -784,10 +782,8 @@ object FileUtils {
     dataset.foreach{ds =>
 
       if (runExtractors) {
-        current.plugin[RabbitmqPlugin].foreach { p =>
-          val dtkey = s"${p.exchange}.dataset.file.added"
-          p.extract(ExtractorMessage(file.id, file.id, clowderurl, dtkey, Map.empty, file.length.toString, ds.id, ""))
-        }
+        val dtkey = s"${rabbitmqService.exchange}.dataset.file.added"
+        rabbitmqService.extract(ExtractorMessage(file.id, file.id, clowderurl, dtkey, Map.empty, file.length.toString, ds.id, ""))
       }
 
       // index dataset

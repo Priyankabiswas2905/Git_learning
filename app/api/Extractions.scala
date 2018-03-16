@@ -35,7 +35,8 @@ class Extractions @Inject()(
   previews: PreviewService,
   sqarql: RdfSPARQLService,
   thumbnails: ThumbnailService,
-  appConfig: AppConfigurationService) extends ApiController {
+  appConfig: AppConfigurationService,
+  rabbitMQService: RabbitMQService) extends ApiController {
 
   /**
    * Uploads file for extraction and returns a file id ; It does not index the file.
@@ -96,10 +97,8 @@ class Extractions @Inject()(
                     val key = "unknown." + "file." + fileType.replace(".", "_").replace("/", ".")
                     val host = Utils.baseUrl(request)
                     val extra = Map("filename" -> f.filename)
-                    Logger.debug("---hostURL------" + host);
-                    current.plugin[RabbitmqPlugin].foreach {
-                      _.extract(ExtractorMessage(id, id, host, key, extra, f.length.toString, null, ""))
-                    }
+                    Logger.debug("---hostURL------" + host)
+                    rabbitMQService.extract(ExtractorMessage(id, id, host, key, extra, f.length.toString, null, ""))
                     /*--- Insert DTS Requests  ---*/
                     val clientIP = request.remoteAddress
                     val serverIP = request.host
@@ -140,33 +139,24 @@ class Extractions @Inject()(
    *
    */
   def submitExtraction(id: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, id)))(parse.json) { implicit request =>
-    current.plugin[RabbitmqPlugin] match {
-      case Some(plugin) => {
-        if (UUID.isValid(id.stringify)) {
-          files.get(id) match {
-            case Some(file) => {
-              val fileType = file.contentType
-              val key = "unknown." + "file." + fileType.replace(".", "_").replace("/", ".")
-              val host = Utils.baseUrl(request)
-              val extra = Map("filename" -> file.filename)
-              current.plugin[RabbitmqPlugin].foreach {
-                _.extract(ExtractorMessage(id, id, host, key, extra, file.length.toString, null, ""))
-              }
-              Ok("Sent for Extraction. check the status")
-            }
-            case None =>
-              Logger.error("Could not retrieve file that was just saved.")
-              InternalServerError("Error uploading file")
-          } //file match
-        } // if Object id
-        else {
-          BadRequest("Not valid id")
+    if (UUID.isValid(id.stringify)) {
+      files.get(id) match {
+        case Some(file) => {
+          val fileType = file.contentType
+          val key = "unknown." + "file." + fileType.replace(".", "_").replace("/", ".")
+          val host = Utils.baseUrl(request)
+          val extra = Map("filename" -> file.filename)
+          rabbitMQService.extract(ExtractorMessage(id, id, host, key, extra, file.length.toString, null, ""))
+          Ok("Sent for Extraction. check the status")
         }
-      } //case plugin  
-      case None => {
-        BadRequest("No Service")
-      }
-    } //plugin match         
+        case None =>
+          Logger.error("Could not retrieve file that was just saved.")
+          InternalServerError("Error uploading file")
+      } //file match
+    } // if Object id
+    else {
+      BadRequest("Not valid id")
+    }
   }
 
   /**
@@ -218,105 +208,88 @@ class Extractions @Inject()(
    *
    */
   def fetch(id: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, id))).async { implicit request =>
-      current.plugin[RabbitmqPlugin] match {
+    if (UUID.isValid(id.stringify)) {
+      files.get(id) match {
+        case Some(file) => {
+          Logger.debug("Getting extract info for file with id " + id)
 
-        case Some(plugin) => {
-          if (UUID.isValid(id.stringify)) {
-            files.get(id) match {
-              case Some(file) => {
-                Logger.debug("Getting extract info for file with id " + id)
-
-                val l = extractions.getExtractorList(file.id) map {
-                  elist => (elist._1, elist._2)
-                }
-
-                var blist = plugin.getBindings
-
-                for {
-                  rkeyResponse <- blist
-                } yield {
-
-                  val status = computeStatus(rkeyResponse, file, l)
-                  val jtags = FileOP.extractTags(file)
-                  val jpreviews = FileOP.extractPreviews(id)
-                  val vdescriptors = files.getVersusMetadata(id) match {
-                    case Some(vd) => api.routes.Files.getVersusMetadataJSON(id).toString
-                    case None => ""
-                  }
-
-                  Logger.debug("jtags: " + jtags.toString)
-                  Logger.debug("jpreviews: " + jpreviews.toString)
-
-                  Ok(Json.obj("file_id" -> id.stringify, "filename" -> file.filename, "Status" -> status, "tags" -> jtags, "previews" -> jpreviews, "versus descriptors url" -> vdescriptors))
-                } //end of yield
-
-              } //end of some file
-              case None => {
-                val error_str = "The file with id " + id + " is not found."
-                Logger.error(error_str)
-                Future(NotFound(toJson(error_str)))
-              }
-            } //end of match file
-          } else {
-            val error_str = "The given id " + id + " is not a valid ObjectId."
-            Logger.error(error_str)
-            Future(BadRequest(Json.toJson(error_str)))
+          val l = extractions.getExtractorList(file.id) map {
+            elist => (elist._1, elist._2)
           }
 
-        }
+          var blist = rabbitMQService.getBindings
 
+          for {
+            rkeyResponse <- blist
+          } yield {
+
+            val status = computeStatus(rkeyResponse, file, l)
+            val jtags = FileOP.extractTags(file)
+            val jpreviews = FileOP.extractPreviews(id)
+            val vdescriptors = files.getVersusMetadata(id) match {
+              case Some(vd) => api.routes.Files.getVersusMetadataJSON(id).toString
+              case None => ""
+            }
+
+            Logger.debug("jtags: " + jtags.toString)
+            Logger.debug("jpreviews: " + jpreviews.toString)
+
+            Ok(Json.obj("file_id" -> id.stringify, "filename" -> file.filename, "Status" -> status, "tags" -> jtags, "previews" -> jpreviews, "versus descriptors url" -> vdescriptors))
+          } //end of yield
+
+        } //end of some file
         case None => {
-          Future(Ok("No Rabbitmq Service"))
+          val error_str = "The file with id " + id + " is not found."
+          Logger.error(error_str)
+          Future(NotFound(toJson(error_str)))
         }
-      }
+      } //end of match file
+    } else {
+      val error_str = "The given id " + id + " is not a valid ObjectId."
+      Logger.error(error_str)
+      Future(BadRequest(Json.toJson(error_str)))
+    }
   }
 
   def checkExtractionsStatuses(id: models.UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, id))).async { implicit request =>
-      request.user match {
-        case Some(user) => {
-          current.plugin[RabbitmqPlugin] match {
-            case Some(plugin) => {
-              Logger.debug("Inside Extraction Checkstatuses")
-              val mapIdUrl = extractions.getWebPageResource(id)
-              val listStatus = for {
-                (fid, url) <- mapIdUrl
+    request.user match {
+      case Some(user) => {
+        Logger.debug("Inside Extraction Checkstatuses")
+        val mapIdUrl = extractions.getWebPageResource(id)
+        val listStatus = for {
+          (fid, url) <- mapIdUrl
+        } yield {
+          Logger.debug("[checkExtractionsStatuses]---fid---" + fid)
+          val statuses = files.get(UUID(fid)) match {
+            case Some(file) => {
+              //Get the list of extractors processing the file
+              val l = extractions.getExtractorList(file.id)
+              //Get the bindings
+              val blist = rabbitMQService.getBindings
+              val fstatus = for {
+                rkeyResponse <- blist
               } yield {
-                  Logger.debug("[checkExtractionsStatuses]---fid---" + fid)
-                  val statuses = files.get(UUID(fid)) match {
-                    case Some(file) => {
-                      //Get the list of extractors processing the file
-                      val l = extractions.getExtractorList(file.id)
-                      //Get the bindings
-                      val blist = plugin.getBindings
-                      val fstatus = for {
-                        rkeyResponse <- blist
-                      } yield {
-                          val status = computeStatus(rkeyResponse, file, l)
-                          Logger.debug(" [checkExtractionsStatuses]: l.toString : " + l.toString)
-                          Map("id" -> file.id.toString, "status" -> status)
-                        } //end of yield
-                      fstatus
-                    } //end of some file
-                    case None => {
-                      Future((Map("id" -> id.toString, "status" -> "No File Id found")))
-                    }
-                  } //end of match file
-                  statuses
-                } //end of outer yield
-              for {
-                ls <- scala.concurrent.Future.sequence(listStatus)
-              } yield {
-                Logger.debug("[checkExtractionsStatuses]: list statuses" + ls)
-                Ok(toJson(ls))
-              }
-            } //rabbitmq plugin
+                  val status = computeStatus(rkeyResponse, file, l)
+                  Logger.debug(" [checkExtractionsStatuses]: l.toString : " + l.toString)
+                  Map("id" -> file.id.toString, "status" -> status)
+                } //end of yield
+              fstatus
+            } //end of some file
             case None => {
-              Future(Ok(toJson(Map("No Rabbitmq Service" -> ""))))
+              Future((Map("id" -> id.toString, "status" -> "No File Id found")))
             }
-          }
-        } //end of match user
-        case None => Future(BadRequest(toJson(Map("request" -> "Not authorized."))))
-      } //user
+          } //end of match file
+          statuses
+          } //end of outer yield
+        for {
+          ls <- scala.concurrent.Future.sequence(listStatus)
+        } yield {
+          Logger.debug("[checkExtractionsStatuses]: list statuses" + ls)
+          Ok(toJson(ls))
+        }
+      } //end of match user
+      case None => Future(BadRequest(toJson(Map("request" -> "Not authorized."))))
+    } //user
   }
 
 
@@ -482,64 +455,59 @@ class Extractions @Inject()(
     file_id)))(parse.json) { implicit request =>
     Logger.debug(s"Submitting file for extraction with body $request.body")
     // send file to rabbitmq for processing
-    current.plugin[RabbitmqPlugin] match {
-      case Some(p) =>
-        files.get(file_id) match {
-          case Some(file) => {
-            val id = file.id
-            val fileType = file.contentType
-            val idAndFlags = ""
-            val host = Utils.baseUrl(request)
+    files.get(file_id) match {
+      case Some(file) => {
+        val id = file.id
+        val fileType = file.contentType
+        val idAndFlags = ""
+        val host = Utils.baseUrl(request)
 
-            // check that the file is ready for processing
-            if (file.status.equals(models.FileStatus.PROCESSED.toString)) {
-              // if extractor_id is not specified default to execution of all extractors matching mime type
-              val key = (request.body \ "extractor").asOpt[String] match {
-                case Some(extractorId) => "extractors." + extractorId
-                case None => "unknown." + "file." + fileType.replace(".", "_").replace("/", ".")
-              }
-              // parameters for execution
-              val parameters = (request.body \ "parameters").asOpt[JsObject].getOrElse(JsObject(Seq.empty[(String, JsValue)]))
-
-              // Log request
-              val clientIP = request.remoteAddress
-              val serverIP = request.host
-              dtsrequests.insertRequest(serverIP, clientIP, file.filename, id, fileType, file.length, file.uploadDate)
-
-              val extra = Map("filename" -> file.filename,
-                "parameters" -> parameters.toString,
-                "action" -> "manual-submission")
-              val showPreviews = file.showPreviews
-
-              val newFlags = if (showPreviews.equals("FileLevel"))
-                idAndFlags + "+filelevelshowpreviews"
-              else if (showPreviews.equals("None"))
-                idAndFlags + "+nopreviews"
-              else
-                idAndFlags
-
-              val originalId = if (!file.isIntermediate) {
-                file.id.toString()
-              } else {
-                idAndFlags
-              }
-
-              var datasetId: UUID = null
-              datasets.findByFileId(file_id).map(ds => {
-                datasetId = ds.id
-              })
-              p.extract(ExtractorMessage(new UUID(originalId), file.id, host, key, extra, file.length.toString,
-                datasetId, newFlags))
-              Ok(Json.obj("status" -> "OK"))
-            } else {
-              Conflict(toJson(Map("status" -> "error", "msg" -> "File is not ready. Please wait and try again.")))
-            }
+        // check that the file is ready for processing
+        if (file.status.equals(models.FileStatus.PROCESSED.toString)) {
+          // if extractor_id is not specified default to execution of all extractors matching mime type
+          val key = (request.body \ "extractor").asOpt[String] match {
+            case Some(extractorId) => "extractors." + extractorId
+            case None => "unknown." + "file." + fileType.replace(".", "_").replace("/", ".")
           }
-          case None =>
-            BadRequest(toJson(Map("request" -> "File not found")))
+          // parameters for execution
+          val parameters = (request.body \ "parameters").asOpt[JsObject].getOrElse(JsObject(Seq.empty[(String, JsValue)]))
+
+          // Log request
+          val clientIP = request.remoteAddress
+          val serverIP = request.host
+          dtsrequests.insertRequest(serverIP, clientIP, file.filename, id, fileType, file.length, file.uploadDate)
+
+          val extra = Map("filename" -> file.filename,
+            "parameters" -> parameters.toString,
+            "action" -> "manual-submission")
+          val showPreviews = file.showPreviews
+
+          val newFlags = if (showPreviews.equals("FileLevel"))
+            idAndFlags + "+filelevelshowpreviews"
+          else if (showPreviews.equals("None"))
+            idAndFlags + "+nopreviews"
+          else
+            idAndFlags
+
+          val originalId = if (!file.isIntermediate) {
+            file.id.toString()
+          } else {
+            idAndFlags
+          }
+
+          var datasetId: UUID = null
+          datasets.findByFileId(file_id).map(ds => {
+            datasetId = ds.id
+          })
+          rabbitMQService.extract(ExtractorMessage(new UUID(originalId), file.id, host, key, extra, file.length.toString,
+            datasetId, newFlags))
+          Ok(Json.obj("status" -> "OK"))
+        } else {
+          Conflict(toJson(Map("status" -> "error", "msg" -> "File is not ready. Please wait and try again.")))
         }
+      }
       case None =>
-        Ok(Json.obj("status" -> "error", "msg"-> "RabbitmqPlugin disabled"))
+        BadRequest(toJson(Map("request" -> "File not found")))
     }
   }
 
@@ -547,33 +515,28 @@ class Extractions @Inject()(
     ds_id)))(parse.json) { implicit request =>
     Logger.debug(s"Submitting dataset for extraction with body $request.body")
     // send file to rabbitmq for processing
-    current.plugin[RabbitmqPlugin] match {
-      case Some(p) =>
-        datasets.get(ds_id) match {
-          case Some(ds) => {
-            val id = ds.id
-            val host = Utils.baseUrl(request)
+    datasets.get(ds_id) match {
+      case Some(ds) => {
+        val id = ds.id
+        val host = Utils.baseUrl(request)
 
-            // if extractor_id is not specified default to execution of all extractors matching mime type
-            val key = (request.body \ "extractor").asOpt[String] match {
-              case Some(extractorId) => "extractors." + extractorId
-              case None => "unknown." + "dataset"
-            }
-            // parameters for execution
-            val parameters = (request.body \ "parameters").asOpt[JsObject].getOrElse(JsObject(Seq.empty[(String, JsValue)]))
-
-            val extra = Map("datasetname" -> ds.name,
-              "parameters" -> parameters.toString,
-              "action" -> "manual-submission")
-
-            p.extract(ExtractorMessage(id, id, host, key, extra, ds.files.length.toString, ds_id, ""))
-            Ok(Json.obj("status" -> "OK"))
-          }
-          case None =>
-            BadRequest(toJson(Map("request" -> "File not found")))
+        // if extractor_id is not specified default to execution of all extractors matching mime type
+        val key = (request.body \ "extractor").asOpt[String] match {
+          case Some(extractorId) => "extractors." + extractorId
+          case None => "unknown." + "dataset"
         }
+        // parameters for execution
+        val parameters = (request.body \ "parameters").asOpt[JsObject].getOrElse(JsObject(Seq.empty[(String, JsValue)]))
+
+        val extra = Map("datasetname" -> ds.name,
+          "parameters" -> parameters.toString,
+          "action" -> "manual-submission")
+
+        rabbitMQService.extract(ExtractorMessage(id, id, host, key, extra, ds.files.length.toString, ds_id, ""))
+        Ok(Json.obj("status" -> "OK"))
+      }
       case None =>
-        Ok(Json.obj("status" -> "error", "msg"-> "RabbitmqPlugin disabled"))
+        BadRequest(toJson(Map("request" -> "File not found")))
     }
   }
 

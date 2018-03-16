@@ -14,8 +14,11 @@ import services.{ExtractorMessage, _}
  * Index data.
  */
 @Inject
-class Indexes @Inject() (multimediaSearch: MultimediaQueryService, previews: PreviewService, versusService: VersusService)
-  extends Controller with ApiController {
+class Indexes @Inject() (
+  multimediaSearch: MultimediaQueryService,
+  previews: PreviewService,
+  versusService: VersusService,
+  rabbitMQService: RabbitMQService) extends Controller with ApiController {
 
   /**
    * Submit section, preview, file for indexing.
@@ -29,15 +32,13 @@ class Indexes @Inject() (multimediaSearch: MultimediaQueryService, previews: Pre
 	            val key = "unknown." + "index."+ p.contentType.replace(".", "_").replace("/", ".")
 	            val host = Utils.baseUrl(request)
 	            val id = p.id
-	            current.plugin[RabbitmqPlugin].foreach{
-                // TODO replace null with None
-	              _.extract(ExtractorMessage(id, id, host, key, Map("section_id"->section_id), p.length.toString, null, ""))}
+              // TODO replace null with None
+              rabbitMQService.extract(ExtractorMessage(id, id, host, key, Map("section_id"->section_id), p.length.toString, null, ""))
 	            val fileType = p.contentType
 	            versusService.indexPreview(id,fileType)
 	            Ok(toJson("success"))
       	      case None => BadRequest(toJson("Missing parameter [preview_id]"))
             }
-      	   
       	  }.getOrElse {
       		BadRequest(toJson("Missing parameter [preview_id]"))
       	  }
