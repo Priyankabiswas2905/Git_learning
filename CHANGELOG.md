@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 - Fixed bug where reindex of Elasticsearch would fail if extractors tried to index simultaneously.
   [CATS-856](https://opensource.ncsa.illinois.edu/jira/browse/CATS-856)
-
+- Fixed bug of ``Account not active'' when using mongo-init to create user account.
+  [BD-2042](https://opensource.ncsa.illinois.edu/jira/browse/BD-2042)
 ### Added
 - Add LDAP authorization
   [CATS-54](https://opensource.ncsa.illinois.edu/jira/browse/CATS-54)
@@ -19,7 +20,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Having a temporary trash option. Can be set with useTrash boolean in the configuration file
   [CATS-780](https://opensource.ncsa.illinois.edu/jira/browse/CATS-780)
 - Track last time a user logged in.
-  
+- Add logic check rabbitmq, mongo, clowder ready before creating default users.[BD-2059](https://opensource.ncsa.illinois.edu/jira/browse/BD-2059)   
   
 ### Changed
 - File and dataset GET metadata endpoints to include their corresponding IDs and resource type information. 
@@ -37,6 +38,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   [CATS-719] (https://opensource.ncsa.illinois.edu/jira/browse/CATS-719)
 - Avoid exception avoid exception in user events when unknown events don't match expected pattern (e.g. metadata events 
   from another branch).
+
+## 1.3.5 - 2018-02-23
+
+### Fixed
+- Modifying subject for emails being sent when a user is added to a space.
+  [CATS-858](https://opensource.ncsa.illinois.edu/jira/browse/CATS-858)
 
 ## 1.3.4 - 2018-02-05
 
