@@ -8,6 +8,7 @@ import java.util.Date
 
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
+import com.google.inject.Provider
 import play.api.Play._
 import play.api.Logger
 import com.mongodb.casbah.commons.MongoDBObject
@@ -21,7 +22,11 @@ import scala.collection.mutable.ArrayBuffer
  * USe MongoDB to store sections
  */
 @Singleton
-class MongoDBSectionService @Inject() (comments: CommentService, previews: PreviewService, files: FileService, datasets: DatasetService, folders: FolderService) extends SectionService {
+class MongoDBSectionService @Inject() (
+  comments: CommentService,
+  previews: PreviewService,
+  datasets: DatasetService,
+  folders: Provider[FolderService]) extends SectionService {
   
   def listSections(): List[Section] = {
     SectionDAO.findAll.toList
@@ -131,7 +136,7 @@ class MongoDBSectionService @Inject() (comments: CommentService, previews: Previ
         orlist += MongoDBObject("author._id" -> new ObjectId(u.id.stringify))
         //Get all datasets you have access to.
         val datasetsList = datasets.listUser(u)
-        val foldersList = folders.findByParentDatasetIds(datasetsList.map(x => x.id))
+        val foldersList = folders.get().findByParentDatasetIds(datasetsList.map(x => x.id))
         val fileIds = datasetsList.map(x => x.files) ++ foldersList.map(x => x.files)
         orlist += ("file_id" $in fileIds.flatten.map(x => new ObjectId(x.stringify)))
       }

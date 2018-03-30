@@ -1,17 +1,13 @@
 package controllers
 
 import java.net.URL
-import javax.inject.{Inject, Singleton}
 
-import api.Permission
-import api.Permission._
-import play.api.{Logger, Play, Routes}
+import javax.inject.{Inject, Singleton}
+import models.{Event, UUID}
+import play.api.{Logger, Play}
+import play.api.Play.current
 import play.api.mvc.Action
 import services._
-import models.{Event, UUID, User}
-import play.api.Logger
-import play.api.libs.concurrent.Execution.Implicits._
-import play.api.Play.current
 
 import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
@@ -268,7 +264,7 @@ class Application @Inject() (files: FileService, collections: CollectionService,
    */
   def javascriptRoutes = Action { implicit request =>
     Ok(
-      Routes.javascriptRouter("jsRoutes")(
+      play.routing.JavaScriptReverseRouter.create("jsRoutes",
         routes.javascript.Admin.reindexFiles,
         routes.javascript.Admin.createIndex,
         routes.javascript.Admin.buildIndex,

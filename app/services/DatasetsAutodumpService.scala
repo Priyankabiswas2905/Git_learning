@@ -3,7 +3,7 @@ package services
 import javax.inject.Inject
 
 import play.api.inject.ApplicationLifecycle
-import play.api.{Application, Logger, Play, Plugin}
+import play.api.{Application, Logger, Play}
 import play.libs.Akka
 
 import scala.concurrent.duration._

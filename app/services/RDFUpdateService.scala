@@ -1,29 +1,22 @@
 package services
 
-import play.api.{Application, Plugin}
-import models._
-import Transformation.LidoToCidocConvertion
-import play.api.Play.current
+import java.io._
 import java.util.ArrayList
 
-import play.api.Logger
-import java.io.BufferedReader
-import java.io.FileReader
-import java.io.BufferedWriter
-import java.io.FileWriter
-import java.io.FileInputStream
-
+import Transformation.LidoToCidocConvertion
 import javax.inject.Inject
+import models._
 import org.apache.commons.io.FileUtils
 import org.bson.types.ObjectId
 import org.json.JSONObject
+import play.api.Logger
+import play.api.Play.current
 import play.api.inject.ApplicationLifecycle
+import play.api.libs.concurrent.Execution.Implicits._
 import play.libs.Akka
 
-import scala.concurrent.duration._
-import play.api.libs.concurrent.Execution.Implicits._
-
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 trait RDFUpdateService
 

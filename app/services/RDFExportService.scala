@@ -1,6 +1,6 @@
 package services
 
-import play.api.{Application, Logger, Plugin}
+import play.api.{Application, Logger}
 import play.api.Play.current
 import org.bson.types.ObjectId
 import org.json.JSONObject

@@ -17,6 +17,7 @@ import java.nio.charset.Charset
 import org.apache.http.util.EntityUtils
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
+import com.google.inject.Provider
 import play.api.Play.current
 import com.mongodb.casbah.Imports._
 import play.api.libs.json.JsValue
@@ -33,7 +34,7 @@ import collection.JavaConverters._
  * Use MongoDB to store previews
  */
 @Singleton
-class MongoDBPreviewService @Inject()(files: FileService, tiles: TileService, storage: ByteStorageService) extends PreviewService {
+class MongoDBPreviewService @Inject()(tiles: TileService, storage: ByteStorageService) extends PreviewService {
 
 
   /**

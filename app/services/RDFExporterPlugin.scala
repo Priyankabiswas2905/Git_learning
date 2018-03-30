@@ -1,7 +1,7 @@
 package services
 
 import javax.inject.Inject
-import play.api.{Application, Logger, Plugin}
+import play.api.{Application, Logger}
 import play.libs.Akka
 
 import scala.concurrent.duration._

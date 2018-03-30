@@ -1,23 +1,20 @@
 package services
 
 import java.io.IOException
-import java.net.URI
+import java.net.{URI, URLEncoder}
 import java.text.SimpleDateFormat
-import java.net.URLEncoder
-import javax.inject.Inject
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props}
-import com.ning.http.client.Realm.AuthScheme
 import com.rabbitmq.client.AMQP.BasicProperties
-import com.rabbitmq.client.{Channel, Connection, ConnectionFactory, DefaultConsumer, Envelope}
+import com.rabbitmq.client._
+import javax.inject.Inject
 import models.{Extraction, UUID}
+import play.api.Logger
 import play.api.Play.current
 import play.api.inject.ApplicationLifecycle
-import play.api.libs.json.Json
+import play.api.libs.json.{JsValue, Json}
 import play.api.libs.ws.{WS, WSAuthScheme, WSResponse}
-import play.api.{Application, Logger, Plugin}
 import play.libs.Akka
-import play.api.libs.json.JsValue
 
 import scala.concurrent.Future
 import scala.util.Try

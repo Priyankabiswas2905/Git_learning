@@ -1,15 +1,16 @@
 package services.mongodb
 
 import javax.inject.Inject
-
 import api.Permission
 import models._
 import java.util.Date
+
 import org.bson.types.ObjectId
 import services._
 import api.Permission.Permission
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
+import com.google.inject.Provider
 import play.api.Play.current
 import play.Logger
 import com.mongodb.casbah.commons.MongoDBObject
@@ -20,10 +21,9 @@ import com.novus.salat.dao.SalatMongoCursor
   * Use MongoDB for storing events.
  */
 class MongoDBEventService @Inject() (
-     userService: UserService,
-     spaces:SpaceService,
+     userService: Provider[UserService],
      datasets: DatasetService,
-     Folders:FolderService) extends EventService {
+     folders: Provider[FolderService]) extends EventService {
 
 
   def listEvents(): List[Event] = {
@@ -184,10 +184,10 @@ class MongoDBEventService @Inject() (
   }
 
   def getCommentEvent( user: User, limit: Option[Integer]): List[Event] ={
-    val roleList = userService.listRoles().filter(_.permissions.contains(Permission.ViewComments.toString))
+    val roleList = userService.get().listRoles().filter(_.permissions.contains(Permission.ViewComments.toString))
     val spaceIdList = user.spaceandrole.filter(x => roleList.contains(x.role)).map(_.spaceId)
     val datasetList = (datasets.listUser(0,  None, true, user) ::: spaceIdList.map(s => datasets.listSpace(0, s.toString)).flatten).distinct
-    val fileIdList = (datasetList.map(_.files) ::: datasetList.map(d => Folders.findByParentDatasetId(d.id).map(_.files).flatten)).flatten
+    val fileIdList = (datasetList.map(_.files) ::: datasetList.map(d => folders.get().findByParentDatasetId(d.id).map(_.files).flatten)).flatten
     val eventList = (Event.find(MongoDBObject(
         "event_type" -> "add_comment_dataset") ++
         ("source_id" $in datasetList.map(x => new ObjectId(x.id.stringify)))

@@ -8,6 +8,7 @@ import MongoContext.context
 import play.api.Play.current
 import java.io.InputStream
 
+import com.google.inject.Provider
 import com.mongodb.casbah.commons.MongoDBObject
 import models.{Tile, UUID}
 import play.api.libs.json.{JsObject, JsValue}
@@ -20,7 +21,7 @@ import util.FileUtils
  * Use mongodb to mange tiles.
  */
 @Singleton
-class MongoDBTileService @Inject() (previews: PreviewService, storage: ByteStorageService) extends TileService {
+class MongoDBTileService @Inject() (previews: Provider[PreviewService], storage: ByteStorageService) extends TileService {
 
   def get(tileId: UUID): Option[Tile] = {
     TileDAO.findOneById(new ObjectId(tileId.stringify))
@@ -29,7 +30,7 @@ class MongoDBTileService @Inject() (previews: PreviewService, storage: ByteStora
   def updateMetadata(tileId: UUID, previewId: UUID, level: String, json: JsValue) {
     json match {
     case JsObject(fields) => {
-      previews.get(previewId) match {
+      previews.get().get(previewId) match {
         case Some(preview) => {
           get(tileId) match {
             case Some(tile) =>

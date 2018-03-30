@@ -23,7 +23,6 @@ import java.nio.file.attribute.BasicFileAttributes
 import collection.JavaConverters._
 import scala.collection.JavaConversions._
 import javax.inject.{Inject, Singleton}
-
 import com.mongodb.casbah.WriteConcern
 import play.api.Logger
 
@@ -35,6 +34,7 @@ import java.util.Date
 
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
+import com.google.inject.Provider
 import play.api.Play._
 import com.mongodb.casbah.Imports._
 import models.FileStatus.FileStatus
@@ -47,7 +47,7 @@ import models.FileStatus.FileStatus
  */
 @Singleton
 class MongoDBFileService @Inject() (
-  datasets: DatasetService,
+  datasets: Provider[DatasetService],
   collections: CollectionService,
   sections: SectionService,
   comments: CommentService,
@@ -56,11 +56,11 @@ class MongoDBFileService @Inject() (
   threeD: ThreeDService,
   sparql: RdfSPARQLService,
   storage: ByteStorageService,
-  userService: UserService,
-  folders: FolderService,
-  metadatas: MetadataService,
+  userService: Provider[UserService],
+  folders: Provider[FolderService],
+  metadatas: Provider[MetadataService],
   events: EventService,
-  elasticsearchService: ElasticsearchService) extends FileService {
+  elasticsearchService: Provider[ElasticsearchService]) extends FileService {
 
   object MustBreak extends Exception {}
 
@@ -215,7 +215,7 @@ class MongoDBFileService @Inject() (
   def index(id: UUID) {
     get(id) match {
       case Some(file) => {
-        elasticsearchService.index(file)
+        elasticsearchService.get().index(file)
       }
       case None => Logger.error("File not found: " + id)
     }
@@ -251,8 +251,8 @@ class MongoDBFileService @Inject() (
       case Some(u) => {
         orlist += MongoDBObject("author._id" -> new ObjectId(u.id.stringify))
         //Get all datasets you have access to.
-        val datasetsList= datasets.listUser(u)
-        val foldersList = folders.findByParentDatasetIds(datasetsList.map(x=> x.id))
+        val datasetsList= datasets.get.listUser(u)
+        val foldersList = folders.get().findByParentDatasetIds(datasetsList.map(x=> x.id))
         val fileIds = datasetsList.map(x=> x.files) ++ foldersList.map(x=> x.files)
         orlist += ("_id" $in fileIds.flatten.map(x=> new ObjectId(x.stringify)))
       }
@@ -454,7 +454,7 @@ class MongoDBFileService @Inject() (
 
 
   def listOutsideDataset(dataset_id: UUID): List[File] = {
-    datasets.get(dataset_id) match{
+    datasets.get.get(dataset_id) match{
       case Some(dataset) => {
         val list = for (file <- FileDAO.findAll(); if(!isInDataset(file,dataset) && !file.isIntermediate)) yield file
         return list.toList
@@ -676,16 +676,16 @@ class MongoDBFileService @Inject() (
     get(id) match{
       case Some(file) => {
         if(!file.isIntermediate){
-          val fileDatasets = datasets.findByFileId(file.id)
+          val fileDatasets = datasets.get.findByFileId(file.id)
           for(fileDataset <- fileDatasets){
-            datasets.removeFile(fileDataset.id, id)
+            datasets.get().removeFile(fileDataset.id, id)
             if(!file.xmlMetadata.isEmpty){
-              datasets.index(fileDataset.id)
+              datasets.get().index(fileDataset.id)
             }
 
             if(!file.thumbnail_id.isEmpty && !fileDataset.thumbnail_id.isEmpty){            
               if(file.thumbnail_id.get.equals(fileDataset.thumbnail_id.get)){ 
-                datasets.newThumbnail(fileDataset.id)
+                datasets.get.newThumbnail(fileDataset.id)
                 	for(collectionId <- fileDataset.collections){
                     collections.get(collectionId) match{
                       case Some(collection) =>{
@@ -703,9 +703,9 @@ class MongoDBFileService @Inject() (
                      
           }
 
-          val fileFolders = folders.findByFileId(file.id)
+          val fileFolders = folders.get().findByFileId(file.id)
           for(fileFolder <- fileFolders) {
-            folders.removeFile(fileFolder.id, file.id)
+            folders.get().removeFile(fileFolder.id, file.id)
           }
           for(section <- sections.findByFileId(file.id)){
             sections.removeSection(section)
@@ -717,7 +717,7 @@ class MongoDBFileService @Inject() (
             ThreeDTextureDAO.removeById(new ObjectId(texture.id.stringify))
           }
           for (follower <- file.followers) {
-            userService.unfollowFile(follower, id)
+            userService.get().unfollowFile(follower, id)
           }
         }
 
@@ -734,7 +734,7 @@ class MongoDBFileService @Inject() (
         FileDAO.remove(file)
 
         // finally remove metadata - if done before file is deleted, document metadataCounts won't match
-        metadatas.removeMetadataByAttachTo(ResourceRef(ResourceRef.file, id))
+        metadatas.get().removeMetadataByAttachTo(ResourceRef(ResourceRef.file, id))
       }
       case None => Logger.debug("File not found")
     }

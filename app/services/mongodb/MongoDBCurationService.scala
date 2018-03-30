@@ -14,6 +14,7 @@ import services._
 import util.Direction._
 import java.util.Date
 
+import com.google.inject.Provider
 import play.api.Logger
 import com.mongodb.casbah.commons.MongoDBObject
 import com.mongodb.casbah.WriteConcern
@@ -22,7 +23,7 @@ import util.Formatters
 
 
 @Singleton
-class MongoDBCurationService  @Inject() (metadatas: MetadataService, spaces: SpaceService, events: EventService)  extends CurationService {
+class MongoDBCurationService  @Inject() (metadatas: Provider[MetadataService], spaces: SpaceService, events: EventService)  extends CurationService {
 
   def insert(curation: CurationObject) = {
 
@@ -52,7 +53,7 @@ class MongoDBCurationService  @Inject() (metadatas: MetadataService, spaces: Spa
     val curation = get(id)
     curation match {
       case Some(c) => {
-        metadatas.removeMetadataByAttachTo(ResourceRef(ResourceRef.curationObject, c.id))
+        metadatas.get().removeMetadataByAttachTo(ResourceRef(ResourceRef.curationObject, c.id))
         c.files.map(f => deleteCurationFile(f))
         c.folders.map(f => {
           removeCurationFolder("dataset", id, f)
@@ -239,7 +240,7 @@ class MongoDBCurationService  @Inject() (metadatas: MetadataService, spaces: Spa
   }
 
   def deleteCurationFile(curationFileId: UUID) : Unit = {
-    metadatas.removeMetadataByAttachTo(ResourceRef(ResourceRef.curationFile, curationFileId))
+    metadatas.get().removeMetadataByAttachTo(ResourceRef(ResourceRef.curationFile, curationFileId))
     CurationFileDAO.remove(MongoDBObject("_id" ->new ObjectId(curationFileId.stringify)))
   }
 

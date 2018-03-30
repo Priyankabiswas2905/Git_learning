@@ -3,12 +3,13 @@ package services.mongodb
 import java.io._
 import java.text.SimpleDateFormat
 import java.util.{ArrayList, Date}
-import javax.inject.{Inject, Singleton}
 
+import javax.inject.{Inject, Singleton}
 import Transformation.LidoToCidocConvertion
-import util.{Parsers, Formatters}
+import util.{Formatters, Parsers}
 import api.Permission
 import api.Permission.Permission
+import com.google.inject.Provider
 import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.WriteConcern
 import com.mongodb.casbah.commons.MongoDBList
@@ -23,7 +24,7 @@ import org.json.JSONObject
 import play.api.Logger
 import play.api.Play._
 import play.api.libs.json.Json._
-import play.api.libs.json.{Json, JsValue, JsArray}
+import play.api.libs.json.{JsArray, JsValue, Json}
 import services._
 import services.mongodb.MongoContext.context
 
@@ -39,15 +40,15 @@ import scala.util.parsing.json.JSONArray
 @Singleton
 class MongoDBDatasetService @Inject() (
   collections: CollectionService,
-  files: FileService,
+  files: Provider[FileService],
   comments: CommentService,
   sparql: RdfSPARQLService,
-  spaces: SpaceService,
-  userService: UserService,
-  folders: FolderService,
-  metadatas:MetadataService,
-  events: EventService,
-  elasticsearchService: ElasticsearchService) extends DatasetService {
+  spaces: Provider[SpaceService],
+  userService: Provider[UserService],
+  folders: Provider[FolderService],
+  metadatas: Provider[MetadataService],
+  events: Provider[EventService],
+  elasticsearchService: Provider[ElasticsearchService]) extends DatasetService {
 
   object MustBreak extends Exception {}
 
@@ -298,7 +299,7 @@ class MongoDBDatasetService @Inject() (
     val enablePublic = play.Play.application().configuration().getBoolean("enablePublic")
     //emptySpaces should not be used in most cases since your dataset maybe in a space, then you are changed to viewer or kicked off.
     val emptySpaces = MongoDBObject("spaces" -> List.empty)
-    val publicSpaces = spaces.listByStatus(SpaceStatus.PUBLIC.toString).map(s => new ObjectId(s.id.stringify))
+    val publicSpaces = spaces.get().listByStatus(SpaceStatus.PUBLIC.toString).map(s => new ObjectId(s.id.stringify))
 
     // create access filter
     val filterAccess = if (showAll || configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public" && permissions.contains(Permission.ViewDataset)) {
@@ -330,7 +331,7 @@ class MongoDBDatasetService @Inject() (
           val permissionsString = permissions.map(_.toString)
           val okspaces = if (showOnlyShared){
             u.spaceandrole.filter(_.role.permissions.intersect(permissionsString).nonEmpty).filter((p: UserSpaceAndRole)=>
-              (spaces.get(p.spaceId) match {
+              (spaces.get().get(p.spaceId) match {
                 case Some(space) => {
                   if (space.userCount > 1){
                     true
@@ -453,7 +454,7 @@ class MongoDBDatasetService @Inject() (
     get(datasetId) match {
       case Some(dataset) => {
         for (fileId <- dataset.files) {
-          files.get(fileId) match {
+          files.get().get(fileId) match {
             case Some(file) => {
               if(file.filename.equals(filename)) {
                 return Some(fileId)
@@ -655,7 +656,7 @@ class MongoDBDatasetService @Inject() (
     get(datasetId) match {
       case Some(dataset) => {
         val filesInDataset = dataset.files map {
-          f => files.get(f).getOrElse(None)
+          f => files.get().get(f).getOrElse(None)
         }
         for (file <- filesInDataset) {
           if (file.isInstanceOf[models.File]) {
@@ -676,7 +677,7 @@ class MongoDBDatasetService @Inject() (
     get(datasetId) match {
       case Some(dataset) => {
         // TODO cleanup
-        val filesInDataset = dataset.files.map(f => files.get(f).getOrElse(None))
+        val filesInDataset = dataset.files.map(f => files.get().get(f).getOrElse(None))
         for (file <- filesInDataset) {
           if (file.isInstanceOf[File]) {
             val theFile = file.asInstanceOf[File]
@@ -854,7 +855,7 @@ class MongoDBDatasetService @Inject() (
   }
 
   def updateName(id: UUID, name: String) {
-    events.updateObjectName(id, name)
+    events.get().updateObjectName(id, name)
     val result = Dataset.update(MongoDBObject("_id" -> new ObjectId(id.stringify)),
       $set("name" -> name),
       false, false, WriteConcern.Safe)
@@ -1242,7 +1243,7 @@ class MongoDBDatasetService @Inject() (
       case Some(dataset) => {
         val filesInDataset = dataset.files map {
           f => {
-            files.get(f).getOrElse {
+            files.get().get(f).getOrElse {
               None
             }
           }
@@ -1272,18 +1273,18 @@ class MongoDBDatasetService @Inject() (
         for (f <- dataset.files) {
           val notTheDataset = for (currDataset <- findByFileId(f) if !dataset.id.toString.equals(currDataset.id.toString)) yield currDataset
           if (notTheDataset.size == 0)
-            files.removeFile(f)
+            files.get().removeFile(f)
         }
         for (folder <- dataset.folders ) {
-          folders.delete(folder)
+          folders.get().delete(folder)
         }
         for (follower <- dataset.followers) {
-          userService.unfollowDataset(follower, id)
+          userService.get().unfollowDataset(follower, id)
         }
         for(space <- dataset.spaces) {
-          spaces.removeDataset(dataset.id, space)
+          spaces.get().removeDataset(dataset.id, space)
         }
-        metadatas.removeMetadataByAttachTo(ResourceRef(ResourceRef.dataset, id))
+        metadatas.get().removeMetadataByAttachTo(ResourceRef(ResourceRef.dataset, id))
         Dataset.remove(MongoDBObject("_id" -> new ObjectId(dataset.id.stringify)))
       }
       case None =>
@@ -1300,7 +1301,7 @@ class MongoDBDatasetService @Inject() (
   def index(id: UUID) {
     Dataset.findOneById(new ObjectId(id.stringify)) match {
       case Some(dataset) => {
-        elasticsearchService.index(dataset, false)
+        elasticsearchService.get().index(dataset, false)
       }
       case None => Logger.error("Dataset not found: " + id)
     }
@@ -1311,7 +1312,7 @@ class MongoDBDatasetService @Inject() (
       MongoDBObject("_id" -> new ObjectId(datasetId.stringify)),
       $addToSet("spaces" -> Some(new ObjectId(spaceId.stringify))),
       false, false)
-    if (get(datasetId).exists(_.isTRIAL == true) && spaces.get(spaceId).exists(_.isTrial == false)) {
+    if (get(datasetId).exists(_.isTRIAL == true) && spaces.get().get(spaceId).exists(_.isTrial == false)) {
       Dataset.update(MongoDBObject("_id" -> new ObjectId(datasetId.stringify)),
         $set("status" -> DatasetStatus.DEFAULT.toString),
         false, false)
@@ -1327,7 +1328,7 @@ class MongoDBDatasetService @Inject() (
     if (play.Play.application().configuration().getBoolean("verifySpaces")) {
 
       get(datasetId) match {
-        case Some(d) if !d.spaces.map(s => spaces.get(s)).flatten.exists(_.isTrial == false) =>
+        case Some(d) if !d.spaces.map(s => spaces.get().get(s)).flatten.exists(_.isTrial == false) =>
           Dataset.update(MongoDBObject("_id" -> new ObjectId(datasetId.stringify)),
             $set("status" -> DatasetStatus.TRIAL.toString),
             false, false)
@@ -1434,7 +1435,7 @@ class MongoDBDatasetService @Inject() (
 
 				  val filePrintStream =  new PrintStream(groupingFile)
 				  for(fileId <- dataset.files){
-            files.get(fileId).foreach(file =>
+            files.get().get(fileId).foreach(file =>
 				      filePrintStream.println("id:"+file.id.toString+" "+"filename:"+file.filename)
             )
 				  }

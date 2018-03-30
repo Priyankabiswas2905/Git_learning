@@ -9,7 +9,7 @@ import com.novus.salat._
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import models._
 import org.bson.types.ObjectId
-import play.api.{Application, Logger, Plugin}
+import play.api.{Application, Logger}
 import play.api.Play.current
 import com.mongodb.casbah.commons.MongoDBObject
 import com.mongodb.casbah.Imports._
@@ -20,8 +20,8 @@ import scala.collection.mutable.ListBuffer
 import services._
 import services.mongodb.MongoContext.context
 import _root_.util.Direction._
+import com.google.inject.Provider
 import javax.inject.Inject
-
 import play.api.inject.ApplicationLifecycle
 
 /**
@@ -34,10 +34,10 @@ import play.api.inject.ApplicationLifecycle
  */
 class MongoDBUserService @Inject() (
   mongoService: MongoService,
-  files: FileService,
+  files: Provider[FileService],
   datasets: DatasetService,
   collections: CollectionService,
-  spaces: SpaceService,
+  spaces: Provider[SpaceService],
   comments: CommentService,
   events: EventService,
   folders: FolderService,
@@ -243,7 +243,7 @@ class MongoDBUserService @Inject() (
     curations.updateAuthorFullName(id, name)
     datasets.updateAuthorFullName(id, name)
     events.updateAuthorFullName(id, name)
-    files.updateAuthorFullName(id, name)
+    files.get().updateAuthorFullName(id, name)
     folders.updateAuthorFullName(id, name)
     metadata.updateAuthorFullName(id, name)
   }
@@ -582,7 +582,7 @@ class MongoDBUserService @Inject() (
         }
       }
       case "file" => {
-        files.get(uuid) match {
+        files.get().get(uuid) match {
           case Some(file) => file.filename
           case None => default
         }
@@ -600,7 +600,7 @@ class MongoDBUserService @Inject() (
         }
       }
       case "'space" => {
-        spaces.get(uuid) match {
+        spaces.get().get(uuid) match {
           case Some(space) => space.name
           case None => default
         }

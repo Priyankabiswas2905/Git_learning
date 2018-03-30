@@ -5,7 +5,7 @@ package services
 
 import java.text.SimpleDateFormat
 
-import play.api.{Application, Logger, Plugin}
+import play.api.{Application, Logger}
 import play.api.Play.current
 import java.sql.DriverManager
 import java.util.Properties

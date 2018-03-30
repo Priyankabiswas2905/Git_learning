@@ -105,7 +105,7 @@ trait FileService {
   def first(): Option[File]
 
   def index(id: Option[UUID])
-  
+
   def index(id: UUID)
 
   /**

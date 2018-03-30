@@ -3,7 +3,7 @@
  */
 package services.mongodb
 
-import play.api.{Application, Logger, Plugin}
+import play.api.{Application, Logger}
 import java.util.Date
 
 import javax.inject.Inject

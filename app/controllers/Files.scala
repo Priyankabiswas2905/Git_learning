@@ -3,14 +3,14 @@ package controllers
 import java.io._
 import java.text.SimpleDateFormat
 import java.util.Date
-import javax.inject.Inject
 
+import javax.inject.Inject
 import api.Permission
 import fileutils.FilesUtils
 import models._
 import org.apache.commons.lang.StringEscapeUtils._
 import play.api.Logger
-import play.api.Play.{ current, configuration }
+import play.api.Play.{configuration, current}
 import play.api.data.Form
 import play.api.data.Forms._
 import play.api.libs.iteratee._
@@ -18,6 +18,7 @@ import play.api.libs.json.Json._
 import play.api.libs.concurrent.Execution.Implicits._
 import services._
 import java.text.SimpleDateFormat
+
 import views.html.defaultpages.badRequest
 import util.SearchUtils
 
@@ -26,11 +27,12 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import play.api.i18n.Messages
 import play.api.i18n.Messages.Implicits._
-
 import util.FileUtils
-
 import javax.mail.internet.MimeUtility
 import java.net.URLEncoder
+
+import akka.stream.scaladsl.StreamConverters
+import play.api.http.HttpEntity
 
 /**
  * Manage files.
@@ -680,6 +682,8 @@ class Files @Inject() (
 
                         inputStream.skip(start)
                         import play.api.mvc.{ ResponseHeader, Result }
+                        val bodySource = StreamConverters.fromInputStream(() => inputStream)
+                        val entity: HttpEntity = HttpEntity.Streamed(bodySource, Some(end - start + 1), Some(contentType))
                         Result(
                           header = ResponseHeader(PARTIAL_CONTENT,
                             Map(
@@ -690,7 +694,7 @@ class Files @Inject() (
                                                   CONTENT_TYPE -> contentType
                                                   )
                                           ),
-                                          body = Enumerator.fromStream(inputStream)
+                                          body = entity
                                   )
                     }
                   }
@@ -834,6 +838,8 @@ class Files @Inject() (
 
                 inputStream.skip(start)
                 import play.api.mvc.{ ResponseHeader, Result }
+                val bodySource = StreamConverters.fromInputStream(() => inputStream)
+                val entity: HttpEntity = HttpEntity.Streamed(bodySource, Some(end - start + 1), Some(contentType))
                 Result(
                   header = ResponseHeader(PARTIAL_CONTENT,
                     Map(
@@ -844,7 +850,7 @@ class Files @Inject() (
 	                    CONTENT_TYPE -> contentType
 	                  )
 	                ),
-	                body = Enumerator.fromStream(inputStream)
+	                body = entity
 	              )
             }
           }

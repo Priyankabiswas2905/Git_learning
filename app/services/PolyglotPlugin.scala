@@ -1,21 +1,21 @@
 package services
 
-import play.libs.Akka
-import play.api.{Application, Logger, Plugin}
 import java.io._
-import javax.inject.Inject
 
+import javax.inject.Inject
+import org.apache.commons.codec.binary.Base64.encodeBase64
+import org.asynchttpclient.{AsyncHttpClient, DefaultAsyncHttpClientConfig}
+import org.asynchttpclient.request.body.multipart.FilePart
+import play.api.Logger
 import play.api.Play.{configuration, current}
-import play.api.libs.iteratee._
+import play.api.inject.ApplicationLifecycle
 import play.api.libs.concurrent.Execution.Implicits._
+import play.api.libs.iteratee._
 import play.api.libs.ws._
+import play.libs.Akka
 
 import scala.concurrent._
 import scala.concurrent.duration._
-import com.ning.http.client.AsyncHttpClient
-import org.apache.commons.codec.binary.Base64.encodeBase64
-import com.ning.http.client.multipart.FilePart
-import play.api.inject.ApplicationLifecycle
 
 trait PolyglotService {
   def checkForFileAndDownload(triesLeft: Int, url: String, outputStream: OutputStream): Future[Unit]
@@ -103,9 +103,9 @@ class PolyglotServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends Po
     }
 
     // FIXME change to WS library call in play 2.5
+    import java.io.{File, FileOutputStream}
+
     import org.apache.commons.io.IOUtils
-    import java.io.File
-    import java.io.FileOutputStream
     val PREFIX = "polyglot-clowder"
     val SUFFIX = ".tmp"
     val tempFile = File.createTempFile(PREFIX, SUFFIX)
@@ -136,7 +136,6 @@ class PolyglotServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends Po
     //result is an html link
     //<a href=http://the_url_string>http://the_url_string</a>
     val fileURL = res.getResponseBody.substring(res.getResponseBody.indexOf("http"), res.getResponseBody.indexOf(">"))
-    fileURL
     Future.successful(fileURL)
   }
   

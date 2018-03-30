@@ -2,15 +2,12 @@ import java.io.{PrintWriter, StringWriter}
 import java.util.Calendar
 
 import akka.actor.Cancellable
-import filters.CORSFilter
-import julienrf.play.jsonp.Jsonp
 import models._
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json.Json._
+import play.api.mvc.RequestHeader
 import play.api.mvc.Results._
-import play.api.mvc.{RequestHeader, WithFilters}
 import play.api.{Application, GlobalSettings, Logger}
-import play.filters.gzip.GzipFilter
 import play.libs.Akka
 import services._
 
@@ -22,9 +19,9 @@ import scala.concurrent.duration._
  *
  * @author Luigi Marini
  */
-object Global extends WithFilters(new GzipFilter(), new Jsonp(), CORSFilter()) with GlobalSettings {
-  var extractorTimer: Cancellable = null
-  var jobTimer: Cancellable = null
+object Global extends GlobalSettings {
+//  var extractorTimer: Cancellable = null
+//  var jobTimer: Cancellable = null
 
 
   override def onStart(app: Application) {
@@ -53,17 +50,17 @@ object Global extends WithFilters(new GzipFilter(), new Jsonp(), CORSFilter()) w
     // set default metadata definitions
     MetadataDefinition.registerDefaultDefinitions()
 
-    if (extractorTimer == null) {
-      extractorTimer = Akka.system().scheduler.schedule(0 minutes, 5 minutes) {
-        ExtractionInfoSetUp.updateExtractorsInfo()
-      }
-    }
-
-    if (jobTimer == null) {
-      jobTimer = Akka.system().scheduler.schedule(0 minutes, 1 minutes) {
-        JobsScheduler.runScheduledJobs()
-      }
-    }
+//    if (extractorTimer == null) {
+//      extractorTimer = Akka.system().scheduler.schedule(0 minutes, 5 minutes) {
+//        ExtractionInfoSetUp.updateExtractorsInfo()
+//      }
+//    }
+//
+//    if (jobTimer == null) {
+//      jobTimer = Akka.system().scheduler.schedule(0 minutes, 1 minutes) {
+//        JobsScheduler.runScheduledJobs()
+//      }
+//    }
 
     // Get database counts from appConfig; generate them if unavailable or user count = 0
     appConfig.getProperty[Long]("countof.users") match {
@@ -96,8 +93,8 @@ object Global extends WithFilters(new GzipFilter(), new Jsonp(), CORSFilter()) w
   }
 
   override def onStop(app: Application) {
-    extractorTimer.cancel()
-    jobTimer.cancel()
+//    extractorTimer.cancel()
+//    jobTimer.cancel()
     Logger.info("Application shutdown")
   }
 

@@ -18,16 +18,8 @@ import play.sbt.routes.RoutesKeys._
 object ApplicationBuild extends Build {
 
   val appName = "clowder"
-  val aapVersion = "2.0-SNAPSHOT"
-  val jvm = "1.7"
-
-  def appVersion: String = {
-    if (gitBranchName == "master") {
-      aapVersion
-    } else {
-      s"${aapVersion}-SNAPSHOT"
-    }
-  }
+  val appVersion = "2.0-SNAPSHOT"
+//  val jvm = "1.7"
 
   def exec(cmd: String): Seq[String] = {
     val r = java.lang.Runtime.getRuntime()
@@ -142,10 +134,7 @@ object ApplicationBuild extends Build {
 //    "org.scalatestplus.play" %% "scalatestplus-play" % "1.5.1" % "test",
 
     // iRods filestorage
-    "org.irods.jargon" % "jargon-core" % "3.3.3-beta1",
-
-    // jsonp return from /api
-    "org.julienrf" %% "play-jsonp-filter" % "1.2"
+    "org.irods.jargon" % "jargon-core" % "3.3.3-beta1"
   )
 
   // Only compile the bootstrap bootstrap.less file and any other *.less file in the stylesheets directory
@@ -161,12 +150,13 @@ object ApplicationBuild extends Build {
     scalaVersion := "2.11.12", // TODO not supported by salat
     //    scalaVersion := "2.12.14",
     libraryDependencies ++= appDependencies,
+    libraryDependencies += filters,
 //    scalacOptions ++= Seq(s"-target:jvm-$jvm", "-feature"),
 //    javacOptions ++= Seq("-source", jvm, "-target", jvm),
-    initialize := {
-      val current  = sys.props("java.specification.version")
-      assert(current >= "1.8", s"Unsupported JDK: java.specification.version $current != $jvm")
-    },
+//    initialize := {
+//      val current  = sys.props("java.specification.version")
+//      assert(current >= "1.8", s"Unsupported JDK: java.specification.version $current != $jvm")
+//    },
     offline := true,
 //    lessEntryPoints <<= baseDirectory(customLessEntryPoints),
     javaOptions in Test += "-Dconfig.file=" + Option(System.getProperty("config.file")).getOrElse("conf/application.conf"),

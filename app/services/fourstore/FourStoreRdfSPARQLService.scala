@@ -1,6 +1,7 @@
 package services.fourstore
 
 import java.io.FileInputStream
+
 import play.Logger
 import org.apache.http.client.methods.HttpPost
 import org.apache.http.client.methods.HttpDelete
@@ -8,15 +9,17 @@ import org.apache.http.impl.client.DefaultHttpClient
 import org.apache.http.util.EntityUtils
 import play.api.Play.current
 import java.util.ArrayList
+
+import com.google.inject.Provider
 import org.apache.http.NameValuePair
 import org.apache.http.message.BasicNameValuePair
 import org.apache.http.client.entity.UrlEncodedFormEntity
-import services.{FileService, RdfSPARQLService, DI, DatasetService}
+import services.{DI, DatasetService, FileService, RdfSPARQLService}
 import javax.inject.{Inject, Singleton}
 import models.UUID
 
 @Singleton
-class FourStoreRdfSPARQLService @Inject() (datasets: DatasetService, files: FileService) extends RdfSPARQLService {
+class FourStoreRdfSPARQLService @Inject() (datasets: Provider[DatasetService], files: Provider[FileService]) extends RdfSPARQLService {
 
   def addFileToGraph(fileId: UUID, selectedGraph:String = "rdfXMLGraphName"): Null = {
     	
@@ -174,13 +177,13 @@ class FourStoreRdfSPARQLService @Inject() (datasets: DatasetService, files: File
   def removeDatasetFromGraphs(datasetId: UUID): Null = {
           
         //First, delete all RDF links having to do with files belonging only to the dataset to be deleted, as those files will be deleted together with the dataset
-         datasets.get(datasetId) match{
+         datasets.get().get(datasetId) match{
           case Some(dataset)=> {
                 var filesString = "" 
 	            for(f <- dataset.files){
-				      var notTheDataset = for(currDataset<- datasets.findByFileId(f) if !dataset.id.toString.equals(currDataset.id.toString)) yield currDataset
+				      var notTheDataset = for(currDataset<- datasets.get().findByFileId(f) if !dataset.id.toString.equals(currDataset.id.toString)) yield currDataset
 				      if(notTheDataset.size == 0){
-                    files.get(f) match  {
+                    files.get().get(f) match  {
                       case Some(file) => {
                         if (file.filename.endsWith(".xml")) {
                           removeFileFromGraphs(f, "rdfXMLGraphName")
@@ -191,7 +194,7 @@ class FourStoreRdfSPARQLService @Inject() (datasets: DatasetService, files: File
                     }
 				      }
 				      else{
-                    files.get(f) match {
+                    files.get().get(f) match {
                       case Some(file) => {
                         if(file.filename.endsWith(".xml")){
                           detachFileFromDataset(f, datasetId, "rdfXMLGraphName")

@@ -3,9 +3,9 @@ package api
 import scala.annotation.tailrec
 import java.io.FileInputStream
 import java.net.{URL, URLEncoder}
+
 import javax.inject.Inject
 import javax.mail.internet.MimeUtility
-
 import _root_.util.{FileUtils, JSONLD, Parsers, RequestUtils, SearchUtils}
 import com.mongodb.casbah.Imports._
 import jsonutils.JsonUtil
@@ -26,7 +26,10 @@ import scala.util.parsing.json.JSONArray
 import java.text.SimpleDateFormat
 import java.util.Date
 
+import akka.stream.scaladsl.{Source, StreamConverters}
 import controllers.{Previewers, Utils}
+import play.api.http.HttpEntity
+import play.api.libs.streams.Streams
 
 /**
  * Json API for files.
@@ -115,6 +118,8 @@ class Files @Inject()(
 		                range match {
 		                  case (start, end) =>
 		                    inputStream.skip(start)
+                        val bodySource = StreamConverters.fromInputStream(() => inputStream)
+                        val entity: HttpEntity = HttpEntity.Streamed(bodySource, Some(end - start + 1), Some(contentType))
 		                    Result(
 		                      header = ResponseHeader(PARTIAL_CONTENT,
 		                        Map(
@@ -125,7 +130,7 @@ class Files @Inject()(
 		                          CONTENT_TYPE -> contentType
 		                        )
 		                      ),
-		                      body = Enumerator.fromStream(inputStream)
+		                      body = entity
 		                    )
 		                }
 		              }
@@ -175,6 +180,8 @@ class Files @Inject()(
                 range match {
                   case (start, end) =>
                     inputStream.skip(start)
+                    val bodySource = StreamConverters.fromInputStream(() => inputStream)
+                    val entity: HttpEntity = HttpEntity.Streamed(bodySource, Some(end - start + 1), Some(contentType))
                     Result(
                       header = ResponseHeader(PARTIAL_CONTENT,
                         Map(
@@ -185,7 +192,7 @@ class Files @Inject()(
                           CONTENT_TYPE -> contentType
                         )
                       ),
-                      body = Enumerator.fromStream(inputStream)
+                      body = entity
                     )
                 }
               }
@@ -818,8 +825,9 @@ class Files @Inject()(
                     }
                     range match {
                       case (start, end) =>
-
                         inputStream.skip(start)
+                        val bodySource = StreamConverters.fromInputStream(() => inputStream)
+                        val entity: HttpEntity = HttpEntity.Streamed(bodySource, Some(end - start + 1), Some(contentType))
                         Result(
                           header = ResponseHeader(PARTIAL_CONTENT,
                             Map(
@@ -830,7 +838,7 @@ class Files @Inject()(
                               CONTENT_TYPE -> contentType
                             )
                           ),
-                          body = Enumerator.fromStream(inputStream)
+                          body = entity
                         )
                     }
                   }
@@ -874,7 +882,8 @@ class Files @Inject()(
                       case (start, end) =>
 
                         inputStream.skip(start)
-
+                        val bodySource = StreamConverters.fromInputStream(() => inputStream)
+                        val entity: HttpEntity = HttpEntity.Streamed(bodySource, Some(end - start + 1), Some(contentType))
                         Result(
                           header = ResponseHeader(PARTIAL_CONTENT,
                             Map(
@@ -885,7 +894,7 @@ class Files @Inject()(
                               CONTENT_TYPE -> contentType
                             )
                           ),
-                          body = Enumerator.fromStream(inputStream)
+                          body = entity
                         )
                     }
                   }

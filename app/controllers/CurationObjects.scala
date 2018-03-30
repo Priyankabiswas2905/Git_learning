@@ -26,7 +26,7 @@ import play.api.libs.ws._
 
 import scala.concurrent.duration._
 import play.api.libs.json.Reads._
-import play.api.libs.ws.ning.NingWSResponse
+import play.api.libs.ws.ahc.AhcWSResponse
 import play.api.i18n.Messages.Implicits._
 
 
@@ -611,7 +611,7 @@ class CurationObjects @Inject()(
           Logger.debug(jsonResponse.toString())
         }
         else {
-          Logger.error("Error Calling Matchmaker: " + response.underlying[NingWSResponse].ahcResponse.getResponseBody())
+          Logger.error("Error Calling Matchmaker: " + response.underlying[AhcWSResponse].ahcResponse.getResponseBody())
         }
     }
 
@@ -847,7 +847,7 @@ class CurationObjects @Inject()(
               }
               else {
 
-                Logger.error("Error Submitting to Repository: " + response.underlying[NingWSResponse].ahcResponse.getResponseBody())
+                Logger.error("Error Submitting to Repository: " + response.underlying[AhcWSResponse].ahcResponse.getResponseBody())
               }
           }
 
@@ -876,7 +876,7 @@ class CurationObjects @Inject()(
               (response.json \ "Status").asOpt[JsValue]
               Ok(response.json)
             } else {
-              Logger.error("Error Getting Status: " + response.underlying[NingWSResponse].ahcResponse.getResponseBody)
+              Logger.error("Error Getting Status: " + response.underlying[AhcWSResponse].ahcResponse.getResponseBody)
               InternalServerError(toJson("Status object not found."))
             }
         }
@@ -968,7 +968,7 @@ class CurationObjects @Inject()(
           publishDataList.sortBy(x => format.parse(x.get("date").getOrElse("Sep 14, 2016 10:59:26 AM"))).reverse.take(limit + index * limit).takeRight(limit)
 
         } else {
-          Logger.error("Error Getting published data: " + response.underlying[NingWSResponse].ahcResponse.getResponseBody)
+          Logger.error("Error Getting published data: " + response.underlying[AhcWSResponse].ahcResponse.getResponseBody)
           List.empty
         }
     }

@@ -1,13 +1,11 @@
 package services.irods
 
 import javax.inject.Inject
-import play.api.{Application, Logger, Play, Plugin}
 import org.irods.jargon.core.connection.IRODSAccount
 import org.irods.jargon.core.pub.IRODSFileSystem
 import org.irods.jargon.core.pub.io.IRODSFileFactory
-import org.irods.jargon.core.exception.JargonException
-import play.api.Play.current
 import play.api.inject.ApplicationLifecycle
+import play.api.{Logger, Play}
 
 import scala.concurrent.Future
 

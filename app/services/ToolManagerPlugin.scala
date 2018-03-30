@@ -11,7 +11,7 @@ import play.api.mvc._
 import play.api.libs.json._
 import play.api.libs.ws.WSResponse
 import play.api.libs.ws.WS._
-import play.api.{Application, Logger, Plugin}
+import play.api.{Application, Logger}
 import models.UUID
 import play.api.Play.current
 import play.api.inject.ApplicationLifecycle
