@@ -1,5 +1,7 @@
 package api
 
+import api.Permission.Permission
+
 import java.net.{ URL, URLEncoder }
 import java.util.Date
 import javax.inject.{ Inject, Singleton }
@@ -29,14 +31,14 @@ import scala.concurrent.Future
  */
 @Singleton
 class Metadata @Inject() (
-    metadataService: MetadataService,
-    contextService: ContextLDService,
-    userService: UserService,
-    datasets: DatasetService,
-    files: FileService,
-    curations: CurationService,
-    events: EventService,
-    spaceService: SpaceService) extends ApiController {
+  metadataService: MetadataService,
+  contextService: ContextLDService,
+  userService: UserService,
+  datasets: DatasetService,
+  files: FileService,
+  curations: CurationService,
+  events: EventService,
+  spaceService: SpaceService) extends ApiController {
 
   def getDefinitions(spaceId: Option[String]) = PermissionAction(Permission.ViewDataset) {
     implicit request =>
@@ -231,7 +233,7 @@ class Metadata @Inject() (
 
   }
 
-  def editDefinition(id: UUID, spaceId: Option[String]) = ServerAdminAction(parse.json) {
+  def editDefinition(id: UUID, spaceId: Option[String]) = AuthenticatedAction(parse.json) {
     implicit request =>
       request.user match {
         case Some(user) => {
@@ -264,23 +266,33 @@ class Metadata @Inject() (
                       }
                       case _ => {
                         //Otherwise, go ahead with the edit
-                        metadataService.editDefinition(id, body)
-                        spaceId match {
-                          case Some(sId) => {
-                            spaceService.get(UUID(sId)) match {
-                              case Some(s) => events.addObjectEvent(Some(user), s.id, s.name, "edit_metadata_space")
-                              case None =>
+                        metadataService.getDefinition(id) match {
+                          case Some(md) => {
+
+                            md.spaceId match {
+                              case Some(sId) if Permission.checkPermission(Some(user), Permission.EditSpace, Some(ResourceRef(ResourceRef.space, sId))) => {
+                                metadataService.editDefinition(id, body)
+                                spaceService.get(sId) match {
+                                  case Some(s) => events.addObjectEvent(Some(user), s.id, s.name, "edit_metadata_space")
+                                  case None =>
+                                }
+                                Ok(JsObject(Seq("status" -> JsString("ok"))))
+                              }
+                              case None if Permission.checkServerAdmin(Some(user)) => {
+                                metadataService.editDefinition(id, body)
+                                events.addEvent(new Event(user.getMiniUser, None, None, None, None, None, "edit_metadata_instance", new Date()))
+                                Ok(JsObject(Seq("status" -> JsString("ok"))))
+                              }
+                              case _ => {
+                                Unauthorized(" Not Authorized")
+                              }
                             }
-                          }
-                          case None => {
-                            events.addEvent(new Event(user.getMiniUser, None, None, None, None, None, "edit_metadata_instance", new Date()))
+
                           }
                         }
-                        Ok(JsObject(Seq("status" -> JsString("ok"))))
 
                       }
                     }
-
                   }
 
                 }
@@ -296,26 +308,31 @@ class Metadata @Inject() (
       }
   }
 
-  def deleteDefinition(id: UUID) = ServerAdminAction { implicit request =>
+  def deleteDefinition(id: UUID) = AuthenticatedAction { implicit request =>
     implicit val user = request.user
     user match {
       case Some(user) => {
         metadataService.getDefinition(id) match {
           case Some(md) => {
-            metadataService.deleteDefinition(id)
-
             md.spaceId match {
-              case Some(spaceId) => {
+              case Some(spaceId) if Permission.checkPermission(Some(user), Permission.EditSpace, Some(ResourceRef(ResourceRef.space, spaceId))) => {
+                metadataService.deleteDefinition(id)
                 spaceService.get(spaceId) match {
                   case Some(s) => events.addObjectEvent(Some(user), s.id, s.name, "delete_metadata_space")
                   case None =>
                 }
+                Ok(JsObject(Seq("status" -> JsString("ok"))))
               }
-              case None => {
+              case None if Permission.checkServerAdmin(Some(user)) => {
+                metadataService.deleteDefinition(id)
                 events.addEvent(new Event(user.getMiniUser, None, None, None, None, None, "delete_metadata_instance", new Date()))
+                Ok(JsObject(Seq("status" -> JsString("ok"))))
+              }
+
+              case _ => {
+                Unauthorized(" Not Authorized")
               }
             }
-            Ok(JsObject(Seq("status" -> JsString("ok"))))
           }
           case None => BadRequest(toJson("Invalid metadata definition"))
         }
@@ -325,26 +342,32 @@ class Metadata @Inject() (
     }
   }
 
-  def makeDefinitionAddable(id: UUID, addable: Boolean) = ServerAdminAction { implicit request =>
+  def makeDefinitionAddable(id: UUID, addable: Boolean) = AuthenticatedAction { implicit request =>
     implicit val user = request.user
     user match {
       case Some(user) => {
         metadataService.getDefinition(id) match {
           case Some(md) => {
-            metadataService.makeDefinitionAddable(id, addable)
 
             md.spaceId match {
-              case Some(spaceId) => {
+              case Some(spaceId) if Permission.checkPermission(Some(user), Permission.EditSpace, Some(ResourceRef(ResourceRef.space, spaceId))) => {
+                metadataService.makeDefinitionAddable(id, addable)
                 spaceService.get(spaceId) match {
                   case Some(s) => events.addObjectEvent(Some(user), s.id, s.name, "toggle_metadata_space")
                   case None =>
                 }
+                Ok(JsObject(Seq("status" -> JsString("ok"))))
               }
-              case None => {
+              case None if Permission.checkServerAdmin(Some(user)) => {
+                metadataService.makeDefinitionAddable(id, addable)
                 events.addEvent(new Event(user.getMiniUser, None, None, None, None, None, "toggle_metadata_instance", new Date()))
+                Ok(JsObject(Seq("status" -> JsString("ok"))))
+              }
+              case _ => {
+                Unauthorized(" Not Authorized")
               }
             }
-            Ok(JsObject(Seq("status" -> JsString("ok"))))
+
           }
           case None => BadRequest(toJson("Invalid metadata definition"))
         }
@@ -458,7 +481,8 @@ class Metadata @Inject() (
                     //add metadata to mongo
                     val newInfo = metadataService.addMetadata(content_ld, context, attachedTo.get, createdAt, creator, space)
                     Logger.info("new stuff is: " + newInfo.toString())
-                    val mdMap = Map("metadata" -> content_ld,
+                    val mdMap = Map(
+                      "metadata" -> content_ld,
                       "resourceType" -> attachedTo.get.resourceType.name,
                       "resourceId" -> attachedTo.get.id.toString)
 
@@ -531,7 +555,8 @@ class Metadata @Inject() (
             }
             case result: JsObject => {
 
-              val mdMap = Map("metadata" -> content,
+              val mdMap = Map(
+                "metadata" -> content,
                 "resourceType" -> attachedtype,
                 "resourceId" -> attachedid)
 
@@ -635,7 +660,8 @@ class Metadata @Inject() (
           metadataService.removeMetadata(resource, term, itemid, deletedAt, deletor, space) match {
             case content: JsObject => {
 
-              val mdMap = Map("metadata" -> content,
+              val mdMap = Map(
+                "metadata" -> content,
                 "resourceType" -> attachedtype,
                 "resourceId" -> attachedUuid)
 
