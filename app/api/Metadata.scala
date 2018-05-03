@@ -529,7 +529,7 @@ class Metadata @Inject() (
       }
   }
 
-  def updateMetadata(attachedtype: String, attachedid: UUID, entryId: String) = PermissionAction(Permission.DeleteMetadata, Some(ResourceRef(Symbol(attachedtype), attachedid)))(parse.json) { implicit request =>
+  def updateMetadata(attachedtype: String, attachedid: UUID, entryId: String) = PermissionAction(Permission.EditMetadata, Some(ResourceRef(Symbol(attachedtype), attachedid)))(parse.json) { implicit request =>
     request.user match {
       case Some(user) => {
         if (attachedtype == ResourceRef.curationObject.name && curations.get(attachedid).map(_.status != "In Preparation").getOrElse(false)

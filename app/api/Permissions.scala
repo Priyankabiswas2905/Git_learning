@@ -61,7 +61,7 @@ object Permission extends Enumeration {
     AddMetadata,
     ViewMetadata,
     DeleteMetadata,
-    EditMetadata,   // FIXME: Unused right now
+    EditMetadata,  
 
     // social annotation
     AddTag,
