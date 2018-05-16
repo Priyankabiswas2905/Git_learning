@@ -2801,6 +2801,22 @@ paths:
       summary: Download file
       description: 'Download a static file, or the alternate file'
 
+  ##############################################################################
+  # Proxy                                                                      #
+  ##############################################################################
+  /proxy/{endpoint}
+    get:
+      responses:
+        200:
+          description: OK
+      parameters:
+        - required: true
+          type: string
+          name: endpoint
+          in: path
+      summary: Proxy a GET request to configured endpoint.
+      description: Access to the endpoint will not be restricted by Clowder authentication.
+
 ################################################################################
 #                                 Definitions                                  #
 ################################################################################
