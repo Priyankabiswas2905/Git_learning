@@ -1,19 +1,10 @@
 package api
 
-import java.io._
-import java.util
-import java.util.Map.Entry
-import java.util.function.Consumer
-
 import com.ning.http.client.FluentCaseInsensitiveStringsMap
-import com.ning.http.client.Realm.AuthScheme
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.iteratee._
 import play.api.libs.ws._
-import play.api.mvc.{Result, SimpleResult}
 import javax.inject.Inject
-import org.apache.commons.io.IOUtils
-import org.apache.commons.io.output.CountingOutputStream
 import services.EventService
 
 import scala.concurrent.Future
@@ -38,7 +29,7 @@ object Proxy {
   val ConfigPrefix: String = "clowder.proxy."
 }
 
-class Proxy @Inject()(/*proxyService: ProxyService,*/ events: EventService) extends ApiController {
+class Proxy @Inject()(events: EventService) extends ApiController {
   import Proxy.ConfigPrefix
 
   /** Translates an endpoint name to a target URL based on Clowder's configuration */
