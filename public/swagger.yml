@@ -2815,7 +2815,7 @@ paths:
           name: endpoint
           in: path
       summary: Proxy a GET request to configured endpoint.
-      description: Access to the endpoint will not be restricted by Clowder authentication.
+      description: Access to the endpoint will be restricted by Clowder authentication.
 
 ################################################################################
 #                                 Definitions                                  #
