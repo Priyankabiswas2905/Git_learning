@@ -19,8 +19,9 @@ import services.EventService
 import scala.concurrent.Future
 
 /**
-  * API to interact with the proxy. The proxy can be configured by setting the "clowder.proxy" key in
-  * Clowder's configuration. Requests to "/api/proxy/:endpoint" will then be routed to the specified target.
+  * An API that allows you to use Clowder as a reverse-proxy. The proxy can be configured by setting up the
+  * "clowder.proxy" key in Clowder's configuration (e.g. your custom.conf file). Requests to "/api/proxy/:endpoint"
+  * will then be routed to the specified target.
   *
   * For example:
   *   clowder.proxy {
@@ -32,50 +33,61 @@ import scala.concurrent.Future
   * and transparently send you the response to your proxied request.
   *
   */
+object Proxy {
+  /** The prefix to search Clowder's configuration for proxy endpoint */
+  val ConfigPrefix: String = "clowder.proxy."
+}
+
 class Proxy @Inject()(/*proxyService: ProxyService,*/ events: EventService) extends ApiController {
+  import Proxy.ConfigPrefix
+
+  /** Translates an endpoint name to a target URL based on Clowder's configuration */
+  def getProxyTarget(endpoint: String): String = {
+    // Prefix our configuration values
+    val endpointCfgKey = ConfigPrefix + endpoint
+    val playConfig = play.Play.application().configuration()
+
+    // If this endpoint has been configured, return it
+    if (playConfig.keys.contains(endpointCfgKey)) {
+      return playConfig.getString(endpointCfgKey)
+    }
+
+    // By default, return null
+    return null
+  }
 
   /** Proxies a GET request to the specified endpoint */
   def get(endpoint: String)= AuthenticatedAction.async { implicit request =>
-    request.user match {
-      case None => {
-        Future(Unauthorized("Not authenticated"))
-      }
-      case Some(user) => {
-        val endpointCfgKey = "clowder.proxy." + endpoint
-        val playConfig = play.Play.application().configuration()
+    // Read Clowder configuration to retrieve the target endpoint URL
+    val proxyTarget = getProxyTarget(endpoint)
 
-        if (!playConfig.keys.contains(endpointCfgKey)) {
-           Future(NotFound("Not found: " + endpoint))
-        } else {
-          // Read Clowder configuration to retrieve the target endpoint URL
-          val proxyTarget = playConfig.getString(endpointCfgKey)
+    if (null == proxyTarget) {
+       Future(NotFound("Not found: " + endpoint))
+    } else {
+      // Build our proxied GET request (preserve query string parameters)
+      val proxiedRequest = WS.url(proxyTarget)
+        .withQueryString(request.queryString.mapValues(_.head).toSeq: _*)
 
-          // Build our proxied GET request (preserve query string parameters)
-          val proxiedRequest = WS.url(proxyTarget)
-            .withQueryString(request.queryString.mapValues(_.head).toSeq: _*)
+      proxiedRequest.get().map { resp =>
+        // Copy all of the headers from our proxied response
+        val map: FluentCaseInsensitiveStringsMap = resp.ahcResponse.getHeaders
+        val contentType = map.getFirstValue("Content-Type")
 
-          proxiedRequest.get().map { resp =>
-            // Stream our response data (to handle large/chunked responses)
-            val responseBody = resp.ahcResponse.getResponseBodyAsStream
-            val chunkedResponseEnumerator = Enumerator.fromStream(responseBody)
+        // Stream our response data (to handle large/chunked responses)
+        val responseBody = resp.ahcResponse.getResponseBodyAsStream
+        val chunkedResponseEnumerator = Enumerator.fromStream(responseBody)
 
-            // Copy all of the headers from our proxied response
-            val map: FluentCaseInsensitiveStringsMap = resp.ahcResponse.getHeaders
-            val contentType = map.getFirstValue("Content-Type")
-
-            // TODO: other headers my be needed for specific cases
-            Ok.chunked(chunkedResponseEnumerator)
-              .withHeaders(
-                SERVER -> map.getFirstValue("Server"),
-                CONTENT_DISPOSITION -> map.getFirstValue("Content-Disposition"),
-                CONTENT_TYPE -> contentType,
-                CONNECTION -> map.getFirstValue("Connection"),
-                TRANSFER_ENCODING -> map.getFirstValue("Transfer-Encoding"),
-                "X-Frame-Options" -> map.getFirstValue("X-Frame-Options")
-              )
-              .as(contentType)
-          }
-        }
+        // TODO: other headers my be needed for specific cases
+        Ok.chunked(chunkedResponseEnumerator)
+          .withHeaders(
+            SERVER -> map.getFirstValue("Server"),
+            CONTENT_DISPOSITION -> map.getFirstValue("Content-Disposition"),
+            CONTENT_TYPE -> contentType,
+            CONNECTION -> map.getFirstValue("Connection"),
+            TRANSFER_ENCODING -> map.getFirstValue("Transfer-Encoding"),
+            "X-Frame-Options" -> map.getFirstValue("X-Frame-Options")
+          )
+          .as(contentType)
       }
     }
   }
