@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   spaces manipulation.    
 - HTML previewer for text/html files. 
   [CATS-861](https://opensource.ncsa.illinois.edu/jira/browse/CATS-861)
+- New API endpoints for proxying GET requests through Clowder.
+  [CATS-793](https://opensource.ncsa.illinois.edu/jira/browse/CATS-793)
 
 ### Changed
 - File and dataset GET metadata endpoints now include their corresponding IDs and resource type information. 
