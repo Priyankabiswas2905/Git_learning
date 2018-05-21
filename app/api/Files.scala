@@ -1,35 +1,26 @@
 package api
 
-import scala.annotation.tailrec
 import java.io.FileInputStream
-import java.net.{URL, URLEncoder}
+import java.net.URL
+import java.util.Date
 
-import javax.inject.Inject
-import javax.mail.internet.MimeUtility
-import _root_.util.{FileUtils, JSONLD, Parsers, RequestUtils, SearchUtils}
+import _root_.util._
+import akka.stream.scaladsl.{Source, StreamConverters}
 import com.mongodb.casbah.Imports._
+import controllers.{Previewers, Utils}
+import javax.inject.Inject
 import jsonutils.JsonUtil
 import models._
-import play.api.Logger
-import play.api.Play.{configuration, current}
+import play.api.{Configuration, Logger}
+import play.api.http.HttpEntity
 import play.api.i18n.Messages
-import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.iteratee.Enumerator
 import play.api.libs.json.Json._
 import play.api.libs.json._
 import play.api.mvc.{ResponseHeader, Result}
-import play.api.i18n.Messages.Implicits._
 import services._
 
-import scala.collection.mutable.ListBuffer
-import scala.util.parsing.json.JSONArray
-import java.text.SimpleDateFormat
-import java.util.Date
-
-import akka.stream.scaladsl.{Source, StreamConverters}
-import controllers.{Previewers, Utils}
-import play.api.http.HttpEntity
-import play.api.libs.streams.Streams
+import scala.annotation.tailrec
 
 /**
  * Json API for files.
@@ -57,7 +48,7 @@ class Files @Inject()(
   elasticsearchService: ElasticsearchService,
   versusService: VersusService,
   rabbitMQService: RabbitMQService,
-  rdfExportService: RDFExportService) extends ApiController {
+  rdfExportService: RDFExportService, config: Configuration) extends ApiController {
 
   def get(id: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
     Logger.debug("GET file with id " + id)
@@ -136,7 +127,7 @@ class Files @Inject()(
 		              }
 		              case None => {
                     val userAgent = request.headers.get("user-agent").getOrElse("")
-                    Ok.chunked(Enumerator.fromStream(inputStream))
+                    Ok.chunked(Source.fromPublisher(play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(Enumerator.fromStream(inputStream))))
 		                  .withHeaders(CONTENT_TYPE -> contentType)
                       .withHeaders(CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(filename, userAgent)))
 		              }
@@ -197,7 +188,7 @@ class Files @Inject()(
                 }
               }
               case None => {
-                Ok.chunked(Enumerator.fromStream(inputStream))
+                Ok.chunked(StreamConverters.fromInputStream(() => inputStream))
                   .withHeaders(CONTENT_TYPE -> contentType)
                   .withHeaders(CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(filename, request.headers.get("user-agent").getOrElse(""))))
               }
@@ -318,7 +309,7 @@ class Files @Inject()(
           json.validate[RDFModel] match {
             case e: JsError => {
               Logger.error("Errors: " + JsError.toFlatForm(e) + "\n\t" + json.toString())
-              BadRequest(JsError.toFlatJson(e))
+              BadRequest(JsError.toFlatForm(e).toString())
             }
             case s: JsSuccess[RDFModel] => { 
               model = s.get 
@@ -588,7 +579,7 @@ class Files @Inject()(
   def getRDFUserMetadata(id: UUID, mappingNumber: String="1") = PermissionAction(Permission.ViewMetadata, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
     rdfExportService.getRDFUserMetadataFile(id.stringify, mappingNumber) match {
       case Some(resultFile) => {
-        Ok.chunked(Enumerator.fromStream(new FileInputStream(resultFile)))
+        Ok.chunked(StreamConverters.fromInputStream(() => new FileInputStream(resultFile)))
           .withHeaders(CONTENT_TYPE -> "application/rdf+xml")
           .withHeaders(CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(resultFile.getName(), request.headers.get("user-agent").getOrElse(""))))
       }
@@ -615,7 +606,7 @@ class Files @Inject()(
           }
         }
         files.index(id)
-        configuration.getString("userdfSPARQLStore").getOrElse("no") match {
+        config.get[String]("userdfSPARQLStore") match {
           case "yes" => {
             files.setUserMetadataWasModified(id, true)
           }
@@ -844,7 +835,7 @@ class Files @Inject()(
                   }
                   case None => {
                     //IMPORTANT: Setting CONTENT_LENGTH header here introduces bug!                  
-                    Ok.chunked(Enumerator.fromStream(inputStream))
+                    Ok.chunked(StreamConverters.fromInputStream(() => inputStream))
                       .withHeaders(CONTENT_TYPE -> contentType)
                       .withHeaders(CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(filename, request.headers.get("user-agent").getOrElse(""))))
 
@@ -900,7 +891,7 @@ class Files @Inject()(
                   }
                   case None => {
                     //IMPORTANT: Setting CONTENT_LENGTH header here introduces bug!
-                    Ok.chunked(Enumerator.fromStream(inputStream))
+                    Ok.chunked(StreamConverters.fromInputStream(() => inputStream))
                       .withHeaders(CONTENT_TYPE -> contentType)
                       //.withHeaders(CONTENT_LENGTH -> contentLength.toString)
                       .withHeaders(CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(filename, request.headers.get("user-agent").getOrElse(""))))
@@ -934,7 +925,7 @@ class Files @Inject()(
             name = s.get
           }
           case e: JsError => {
-            Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+            Logger.error("Errors: " + JsError.toFlatForm(e).toString())
             BadRequest(toJson(s"name data is missing"))
           }
         }
@@ -1006,7 +997,7 @@ class Files @Inject()(
                 licenseType = s.get
               }
               case e: JsError => {
-                Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+                Logger.error("Errors: " + JsError.toFlatForm(e).toString())
                 BadRequest(toJson(s"licenseType data is missing."))
               }
           }
@@ -1019,7 +1010,7 @@ class Files @Inject()(
                 rightsHolder = s.get
               }
               case e: JsError => {
-                Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+                Logger.error("Errors: " + JsError.toFlatForm(e).toString())
                 BadRequest(toJson(s"rightsHolder data is missing."))
               }
           }
@@ -1052,7 +1043,7 @@ class Files @Inject()(
                 }
               }
               case e: JsError => {
-                Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+                Logger.error("Errors: " + JsError.toFlatForm(e).toString())
                 BadRequest(toJson(s"licenseText data is missing."))
               }
           }
@@ -1065,7 +1056,7 @@ class Files @Inject()(
                 licenseUrl = s.get
               }
               case e: JsError => {
-                Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+                Logger.error("Errors: " + JsError.toFlatForm(e).toString())
                 BadRequest(toJson(s"licenseUrl data is missing."))
               }
           }
@@ -1078,7 +1069,7 @@ class Files @Inject()(
                 allowDownload = s.get
               }
               case e: JsError => {
-                Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+                Logger.error("Errors: " + JsError.toFlatForm(e).toString())
                 BadRequest(toJson(s"allowDownload data is missing."))
               }
           }          
@@ -1399,7 +1390,7 @@ class Files @Inject()(
           case Some(file) => {
 
             val previewsFromDB = previews.findByFileId(file.id)
-            val previewers = new Previewers().findPreviewers
+            val previewers = previews.findPreviewers
             //Logger.debug("Number of previews " + previews.length);
             val files = List(file)
             //NOTE Should the following code be unified somewhere since it is duplicated in Datasets and Files for both api and controllers
@@ -1530,7 +1521,7 @@ class Files @Inject()(
           appConfig.incrementCount('bytes, -file.length)
           elasticsearchService.delete("data", "file", id.stringify)
           //remove file from RDF triple store if triple store is used
-          configuration.getString("userdfSPARQLStore").getOrElse("no") match {
+          config.get[String]("userdfSPARQLStore") match {
             case "yes" => {
               if (file.filename.endsWith(".xml")) {
                 sqarql.removeFileFromGraphs(id, "rdfXMLGraphName")
@@ -1539,7 +1530,7 @@ class Files @Inject()(
             }
             case _ => {}
           }
-          if (current.configuration.getBoolean("clowder.events.notifyadmins").getOrElse(false)) {
+          if (config.get[Boolean]("clowder.events.notifyadmins")) {
             AdminsNotifier.sendAdminsNotification(Utils.baseUrl(request), "File","removed",id.stringify, file.filename)
           }
           Ok(toJson(Map("status"->"success")))
@@ -1561,7 +1552,7 @@ class Files @Inject()(
             Ok(toJson(Map("status"->"success")))
           }
           case e: JsError => {
-            Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+            Logger.error("Errors: " + JsError.toFlatForm(e).toString())
             BadRequest(toJson(s"description data is missing"))
           }
         }
@@ -1696,7 +1687,7 @@ class Files @Inject()(
       case Some(followeeModel) => {
         val sourceFollowerIDs = followeeModel.followers
         val excludeIDs = follower.followedEntities.map(typedId => typedId.id) ::: List(followeeUUID, follower.id)
-        val num = play.api.Play.configuration.getInt("number_of_recommendations").getOrElse(10)
+        val num = config.get[Int]("number_of_recommendations")
         userService.getTopRecommendations(sourceFollowerIDs, excludeIDs, num)
       }
       case None => {

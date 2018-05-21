@@ -9,8 +9,7 @@ import api.Permission
 import fileutils.FilesUtils
 import models._
 import org.apache.commons.lang.StringEscapeUtils._
-import play.api.Logger
-import play.api.Play.{configuration, current}
+import play.api.{Configuration, Environment, Logger}
 import play.api.data.Form
 import play.api.data.Forms._
 import play.api.libs.iteratee._
@@ -31,7 +30,7 @@ import util.FileUtils
 import javax.mail.internet.MimeUtility
 import java.net.URLEncoder
 
-import akka.stream.scaladsl.StreamConverters
+import akka.stream.scaladsl.{Source, StreamConverters}
 import play.api.http.HttpEntity
 
 /**
@@ -60,7 +59,8 @@ class Files @Inject() (
   elasticsearchService: ElasticsearchService,
   versusService: VersusService,
   rabbitMQService: RabbitMQService,
-  fileDumpService: FileDumpService) extends SecuredController {
+  fileDumpService: FileDumpService,
+  conf: Configuration) extends SecuredController {
 
   /**
    * Upload form.
@@ -593,7 +593,7 @@ class Files @Inject() (
 
               //add file to RDF triple store if triple store is used
               if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
-                play.api.Play.configuration.getString("userdfSPARQLStore").getOrElse("no") match {
+                conf.get[String]("userdfSPARQLStore") match {
                   case "yes" => sparql.addFileToGraph(f.id)
                   case _ => {}
                 }
@@ -791,7 +791,7 @@ class Files @Inject() (
                       }.map {
                         x =>
                           //successfuly completed future - get here only after polyglotPlugin.getConvertedFileURL is done executing
-                          Ok.chunked(Enumerator.fromStream(new FileInputStream(tempFileName)))
+                          Ok.chunked(StreamConverters.fromInputStream(() => new FileInputStream(tempFileName)))
                             .withHeaders(CONTENT_TYPE -> "some-content-Type")
                             .withHeaders(CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(outputFileName, request.headers.get("user-agent").getOrElse(""))))
                       }.recover {
@@ -855,7 +855,7 @@ class Files @Inject() (
             }
           }
           case None => {
-            Ok.chunked(Enumerator.fromStream(inputStream))
+            Ok.chunked(Source.fromPublisher(play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(Enumerator.fromStream(inputStream))))
               .withHeaders(CONTENT_TYPE -> contentType)
               .withHeaders(CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(filename, request.headers.get("user-agent").getOrElse(""))))
 
@@ -875,7 +875,7 @@ class Files @Inject() (
    * Gets type of index and list of sections, and passes on to the Search controller
    */
   def uploadSelectQuery() = PermissionAction(Permission.ViewDataset)(parse.multipartFormData) { implicit request =>
-    val nameOfIndex = play.api.Play.configuration.getString("elasticsearchSettings.indexNamePrefix").getOrElse("clowder")
+    val nameOfIndex = conf.get[String]("elasticsearchSettings.indexNamePrefix")
     //=== processing searching within files or sections of files or both ===
     //dataParts are from the seach form in view/multimediasearch
     //get type of index and list of sections, and pass on to the Search controller
@@ -957,7 +957,7 @@ class Files @Inject() (
 
             //add file to RDF triple store if triple store is used
             if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
-              play.api.Play.configuration.getString("userdfSPARQLStore").getOrElse("no") match {
+              conf.get[String]("userdfSPARQLStore") match {
                 case "yes" => sparql.addFileToGraph(f.id)
                 case _ => {}
               }
@@ -1048,7 +1048,7 @@ class Files @Inject() (
             }
             //add file to RDF triple store if triple store is used
             if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
-              play.api.Play.configuration.getString("userdfSPARQLStore").getOrElse("no") match {
+              conf.get[String]("userdfSPARQLStore") match {
                 case "yes" => sparql.addFileToGraph(f.id)
                 case _ => {}
               }

@@ -2,6 +2,7 @@ package api
 
 import java.util.Date
 
+import akka.actor.ActorSystem
 import javax.inject.Inject
 import models.{ClowderUser, Event, UUID}
 import org.apache.commons.lang3.StringEscapeUtils
@@ -29,7 +30,8 @@ class Admin @Inject()(userService: UserService,
   files:FileService,
   events:EventService,
   elasticsearchService: ElasticsearchService,
-  mongoService: MongoService) extends Controller with ApiController {
+  mongoService: MongoService,
+  actorSystem: ActorSystem) extends Controller with ApiController {
 
   /**
    * DANGER: deletes all data, keep users.
@@ -178,7 +180,7 @@ class Admin @Inject()(userService: UserService,
 
 
   def reindex = ServerAdminAction { implicit request =>
-    Akka.system.scheduler.scheduleOnce(1 seconds) {
+    actorSystem.scheduler.scheduleOnce(1 seconds) {
       if (current.configuration.getBoolean("elasticsearchSettings.enabled").getOrElse(false)) {
         // Delete & recreate index
         elasticsearchService.deleteAll

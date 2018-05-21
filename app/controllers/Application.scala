@@ -4,7 +4,7 @@ import java.net.URL
 
 import javax.inject.{Inject, Singleton}
 import models.{Event, UUID}
-import play.api.{Logger, Play}
+import play.api.{Environment, Logger, Play}
 import play.api.Play.current
 import play.api.mvc.Action
 import services._
@@ -18,7 +18,7 @@ import scala.collection.mutable.ListBuffer
 @Singleton
 class Application @Inject() (files: FileService, collections: CollectionService, datasets: DatasetService,
                              spaces: SpaceService, events: EventService, comments: CommentService,
-                             sections: SectionService, users: UserService, selections: SelectionService) extends SecuredController {
+                             sections: SectionService, users: UserService, selections: SelectionService, env: Environment) extends SecuredController {
   /**
    * Redirect any url's that have a trailing /
    *
@@ -38,7 +38,7 @@ class Application @Inject() (files: FileService, collections: CollectionService,
     * Returns the swagger documentation customized for this site.
     */
   def swagger = Action  { implicit request =>
-    Play.resource("/public/swagger.yml") match {
+    env.resource("/public/swagger.yml") match {
       case Some(resource) => {
         val https = Utils.https(request)
         val clowderurl = new URL(Utils.baseUrl(request))

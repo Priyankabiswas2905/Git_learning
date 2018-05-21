@@ -1,12 +1,12 @@
 package api
 
 import javax.inject.{Inject, Singleton}
-
 import models._
 import play.Logger
-import play.api.Play.{configuration, current}
+import play.api.Configuration
 import play.api.libs.json.Json.toJson
 import play.api.libs.json.{JsObject, JsValue, Json}
+import play.api.mvc.AnyContent
 import services._
 import util.SearchResult
 
@@ -20,11 +20,11 @@ class Search @Inject() (
    previews: PreviewService,
    queries: MultimediaQueryService,
    sparql: RdfSPARQLService,
-   elasticsearchService: ElasticsearchService)  extends ApiController {
+   elasticsearchService: ElasticsearchService, config: Configuration)  extends ApiController {
 
   /** Search using a simple text string */
   def search(query: String) = PermissionAction(Permission.ViewDataset) { implicit request =>
-    if (current.configuration.getBoolean("elasticsearchSettings.enabled").getOrElse(false)) {
+    if (config.get[Boolean]("elasticsearchSettings.enabled")) {
       var filesFound = ListBuffer.empty[String]
       var datasetsFound = ListBuffer.empty[String]
       var collectionsFound = ListBuffer.empty[String]
@@ -54,7 +54,7 @@ class Search @Inject() (
   def searchJson(query: String, grouping: String) = PermissionAction(Permission.ViewDataset) {
     implicit request =>
       implicit val user = request.user
-      if (current.configuration.getBoolean("elasticsearchSettings.enabled").getOrElse(false)) {
+      if (config.get[Boolean]("elasticsearchSettings.enabled")) {
         val queryList = Json.parse(query).as[List[JsValue]]
         val results = elasticsearchService.search(queryList, grouping)
 
@@ -80,8 +80,8 @@ class Search @Inject() (
     }
 
 
-  def querySPARQL() = PermissionAction(Permission.ViewMetadata) { implicit request =>
-      configuration.getString("userdfSPARQLStore").getOrElse("no") match {
+  def querySPARQL() = PermissionAction(Permission.ViewMetadata) { implicit request: UserRequest[AnyContent] =>
+      config.get[String]("userdfSPARQLStore") match {
         case "yes" => {
           val queryText = request.body.asFormUrlEncoded.get("query").apply(0)
           Logger.debug("whole msg: " + request.toString)

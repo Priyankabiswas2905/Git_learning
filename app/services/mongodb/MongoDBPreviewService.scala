@@ -6,7 +6,7 @@ import services._
 import com.mongodb.casbah.commons.MongoDBObject
 import java.io.{BufferedReader, InputStream, InputStreamReader}
 
-import play.api.Logger
+import play.api.{Environment, Logger}
 import models._
 import org.apache.http.impl.client.DefaultHttpClient
 import org.apache.http.client.methods.HttpPost
@@ -20,21 +20,93 @@ import MongoContext.context
 import com.google.inject.Provider
 import play.api.Play.current
 import com.mongodb.casbah.Imports._
-import play.api.libs.json.JsValue
+import play.api.libs.json.{JsObject, JsValue, Json}
 import javax.inject.{Inject, Singleton}
 import models.Preview
-import play.api.libs.json.JsObject
 import com.mongodb.casbah.commons.TypeImports.ObjectId
 import com.mongodb.casbah.WriteConcern
-import util.FileUtils
+import util.{FileUtils, ResourceLister}
 
 import collection.JavaConverters._
+import scala.io.Source
 
 /**
  * Use MongoDB to store previews
  */
 @Singleton
-class MongoDBPreviewService @Inject()(tiles: TileService, storage: ByteStorageService) extends PreviewService {
+class MongoDBPreviewService @Inject()(tiles: TileService, storage: ByteStorageService, env: Environment) extends PreviewService {
+
+  def findPreviewers(): Array[Previewer] = {
+    var result = Array[Previewer]()
+    val previewers = ResourceLister.listFiles("public.javascripts.previewers", "package.json")
+    for (previewer <- previewers) {
+      env.resourceAsStream(previewer) match {
+        case Some(stream) => {
+          val json = Json.parse(Source.fromInputStream(stream).mkString)
+          result +:= Previewer((json \ "name").as[String],
+            previewer.replace("public/", "").replace("/package.json", ""),
+            (json \ "main").as[String],
+            (json \ "contentType").as[List[String]],
+            (json \ "supported_previews").asOpt[List[String]].getOrElse(List.empty[String]),
+            (json \ "collection").asOpt[Boolean].getOrElse(false)
+          )
+        }
+        case None => {
+          Logger.warn("Thought I saw previewer " + previewer)
+        }
+      }
+    }
+    result
+  }
+
+  def findCollectionPreviewers(): Array[Previewer] = {
+    var result = Array[Previewer]()
+    val previewers = ResourceLister.listFiles("public.javascripts.previewers", "package.json")
+    for (previewer <- previewers) {
+      env.resourceAsStream(previewer) match {
+        case Some(stream) => {
+          val json = Json.parse(Source.fromInputStream(stream).mkString)
+          val preview = Previewer((json \ "name").as[String],
+            previewer.replace("public/", "").replace("/package.json", ""),
+            (json \ "main").as[String],
+            (json \ "contentType").as[List[String]],
+            (json \ "supported_previews").asOpt[List[String]].getOrElse(List.empty[String]),
+            (json \ "collection").asOpt[Boolean].getOrElse(false)
+          )
+          if (preview.collection) result +:= preview
+        }
+        case None => {
+          Logger.warn("Thought I saw previewer " + previewer)
+        }
+      }
+    }
+    result
+  }
+
+  def findDatasetPreviewers(): Array[Previewer] = {
+    var result = Array[Previewer]()
+    val previewers = ResourceLister.listFiles("public.javascripts.previewers", "package.json")
+    for (previewer <- previewers) {
+      env.resourceAsStream(previewer) match {
+        case Some(stream) => {
+          val json = Json.parse(Source.fromInputStream(stream).mkString)
+          val preview = Previewer((json \ "name").as[String],
+            previewer.replace("public/", "").replace("/package.json", ""),
+            (json \ "main").as[String],
+            (json \ "contentType").as[List[String]],
+            (json \ "supported_previews").asOpt[List[String]].getOrElse(List.empty[String]),
+            false,
+            (json \ "dataset").asOpt[Boolean].getOrElse(false)
+          )
+          if (preview.dataset) result +:= preview
+        }
+        case None => {
+          Logger.warn("Thought I saw previewer " + previewer)
+        }
+      }
+    }
+    result
+  }
 
 
   /**

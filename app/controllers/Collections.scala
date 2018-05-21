@@ -24,7 +24,7 @@ import play.api.i18n.Messages.Implicits._
 class Collections @Inject() (
   datasets: DatasetService, collections: CollectionService, previewsService: PreviewService, spaceService: SpaceService,
   users: UserService, events: EventService, appConfig: AppConfigurationService, selections: SelectionService,
-  elasticsearchService: ElasticsearchService
+  elasticsearchService: ElasticsearchService, previews: PreviewService
 ) extends SecuredController {
 
   /**
@@ -491,14 +491,13 @@ class Collections @Inject() (
         case Some(collection) => {
           Logger.debug(s"Found collection $id")
           // only show previewers that have a matching preview object associated with collection
-          Logger.debug("Num previewers " + new Previewers().findCollectionPreviewers.size)
+          Logger.debug("Num previewers " + previews.findCollectionPreviewers.size)
 
           //Decode the encoded items
           val dCollection = Utils.decodeCollectionElements(collection)
-          val previewers = new Previewers()
-          for (p <- previewers.findCollectionPreviewers) Logger.debug("Previewer " + p)
+          for (p <- previews.findCollectionPreviewers) Logger.debug("Previewer " + p)
           val filteredPreviewers = for (
-            previewer <- previewers.findCollectionPreviewers;
+            previewer <- previews.findCollectionPreviewers;
             preview <- previewsService.findByCollectionId(id);
             if (previewer.collection);
             if (previewer.supportedPreviews.contains(preview.preview_type.get))
@@ -749,7 +748,7 @@ class Collections @Inject() (
       collections.get(collection_id) match {
         case Some(collection) => {
           val previewsByCol = previewsService.findByCollectionId(collection_id)
-          Ok(views.html.collectionPreviews(collection_id.toString, previewsByCol, new Previewers().findCollectionPreviewers))
+          Ok(views.html.collectionPreviews(collection_id.toString, previewsByCol, previews.findCollectionPreviewers))
         }
         case None => {
           Logger.error("Error getting " + Messages("collection.title")  + " " + collection_id);

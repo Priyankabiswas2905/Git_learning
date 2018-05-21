@@ -1,10 +1,10 @@
 package api
 
-import java.net.{ URL, URLEncoder }
+import java.net.{URL, URLEncoder}
 import java.util.Date
-import javax.inject.{ Inject, Singleton }
 
-import models.{ ResourceRef, UUID, UserAgent, _ }
+import javax.inject.{Inject, Singleton}
+import models.{ResourceRef, UUID, UserAgent, _}
 import org.elasticsearch.action.search.SearchResponse
 import org.apache.commons.lang.WordUtils
 import play.api.Play.current
@@ -16,8 +16,8 @@ import play.api.libs.ws.WS
 import play.api.mvc.Result
 import services._
 import play.api.i18n.Messages
-
 import play.api.libs.json.JsValue
+import play.libs.ws.WS
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -276,7 +276,7 @@ class Metadata @Inject() (
           json.validate[RDFModel] match {
             case e: JsError => {
               Logger.error("Errors: " + JsError.toFlatForm(e))
-              BadRequest(JsError.toFlatJson(e))
+              BadRequest(JsError.toFlatForm(e))
             }
             case s: JsSuccess[RDFModel] => {
               model = s.get
@@ -398,7 +398,7 @@ class Metadata @Inject() (
     }
   }
 
-  def getPerson(pid: String) = PermissionAction(Permission.ViewMetadata).async { implicit request =>
+  def getPerson(pid: String) = PermissionAction(Permission.ViewMetadata).async { implicit request: UserRequest[JsValue] =>
 
     implicit val context = scala.concurrent.ExecutionContext.Implicits.global
     val peopleEndpoint = (play.Play.application().configuration().getString("people.uri"))

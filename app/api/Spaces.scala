@@ -1,10 +1,11 @@
 package api
 
 import java.util.Date
+
 import javax.inject.Inject
 import api.Permission.Permission
 import models._
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import controllers.Utils
 import play.api.Play._
 import play.api.libs.json.Json
@@ -29,7 +30,8 @@ class Spaces @Inject()(spaces: SpaceService,
                        collectionService: CollectionService,
                        events: EventService,
                        datasets: DatasetService,
-                       appConfig: AppConfigurationService) extends ApiController {
+                       appConfig: AppConfigurationService,
+                       config: Configuration) extends ApiController {
 
   //TODO- Minimal Space created with Name and description. URLs are not yet put in
   def createSpace() = AuthenticatedAction(parse.json) { implicit request =>
@@ -357,7 +359,7 @@ class Spaces @Inject()(spaces: SpaceService,
           description = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson("description data is missing from the updateSpace call."))
         }
       }
@@ -370,7 +372,7 @@ class Spaces @Inject()(spaces: SpaceService,
           name = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson("name data is missing from the updateSpace call."))
         }
       }
@@ -383,7 +385,7 @@ class Spaces @Inject()(spaces: SpaceService,
           timeAsString = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson("timetolive data is missing from the updateSpace call."))
         }
       }
@@ -394,7 +396,7 @@ class Spaces @Inject()(spaces: SpaceService,
           enabled = b.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson("enabled data is missing from the updateSpace call."))
         }
       }
@@ -404,7 +406,7 @@ class Spaces @Inject()(spaces: SpaceService,
           access = b.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson("access data is missing from the updateSpace call."))
         }
       }
@@ -537,7 +539,7 @@ class Spaces @Inject()(spaces: SpaceService,
           }
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson("rolesandusers data is missing from the updateUsers call."))
         }
       }
@@ -623,7 +625,7 @@ class Spaces @Inject()(spaces: SpaceService,
       case Some(followeeModel) => {
         val sourceFollowerIDs = followeeModel.followers
         val excludeIDs = follower.followedEntities.map(typedId => typedId.id) ::: List(followeeUUID, follower.id)
-        val num = play.api.Play.configuration.getInt("number_of_recommendations").getOrElse(10)
+        val num = config.get[Int]("number_of_recommendations")
         userService.getTopRecommendations(sourceFollowerIDs, excludeIDs, num)
       }
       case None => {

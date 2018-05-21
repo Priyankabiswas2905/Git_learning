@@ -3,9 +3,10 @@ package models
 import java.security.MessageDigest
 import java.util.Date
 
-import play.api.Play.{configuration, current}
 import play.api.libs.json.Json
 import org.joda.time.DateTime
+import play.api.Configuration
+import services.DI
 
 // TODO placeholders
 trait Identity {
@@ -99,7 +100,8 @@ trait User extends Identity {
     * @return Full gravatar URL for the user's profile picture
     */
   def getAvatarUrl(size: Integer = 256): String = {
-    val default_gravatar = configuration.getString("default_gravatar").getOrElse("")
+    val configuration: Configuration = DI.injector.instanceOf[Configuration]
+    val default_gravatar = configuration.get[String]("default_gravatar")
 
     if (profile.isDefined && profile.get.avatarUrl.isDefined) {
       profile.get.avatarUrl.get

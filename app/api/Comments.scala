@@ -1,24 +1,23 @@
 package api
 
-import play.api.libs.json._
-import play.api.libs.json.Json._
-import play.Logger
 import java.util.Date
-import play.api.Play.current
+
 import javax.inject.Inject
 import models._
+import play.Logger
+import play.api.i18n.{I18nSupport, Messages}
+import play.api.libs.json.Json._
+import play.api.libs.json._
 import services._
-import play.api.i18n.Messages
-import play.api.i18n.Messages.Implicits._
 
 /**
  * Comments on datasets.
  *
  */
 class Comments @Inject()(datasets: DatasetService, comments: CommentService, events: EventService, users: UserService,
-  elasticsearchService: ElasticsearchService) extends ApiController {
+  elasticsearchService: ElasticsearchService) extends ApiController with I18nSupport {
 
-  def comment(id: UUID) = PermissionAction(Permission.AddComment, Some(ResourceRef(ResourceRef.comment, id)))(parse.json) { implicit request =>
+  def comment(id: UUID) = PermissionAction(Permission.AddComment, Some(ResourceRef(ResourceRef.comment, id))) { implicit request: UserRequest[JsValue] =>
       Logger.trace("Adding comment")
       comments.get(id) match {          
         case Some(parent) => {
@@ -138,7 +137,7 @@ class Comments @Inject()(datasets: DatasetService, comments: CommentService, eve
 	    		             //Make sure that the author of the comment is the one editing it
 	    		             if (identity.email == theComment.author.email) {
 	    		            	 //Set up the vars we are looking for
-	    		            	 var commentText: String = null;
+	    		            	 var commentText: String = null
 
 	    		             	 var aResult: JsResult[String] = (request.body \ "commentText").validate[String]
 
@@ -148,7 +147,7 @@ class Comments @Inject()(datasets: DatasetService, comments: CommentService, eve
 	    		             	 		commentText = s.get
 	    		             	 	}
 	    		             	 	case e: JsError => {
-	    		             	 		Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+	    		             	 		Logger.error("Errors: " + JsError.toFlatForm(e).toString())
 	    		             	 		BadRequest(toJson(s"description data is missing."))
 	    		             	 	}                            
 	    		                 }

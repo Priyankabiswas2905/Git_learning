@@ -1,26 +1,26 @@
 package api
 
-import java.io.{FileInputStream, InputStream}
-import java.net.URL
+import java.io.InputStream
 import java.util.Calendar
-import javax.inject.Inject
+import java.util.concurrent.TimeUnit
 
+import akka.NotUsed
+import akka.stream.scaladsl.{Source, StreamConverters}
+import akka.util.ByteString
 import controllers.Utils
-import fileutils.FilesUtils
+import javax.inject.Inject
 import models._
 import play.api.Logger
-import play.api.Play.{configuration, current}
-import play.api.http.ContentTypes
-import play.api.libs.{Files, MimeTypes}
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json.Json._
 import play.api.libs.json._
+import play.api.libs.ws.{WSClient, WSResponse}
 import play.api.libs.ws.ahc.AhcWSResponse
-import play.api.libs.ws.{WSResponse, WS}
-import play.api.mvc.MultipartFormData
+import play.libs.ws.WS
 import services._
 
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 
 
 /**
@@ -36,7 +36,7 @@ class Extractions @Inject()(
   sqarql: RdfSPARQLService,
   thumbnails: ThumbnailService,
   appConfig: AppConfigurationService,
-  rabbitMQService: RabbitMQService) extends ApiController {
+  rabbitMQService: RabbitMQService, ws: WSClient) extends ApiController {
 
   /**
    * Uploads file for extraction and returns a file id ; It does not index the file.
@@ -80,10 +80,12 @@ class Extractions @Inject()(
           val listIds = for {fileurl <- listURLs} yield {
             val urlsplit = fileurl.split("/")
             val filename = urlsplit(urlsplit.length - 1)
-            val futureResponse = WS.url(fileurl).get()
+            val futureResponse = ws.url(fileurl).get()
             val fid = for {response <- futureResponse} yield {
               if (response.status == 200) {
-                val inputStream: InputStream = response.underlying[AhcWSResponse].ahcResponse.getResponseBodyAsStream()
+                val inputStream: InputStream = response.bodyAsSource.runWith(
+                  StreamConverters.asInputStream(FiniteDuration(3, TimeUnit.SECONDS))
+                )
                 val file = files.save(inputStream, filename, response.header("Content-Type"), user, null)
                 file match {
                   case Some(f) => {
@@ -430,7 +432,7 @@ class Extractions @Inject()(
     val extractionInfoResult = requestJson.validate[ExtractorInfo]
     extractionInfoResult.fold(
       errors => {
-        BadRequest(Json.obj("status" -> "KO", "message" -> JsError.toFlatJson(errors)))
+        BadRequest(Json.obj("status" -> "KO", "message" -> JsError.toJson(errors)))
       },
       info => {
         extractors.updateExtractorInfo(info) match {

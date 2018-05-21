@@ -1,7 +1,7 @@
 package api
 
 import models.{ResourceRef, User}
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import play.api.mvc._
 import play.api.Play.configuration
 import services._
@@ -170,7 +170,8 @@ object Permission extends Enumeration {
 
 
   def checkPermission(user: Option[User], permission: Permission, resourceRef: Option[ResourceRef] = None): Boolean = {
-    (user, configuration(play.api.Play.current).getString("permissions").getOrElse("public"), resourceRef) match {
+    val config: Configuration = DI.injector.instanceOf[Configuration]
+    (user, config.get[String]("permissions"), resourceRef) match {
       case (Some(u), "public", Some(r)) => {
         if (READONLY.contains(permission))
           true
@@ -178,7 +179,7 @@ object Permission extends Enumeration {
           checkPermission(u, permission, r)
       }
       case (Some(u), "private", Some(r)) => {
-        if (configuration(play.api.Play.current).getBoolean("makeGeostreamsPublicReadable").getOrElse(true) && permission == Permission.ViewGeoStream)
+        if (config.get[Boolean]("makeGeostreamsPublicReadable") && permission == Permission.ViewGeoStream)
           true
         else
           checkPermission(u, permission, r)
@@ -187,7 +188,7 @@ object Permission extends Enumeration {
       case (None, "private", Some(res)) => checkAnonymousPrivatePermissions(permission, res)
       case (None, "public", _) => READONLY.contains(permission)
       case (None, "private", None) => {
-        if (configuration(play.api.Play.current).getBoolean("makeGeostreamsPublicReadable").getOrElse(true) && permission == Permission.ViewGeoStream)
+        if (config.get[Boolean]("makeGeostreamsPublicReadable") && permission == Permission.ViewGeoStream)
           true
         else {
           Logger.debug(s"Private, no user, no resourceRef, permission=${permission}", new Exception())
@@ -475,7 +476,8 @@ object Permission extends Enumeration {
 
   /** on a private server this will return true iff user logged in, on public server this will always be true */
   def checkPrivateServer(user: Option[User]): Boolean = {
-    configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public" || user.isDefined
+    val config: Configuration = DI.injector.instanceOf[Configuration]
+    config.get[String]("permissions") == "public" || user.isDefined
   }
 }
 

@@ -29,7 +29,7 @@ class Geostreams @Inject() (metadata: MetadataService, geostremsService: Geostre
     val list = sensorResult match {
       case JsSuccess(list : List[JsValue], _) => list
       case e: JsError => {
-        Logger.debug("Errors: " + JsError.toFlatJson(e).toString())
+        Logger.debug("Errors: " + JsError.toFlatForm(e).toString())
         List()
       }
     }
@@ -44,7 +44,7 @@ class Geostreams @Inject() (metadata: MetadataService, geostremsService: Geostre
     val list = sensorResult match {
       case JsSuccess(list : List[JsValue], _) => list
       case e: JsError => {
-        Logger.debug("Errors: " + JsError.toFlatJson(e).toString())
+        Logger.debug("Errors: " + JsError.toFlatForm(e).toString())
         List()
       }
     }
@@ -66,7 +66,7 @@ class Geostreams @Inject() (metadata: MetadataService, geostremsService: Geostre
     val list = streamsResult match {
       case JsSuccess(list : List[JsValue], _) => list
       case e: JsError => {
-        Logger.debug("Errors: " + JsError.toFlatJson(e).toString())
+        Logger.debug("Errors: " + JsError.toFlatForm(e).toString())
         List()
       }
     }

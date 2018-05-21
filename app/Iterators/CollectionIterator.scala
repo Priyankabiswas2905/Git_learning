@@ -112,7 +112,7 @@ class CollectionIterator(pathToFolder : String, parent_collection : models.Colle
     }
   }
 
-  def next() = {
+  def next(): Option[InputStream] = {
     file_type match {
       //collection info
       case 0 => {

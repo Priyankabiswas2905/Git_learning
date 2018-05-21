@@ -5,16 +5,17 @@ import java.net.URL
 import java.security.{DigestInputStream, MessageDigest}
 import java.text.SimpleDateFormat
 import java.util.{Calendar, Date}
+
 import api.Permission.Permission
 import java.util.zip._
+
 import javax.inject.{Inject, Singleton}
 import controllers.{Previewers, Utils}
 import jsonutils.JsonUtil
 import models._
 import org.apache.commons.codec.binary.Hex
 import org.json.JSONObject
-import play.api.Logger
-import play.api.Play.{configuration, current}
+import play.api.{Configuration, Logger}
 import play.api.i18n.Messages
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.iteratee.Enumerator
@@ -23,6 +24,8 @@ import play.api.libs.json.Json._
 import play.api.mvc.AnyContent
 import services._
 import _root_.util._
+import akka.stream.scaladsl.Source
+
 import scala.concurrent.{ExecutionContext, Future}
 import scala.collection.mutable.ListBuffer
 import play.api.i18n.Messages.Implicits._
@@ -52,7 +55,7 @@ class  Datasets @Inject()(
   appConfig: AppConfigurationService,
   elasticsearchService: ElasticsearchService,
   rabbitMQService: RabbitMQService,
-  rdfExportService: RDFExportService) extends ApiController {
+  rdfExportService: RDFExportService, config: Configuration) extends ApiController {
 
   def get(id: UUID) = PermissionAction(Permission.ViewDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     datasets.get(id) match {
@@ -70,7 +73,7 @@ class  Datasets @Inject()(
   }
 
   def listMoveFileToDataset(file_id: UUID, title: Option[String], limit: Int) = PrivateServerAction { implicit request =>
-    if (play.Play.application().configuration().getBoolean("datasetFileWithinSpace")) {
+    if (config.get[Boolean]("datasetFileWithinSpace")) {
       Ok(toJson(listDatasetsInSpace(file_id, title, limit, Set[Permission](Permission.AddResourceToDataset, Permission.EditDataset), request.user, request.user.fold(false)(_.superAdminMode))))
     } else {
       Ok(toJson(listDatasets(title, None, limit, Set[Permission](Permission.AddResourceToDataset, Permission.EditDataset), request.user, request.user.fold(false)(_.superAdminMode))))
@@ -231,7 +234,7 @@ class  Datasets @Inject()(
                     elasticsearchService.index(SearchUtils.getElasticsearchObject(d))
                   }
 
-                  if (current.configuration.getBoolean("clowder.events.notifyadmins").getOrElse(false)) {
+                  if (config.get[Boolean]("clowder.events.notifyadmins")) {
                     AdminsNotifier.sendAdminsNotification(Utils.baseUrl(request), "Dataset", "added", id, name)
                   }
 
@@ -436,9 +439,10 @@ class  Datasets @Inject()(
       }
         //add file to RDF triple store if triple store is used
         if (file.filename.endsWith(".xml")) {
-          configuration.getString("userdfSPARQLStore").getOrElse("no") match {
-            case "yes" => rdfsparql.linkFileToDataset(fileId, dsId)
-            case _ => Logger.trace("Skipping RDF store. userdfSPARQLStore not enabled in configuration file")
+          if (config.get[String]("userdfSPARQLStore") == "yes") {
+            rdfsparql.linkFileToDataset(fileId, dsId)
+          } else {
+            Logger.trace("Skipping RDF store. userdfSPARQLStore not enabled in configuration file")
           }
         }
         Logger.debug("----- Adding file to dataset completed")
@@ -525,9 +529,10 @@ class  Datasets @Inject()(
 
           //remove link between dataset and file from RDF triple store if triple store is used
           if (file.filename.endsWith(".xml")) {
-            configuration.getString("userdfSPARQLStore").getOrElse("no") match {
-              case "yes" => rdfsparql.detachFileFromDataset(fileId, datasetId)
-              case _ => Logger.trace("Skipping RDF store. userdfSPARQLStore not enabled in configuration file")
+            if (config.get[String]("userdfSPARQLStore") == "yes") {
+              rdfsparql.detachFileFromDataset(fileId, datasetId)
+            } else {
+              Logger.trace("Skipping RDF store. userdfSPARQLStore not enabled in configuration file")
             }
           }
         }
@@ -625,7 +630,7 @@ class  Datasets @Inject()(
     * Add metadata in JSON-LD format.
     */
   def addMetadataJsonLD(id: UUID) =
-     PermissionAction(Permission.AddMetadata, Some(ResourceRef(ResourceRef.dataset, id)))(parse.json) { implicit request =>
+     PermissionAction(Permission.AddMetadata, Some(ResourceRef(ResourceRef.dataset, id)))(parse.json) { implicit request: UserRequest[JsValue] =>
         datasets.get(id) match {
           case Some(x) => {
             val json = request.body
@@ -634,7 +639,7 @@ class  Datasets @Inject()(
             json.validate[RDFModel] match {
               case e: JsError => {
                 Logger.error("Errors: " + JsError.toFlatForm(e))
-                BadRequest(JsError.toFlatJson(e))
+                BadRequest(JsError.toFlatForm(e).toString)
               }
               case s: JsSuccess[RDFModel] => {
                 model = s.get
@@ -777,9 +782,10 @@ class  Datasets @Inject()(
     }
 
     datasets.index(id)
-    configuration.getString("userdfSPARQLStore").getOrElse("no") match {
-      case "yes" => datasets.setUserMetadataWasModified(id, true)
-      case _ => Logger.debug("userdfSPARQLStore not enabled")
+    if (config.get[String]("userdfSPARQLStore") == "yes") {
+      datasets.setUserMetadataWasModified(id, true)
+    } else {
+    Logger.debug("userdfSPARQLStore not enabled")
     }
     Ok(toJson(Map("status" -> "success")))
   }
@@ -974,7 +980,7 @@ class  Datasets @Inject()(
           description = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"description data is missing."))
         }
       }
@@ -987,7 +993,7 @@ class  Datasets @Inject()(
           name = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"name data is missing."))
         }
       }
@@ -1023,7 +1029,7 @@ class  Datasets @Inject()(
           name = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"name data is missing."))
         }
       }
@@ -1062,7 +1068,7 @@ class  Datasets @Inject()(
           description = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"description data is missing."))
         }
       }
@@ -1099,7 +1105,7 @@ class  Datasets @Inject()(
           creator = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"creator data is missing."))
         }
       }
@@ -1215,7 +1221,7 @@ class  Datasets @Inject()(
           licenseType = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"licenseType data is missing."))
         }
       }
@@ -1228,7 +1234,7 @@ class  Datasets @Inject()(
           rightsHolder = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"rightsHolder data is missing."))
         }
       }
@@ -1261,7 +1267,7 @@ class  Datasets @Inject()(
           }
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"licenseText data is missing."))
         }
       }
@@ -1274,7 +1280,7 @@ class  Datasets @Inject()(
           licenseUrl = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"licenseUrl data is missing."))
         }
       }
@@ -1287,7 +1293,7 @@ class  Datasets @Inject()(
           allowDownload = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"allowDownload data is missing."))
         }
       }
@@ -1687,7 +1693,7 @@ class  Datasets @Inject()(
       case Some(dataset) => {
         val datasetWithFiles = dataset.copy(files = dataset.files)
         val datasetFiles: List[models.File] = datasetWithFiles.files.flatMap(f => files.get(f))
-        val previewers = new Previewers().findPreviewers
+        val previewers = previews.findPreviewers
         //NOTE Should the following code be unified somewhere since it is duplicated in Datasets and Files for both api and controllers
         val previewslist = for (f <- datasetFiles; if (f.showPreviews.equals("DatasetLevel"))) yield {
           val pvf = for (p <- previewers; pv <- f.previews; if (p.contentType.contains(pv.contentType))) yield {
@@ -1749,11 +1755,11 @@ class  Datasets @Inject()(
     * @param request The implicit request parameter which is part of the REST API call
     *
     */
-  def deleteDatasetHelper(id: UUID, request: UserRequest[AnyContent]) = {
+  def deleteDatasetHelper(id: UUID, request: UserRequest[JsValue]) = {
     datasets.get(id) match {
       case Some(dataset) => {
         //remove dataset from RDF triple store if triple store is used
-        configuration.getString("userdfSPARQLStore").getOrElse("no") match {
+        config.get[String]("userdfSPARQLStore") match {
           case "yes" => rdfsparql.removeDatasetFromGraphs(id)
           case _ => Logger.debug("userdfSPARQLStore not enabled")
         }
@@ -1766,7 +1772,7 @@ class  Datasets @Inject()(
         for (file <- dataset.files)
           files.index(file)
 
-        if (current.configuration.getBoolean("clowder.events.notifyadmins").getOrElse(false)) {
+        if (config.get[Boolean]("clowder.events.notifyadmins")) {
           AdminsNotifier.sendAdminsNotification(Utils.baseUrl(request), "Dataset", "removed", dataset.id.stringify, dataset.name)
         }
 
@@ -1776,14 +1782,14 @@ class  Datasets @Inject()(
     }
   }
 
-  def deleteDataset(id: UUID) = PermissionAction(Permission.DeleteDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
+  def deleteDataset(id: UUID) = PermissionAction(Permission.DeleteDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request: UserRequest[JsValue] =>
     deleteDatasetHelper(id, request)
   }
 
   def getRDFUserMetadata(id: UUID, mappingNumber: String="1") = PermissionAction(Permission.ViewMetadata, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     rdfExportService.getRDFUserMetadataDataset(id.toString, mappingNumber) match{
       case Some(resultFile) =>{
-        Ok.chunked(Enumerator.fromStream(new FileInputStream(resultFile)))
+        Ok.chunked(Source.fromPublisher(play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(Enumerator.fromStream(new FileInputStream(resultFile)))))
           .withHeaders(CONTENT_TYPE -> "application/rdf+xml")
           .withHeaders(CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(resultFile.getName(),request.headers.get("user-agent").getOrElse(""))))
       }
@@ -2357,7 +2363,7 @@ class  Datasets @Inject()(
             val bagit = play.api.Play.configuration.getBoolean("downloadDatasetBagit").getOrElse(true)
             // Use custom enumerator to create the zip file on the fly
             // Use a 1MB in memory byte array
-            Ok.chunked(enumeratorFromDataset(dataset,1024*1024, compression,bagit,user)).withHeaders(
+            Ok.chunked(Source.fromPublisher(play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(enumeratorFromDataset(dataset,1024*1024, compression,bagit,user)))).withHeaders(
               CONTENT_TYPE -> "application/zip",
               CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(dataset.name+ ".zip", request.headers.get("user-agent").getOrElse("")))
             )

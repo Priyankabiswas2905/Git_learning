@@ -1,13 +1,20 @@
 package services
 
-import models.{UUID, ThreeDAnnotation, Preview}
+import models.{Preview, Previewer, ThreeDAnnotation, UUID}
 import java.io.InputStream
+
 import play.api.libs.json.JsValue
 
 /**
  * Service to manipulate previews in files and datasets.
  */
 trait PreviewService {
+
+  def findPreviewers(): Array[Previewer]
+
+  def findCollectionPreviewers(): Array[Previewer]
+
+  def findDatasetPreviewers(): Array[Previewer]
 
   /**
    * Count all preview files

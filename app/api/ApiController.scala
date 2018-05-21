@@ -1,13 +1,16 @@
 package api
 
 import api.Permission.Permission
+import com.google.inject.Inject
 import models.{ClowderUser, ResourceRef, User}
 import org.apache.commons.codec.binary.Base64
 import play.api.Logger
-import play.api.mvc._
+import play.api.i18n.I18nSupport
+import play.api.libs.json.JsValue
+import play.api.mvc.{ControllerComponents, _}
 import services.{AppConfiguration, DI}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
  * Action builders check permissions in API calls. When creating a new endpoint, pick one of the actions defined below.
@@ -20,9 +23,12 @@ import scala.concurrent.Future
  * PermissionAction: call the wrapped code iff the user has the right permission on the reference object.
  *
  */
-trait ApiController extends Controller {
+trait ApiController extends BaseController with I18nSupport {
+
   /** get user if logged in */
-  def UserAction(needActive: Boolean) = new ActionBuilder[UserRequest] {
+  def UserAction(needActive: Boolean) = new ActionBuilder[UserRequest, JsValue] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[JsValue] = controllerComponents.parsers.json
     def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
@@ -36,7 +42,9 @@ trait ApiController extends Controller {
   /**
    * Use when you want to require the user to be logged in on a private server or the server is public.
    */
-  def PrivateServerAction = new ActionBuilder[UserRequest] {
+  def PrivateServerAction = new ActionBuilder[UserRequest, JsValue] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[JsValue] = controllerComponents.parsers.json
     def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
@@ -50,7 +58,9 @@ trait ApiController extends Controller {
   }
 
   /** call code iff user is logged in */
-  def AuthenticatedAction = new ActionBuilder[UserRequest] {
+  def AuthenticatedAction = new ActionBuilder[UserRequest, JsValue] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[JsValue] = controllerComponents.parsers.json
     def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
@@ -63,7 +73,9 @@ trait ApiController extends Controller {
   }
 
   /** call code iff user is a server admin */
-  def ServerAdminAction = new ActionBuilder[UserRequest] {
+  def ServerAdminAction = new ActionBuilder[UserRequest, JsValue] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[JsValue] = controllerComponents.parsers.json
     def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
@@ -76,7 +88,9 @@ trait ApiController extends Controller {
   }
 
   /** call code iff user has right permission for resource */
-  def PermissionAction(permission: Permission, resourceRef: Option[ResourceRef] = None, affectedResource: Option[ResourceRef] = None) = new ActionBuilder[UserRequest] {
+  def PermissionAction(permission: Permission, resourceRef: Option[ResourceRef] = None, affectedResource: Option[ResourceRef] = None) = new ActionBuilder[UserRequest, JsValue] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[JsValue] = controllerComponents.parsers.json
     def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
@@ -99,7 +113,9 @@ trait ApiController extends Controller {
    * Disable a route without having to comment out the entry in the routes file. Useful for when we want to keep the
    * code around but we don't want users to have access to it.
    */
-  def DisabledAction = new ActionBuilder[UserRequest] {
+  def DisabledAction = new ActionBuilder[UserRequest, JsValue] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[JsValue] = controllerComponents.parsers.json
     def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       Future.successful(Unauthorized("Disabled"))
     }

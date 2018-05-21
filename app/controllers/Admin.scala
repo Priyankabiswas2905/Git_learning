@@ -392,7 +392,7 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
       )
   }
 
-  def users() = ServerAdminAction { implicit request =>
+  def users() = ServerAdminAction { implicit request: UserRequest[AnyContent] =>
     implicit val user = request.user
 
     val configAdmins = play.Play.application().configuration().getString("initialAdmins").trim.split("\\s*,\\s*").filter(_ != "").toList

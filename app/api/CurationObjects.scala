@@ -1,6 +1,7 @@
 package api
 
 import java.net.URI
+
 import javax.inject.{Inject, Singleton}
 import models._
 import org.apache.http.client.methods.HttpDelete
@@ -11,7 +12,7 @@ import play.api.libs.json._
 import play.api.libs.json.Json
 import play.api.libs.json.JsResult
 import play.api.libs.json.Json.toJson
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import play.api.Play.current
 
 /**
@@ -26,7 +27,7 @@ class CurationObjects @Inject()(datasets: DatasetService,
       spaces: SpaceService,
       userService: UserService,
       curationObjectController: controllers.CurationObjects,
-      metadatas: MetadataService
+      metadatas: MetadataService, config: Configuration
       ) extends ApiController {
   def getCurationObjectOre(curationId: UUID) = PermissionAction(Permission.EditStagingArea, Some(ResourceRef(ResourceRef.curationObject, curationId))) {
     implicit request =>
@@ -35,7 +36,7 @@ class CurationObjects @Inject()(datasets: DatasetService,
         case Some(c) => {
 
           val https = controllers.Utils.https(request)
-          val key = play.api.Play.configuration.getString("commKey").getOrElse("")
+          val key = config.get[String]("commKey")
           val filesJson = curations.getCurationFiles(curations.getAllCurationFileIds(c.id)).map { file =>
 
             var fileMetadata = scala.collection.mutable.Map.empty[String, JsValue]
@@ -263,7 +264,7 @@ class CurationObjects @Inject()(datasets: DatasetService,
                 }
               }
               case e: JsError => {
-                Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+                Logger.error("Errors: " + JsError.toFlatForm(e).toString())
                 BadRequest(toJson("The user repository preferences are missing from the find matchmaking repositories call."))
               }
             }

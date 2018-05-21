@@ -1,8 +1,8 @@
 package services
 
 import java.net.InetAddress
-import javax.inject.Inject
 
+import javax.inject.Inject
 import _root_.util.SearchUtils
 import models._
 import org.elasticsearch.ElasticsearchException
@@ -15,7 +15,7 @@ import org.elasticsearch.common.xcontent.XContentBuilder
 import org.elasticsearch.common.xcontent.XContentFactory._
 import org.elasticsearch.search.aggregations.AggregationBuilders
 import org.elasticsearch.search.aggregations.bucket.terms.StringTerms.Bucket
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import play.api.Play.current
 import play.api.inject.ApplicationLifecycle
 import play.api.libs.json._
@@ -26,10 +26,6 @@ import scala.concurrent.Future
 import scala.util.Try
 
 trait ElasticsearchService {
-  val nameOfCluster = play.api.Play.configuration.getString("elasticsearchSettings.clusterName").getOrElse("clowder")
-  val serverAddress = play.api.Play.configuration.getString("elasticsearchSettings.serverAddress").getOrElse("localhost")
-  val serverPort = play.api.Play.configuration.getInt("elasticsearchSettings.serverPort").getOrElse(9300)
-  val nameOfIndex = play.api.Play.configuration.getString("elasticsearchSettings.indexNamePrefix").getOrElse("clowder")
   def index(dataset: Dataset, recursive: Boolean)
   def index(collection: Collection, recursive: Boolean)
   def index(file: File)
@@ -49,7 +45,11 @@ trait ElasticsearchService {
  * Elasticsearch plugin.
  *
  */
-class ElasticsearchServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends ElasticsearchService {
+class ElasticsearchServiceImpl @Inject() (lifecycle: ApplicationLifecycle, conf: Configuration) extends ElasticsearchService {
+  val nameOfCluster = conf.get[String]("elasticsearchSettings.clusterName")
+  val serverAddress = conf.get[String]("elasticsearchSettings.serverAddress")
+  val serverPort = conf.get[Int]("elasticsearchSettings.serverPort")
+  val nameOfIndex = conf.get[String]("elasticsearchSettings.indexNamePrefix")
   val comments: CommentService = DI.injector.instanceOf[CommentService]
   val files: FileService = DI.injector.instanceOf[FileService]
   val datasets: DatasetService = DI.injector.instanceOf[DatasetService]

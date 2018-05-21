@@ -1,20 +1,18 @@
 package services
 
-import java.util.{Calendar, Date}
 import java.text.SimpleDateFormat
-import javax.inject.Inject
+import java.util.Calendar
 
-import scala.collection.mutable.Map
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
-import play.api.mvc._
+import javax.inject.Inject
+import models.UUID
+import play.api.Logger
+import play.api.inject.ApplicationLifecycle
 import play.api.libs.json._
 import play.api.libs.ws.WSResponse
-import play.api.libs.ws.WS._
-import play.api.{Application, Logger}
-import models.UUID
-import play.api.Play.current
-import play.api.inject.ApplicationLifecycle
+
+import scala.collection.mutable.Map
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 /**
   * ToolSession describes an active analysis environment. Each instance keeps a history of datasets that were

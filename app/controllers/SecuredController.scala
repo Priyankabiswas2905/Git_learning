@@ -3,13 +3,11 @@ package controllers
 import api.Permission.Permission
 import api.{Permission, UserRequest}
 import models.{ResourceRef, User}
-import play.api.Play.current
-import play.api.i18n.Messages
-import play.api.i18n.Messages.Implicits._
+import play.api.i18n.{I18nSupport, Messages}
 import play.api.mvc._
 import services._
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
  * Action builders check permissions in controller calls. When creating a new endpoint, pick one of the actions defined below.
@@ -22,9 +20,12 @@ import scala.concurrent.Future
  * PermissionAction: call the wrapped code iff the user has the right permission on the reference object.
  *
  */
-trait SecuredController extends Controller {
+trait SecuredController extends BaseController with I18nSupport {
+
   /** get user if logged in */
-  def UserAction(needActive: Boolean) = new ActionBuilder[UserRequest] {
+  def UserAction(needActive: Boolean) = new ActionBuilder[UserRequest, String] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[String] = controllerComponents.parsers.text
     def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
@@ -44,7 +45,9 @@ trait SecuredController extends Controller {
   /**
    * Use when you want to require the user to be logged in on a private server or the server is public.
    */
-  def PrivateServerAction = new ActionBuilder[UserRequest] {
+  def PrivateServerAction = new ActionBuilder[UserRequest, String] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[String] = controllerComponents.parsers.text
     def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
@@ -60,7 +63,9 @@ trait SecuredController extends Controller {
   }
 
   /** call code iff user is logged in */
-  def AuthenticatedAction = new ActionBuilder[UserRequest] {
+  def AuthenticatedAction = new ActionBuilder[UserRequest, String] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[String] = controllerComponents.parsers.text
     def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
@@ -81,7 +86,9 @@ trait SecuredController extends Controller {
   }
 
   /** call code if user is a server admin */
-  def ServerAdminAction = new ActionBuilder[UserRequest] {
+  def ServerAdminAction = new ActionBuilder[UserRequest, String] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[String] = controllerComponents.parsers.text
     def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
@@ -96,7 +103,9 @@ trait SecuredController extends Controller {
   }
 
   /** call code if user has right permission for resource */
-  def PermissionAction(permission: Permission, resourceRef: Option[ResourceRef] = None) = new ActionBuilder[UserRequest] {
+  def PermissionAction(permission: Permission, resourceRef: Option[ResourceRef] = None) = new ActionBuilder[UserRequest, String] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[String] = controllerComponents.parsers.text
     def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
@@ -183,7 +192,9 @@ trait SecuredController extends Controller {
    * Disable a route without having to comment out the entry in the routes file. Useful for when we want to keep the
    * code around but we don't want users to have access to it.
    */
-  def DisabledAction = new ActionBuilder[UserRequest] {
+  def DisabledAction = new ActionBuilder[UserRequest, String] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[String] = controllerComponents.parsers.text
     def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       Future.successful(Results.Redirect(routes.Error.notAuthorized("", null, null)))
     }

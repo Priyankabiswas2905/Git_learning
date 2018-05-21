@@ -1,7 +1,7 @@
 package api
 
 import javax.inject.Inject
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import models.User
 import play.api.Play._
 import play.api.libs.json.{JsValue, Json}
@@ -24,7 +24,7 @@ class Status @Inject()(spaces: SpaceService,
   elasticsearchService: ElasticsearchService,
   mongoService: MongoService,
   rabbitMQService: RabbitMQService,
-  toolManagerService: ToolManagerService) extends ApiController {
+  toolManagerService: ToolManagerService, conf: Configuration) extends ApiController {
 
   val jsontrue = Json.toJson(true)
   val jsonfalse = Json.toJson(false)
@@ -79,9 +79,9 @@ class Status @Inject()(spaces: SpaceService,
     }
 
     // versus
-    if (current.configuration.getBoolean("versus.enabled").getOrElse(false)) {
+    if (conf.get[Boolean]("versus.enabled")) {
       result.put("versus", if (Permission.checkServerAdmin(user)) {
-        Json.obj("host" -> configuration.getString("versus.host").getOrElse("").toString)
+        Json.obj("host" -> conf.get[String]("versus.host"))
       } else {
         jsontrue
       })
@@ -118,7 +118,7 @@ class Status @Inject()(spaces: SpaceService,
           "disabled"
         }
         result.put("toolmanager", if (Permission.checkServerAdmin(user)) {
-          Json.obj("host" -> configuration.getString("toolmanagerURI").getOrElse("").toString,
+          Json.obj("host" -> conf.get[String]("toolmanagerURI").getOrElse("").toString,
             "tools" -> toolManagerService.getLaunchableTools(),
             "status" -> status)
         } else {

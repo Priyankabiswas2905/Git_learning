@@ -13,7 +13,7 @@ import play.api.Logger
 import play.api.Play.current
 import play.api.inject.ApplicationLifecycle
 import play.api.libs.json.{JsValue, Json}
-import play.api.libs.ws.{WS, WSAuthScheme, WSResponse}
+import play.api.libs.ws.{WSAuthScheme, WSResponse}
 import play.libs.Akka
 
 import scala.concurrent.Future

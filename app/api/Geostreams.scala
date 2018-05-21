@@ -5,36 +5,33 @@ package api
 
 import java.io.{File, PrintStream}
 import java.security.MessageDigest
-
-import _root_.util.{Parsers, PeekIterator}
-import org.joda.time.{DateTime, IllegalInstantException}
-import org.joda.time.format.{DateTimeFormat, ISODateTimeFormat}
-import play.api.mvc.{Request, Result}
-import play.api.libs.json._
-import play.api.libs.json.Json._
-import play.api.libs.functional.syntax._
-import play.api.Play.current
+import java.sql.Timestamp
 import java.text.SimpleDateFormat
 
-import play.api.Logger
-import java.sql.Timestamp
+import _root_.util.{Parsers, PeekIterator}
+import akka.stream.scaladsl.Source
 import javax.inject.Inject
-
-import play.filters.gzip.Gzip
+import org.joda.time.format.{DateTimeFormat, ISODateTimeFormat}
+import org.joda.time.{DateTime, IllegalInstantException}
+import play.api.{Configuration, Logger}
+import play.api.Play.current
+import play.api.libs.functional.syntax._
+import play.api.libs.iteratee.{Enumeratee, Enumerator}
+import play.api.libs.json.Json._
+import play.api.libs.json._
+import play.api.libs.streams.GzipFlow
+import play.api.mvc.{Request, Result}
 import services.{AppConfiguration, GeostreamsService}
 
 import scala.collection.mutable.ListBuffer
-import play.api.libs.iteratee.{Enumeratee, Enumerator}
-
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.io.Source
+import scala.concurrent.Future
 
 /**
  * Geostreaming endpoints. A geostream is a time and geospatial referenced
  * sequence of datapoints.
  */
-class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiController {
+class Geostreams @Inject() (geostreamsService: GeostreamsService, config: Configuration) extends ApiController {
 
   val pluginNotEnabled = InternalServerError(toJson("Geostreaming not enabled"))
 
@@ -95,7 +92,7 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
     ) tupled
 
 
-  def createSensor() = PermissionAction(Permission.AddGeoStream)(parse.json) { implicit request =>
+  def createSensor() = PermissionAction(Permission.AddGeoStream) { implicit request: UserRequest[JsValue] =>
     Logger.debug("Creating sensor")
     if (current.configuration.getBoolean("geostream.enabled").getOrElse(false)) {
       request.body.validate[(String, String, List[Double], JsValue)].map {
@@ -118,7 +115,7 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
           }.recoverTotal {
             e => {
               Logger.error("Error parsing json: " + e);
-              BadRequest("Failed to create sensor:" + JsError.toFlatJson(e))
+              BadRequest("Failed to create sensor:" + JsError.toFlatForm(e))
             }
           }
         }
@@ -126,7 +123,7 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
     } else pluginNotEnabled
   }
 
-  def updateSensorMetadata(id: String) = PermissionAction(Permission.CreateSensor)(parse.json) { implicit request =>
+  def updateSensorMetadata(id: String) = PermissionAction(Permission.CreateSensor) { implicit request: UserRequest[JsValue] =>
     Logger.debug("Updating sensor")
     request.body.validate[(JsValue)].map {
       case (data) => {
@@ -145,11 +142,11 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
           } else pluginNotEnabled
       }
     }.recoverTotal {
-      e => BadRequest("Detected error:" + JsError.toFlatJson(e))
+      e => BadRequest("Detected error:" + JsError.toFlatForm(e))
     }
   }
 
-  def patchStreamMetadata(id: String) = PermissionAction(Permission.CreateSensor)(parse.json) { implicit request =>
+  def patchStreamMetadata(id: String) = PermissionAction(Permission.CreateSensor) { implicit request: UserRequest[JsValue] =>
     Logger.debug("Updating stream")
     request.body.validate[(JsValue)].map {
       case (data) => {
@@ -161,7 +158,7 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
           } else pluginNotEnabled
       }
     }.recoverTotal {
-      e => BadRequest("Detected error:" + JsError.toFlatJson(e))
+      e => BadRequest("Detected error:" + JsError.toFlatForm(e))
     }
   }
 
@@ -274,7 +271,7 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
           }.recoverTotal {
             e => {
               Logger.error("Error parsing json: " + e);
-              BadRequest("Failed to create stream:" + JsError.toFlatJson(e))
+              BadRequest("Failed to create stream:" + JsError.toFlatForm(e))
             }
           }
         }
@@ -394,7 +391,7 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
         }.recoverTotal {
           e => {
             Logger.debug("Error parsing json: " + e);
-            BadRequest("Failed to create datapoint:" + JsError.toFlatJson(e))
+            BadRequest("Failed to create datapoint:" + JsError.toFlatForm(e))
           }
         }}
       }
@@ -516,7 +513,7 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
 
       // get depth
       val coordinates = (sensor \ "geometry" \ "coordinates").get
-      val depthBin = depth * Math.ceil(Parsers.parseDouble(coordinates(2).get).getOrElse(0.0) / depth)
+      val depthBin = depth * Math.ceil(Parsers.parseDouble(coordinates(2)).getOrElse(0.0) / depth)
 
       // bin time
       val startTime = Parsers.parseDate((sensor \ "start_time").get).getOrElse(DateTime.now)
@@ -1452,10 +1449,10 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
   def jsonp(data:Enumerator[String], request: Request[Any]) = {
     val toByteArray: Enumeratee[String, Array[Byte]] = Enumeratee.map[String]{ s => s.getBytes }
     request.getQueryString("callback") match {
-      case Some(callback) => Ok.chunked(Enumerator(s"$callback(") >>> data >>> Enumerator(");") &> toByteArray &> Gzip.gzip())
+      case Some(callback) => Ok.chunked(Source.fromPublisher(play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(Enumerator(s"$callback(") >>> data >>> Enumerator(");") &> toByteArray &> GzipFlow.gzip())))
         .withHeaders(("Content-Encoding", "gzip"))
         .as(JAVASCRIPT)
-      case None => Ok.chunked(data &> toByteArray &> Gzip.gzip())
+      case None => Ok.chunked(Source.fromPublisher(play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(data &> toByteArray &> GzipFlow.gzip())))
         .withHeaders(("Content-Encoding", "gzip"))
         .as(JSON)
     }
@@ -1475,23 +1472,19 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
    * @return an enumerator that will save data as data is being enumerated.
    */
   def cacheWrite(description: JsObject, data:Enumerator[String]): Enumerator[String] = {
-    play.api.Play.configuration.getString("geostream.cache") match {
-      case Some(x) => {
-        val cacheFolder = new File(x)
-        if (cacheFolder.isDirectory || cacheFolder.mkdirs) {
-          val filename = MessageDigest.getInstance("MD5").digest(description.toString().getBytes).map("%02X".format(_)).mkString
-          new PrintStream(new File(cacheFolder, filename + ".json")).print(description.toString())
-          val writer = new PrintStream(new File(cacheFolder, filename))
-          val save: Enumeratee[String, String] = Enumeratee.map { s =>
-            writer.print(s)
-            s
-          }
-          data.through(save)
-        } else {
-          data
-        }
+    val cache = config.get[String]("geostream.cache")
+    val cacheFolder = new File(cache)
+    if (cacheFolder.isDirectory || cacheFolder.mkdirs) {
+      val filename = MessageDigest.getInstance("MD5").digest(description.toString().getBytes).map("%02X".format(_)).mkString
+      new PrintStream(new File(cacheFolder, filename + ".json")).print(description.toString())
+      val writer = new PrintStream(new File(cacheFolder, filename))
+      val save: Enumeratee[String, String] = Enumeratee.map { s =>
+        writer.print(s)
+        s
       }
-      case None => data
+      data.through(save)
+    } else {
+      data
     }
   }
 
@@ -1499,26 +1492,19 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
    * Return a list of all files and their descriptions in the cache.
    */
   def cacheListAction() = PermissionAction(Permission.ViewGeoStream) { implicit request =>
-    play.api.Play.configuration.getString("geostream.cache") match {
-      case Some(x) => {
-        val files = collection.mutable.Map.empty[String, JsValue]
-        var total = 0l
-        for (file <- new File(x).listFiles) {
-          val jsonFile = new File(file.getAbsolutePath + ".json")
-          if (jsonFile.exists()) {
-            val data = Json.parse(Source.fromFile(jsonFile).mkString)
-            files.put(file.getName, data.as[JsObject] ++ Json.obj("filesize" -> file.length,
-              "created" -> ISODateTimeFormat.dateTime.print(new DateTime(jsonFile.lastModified))))
-          }
-          total += file.length()
-        }
-        Ok(Json.obj("files" -> Json.toJson(files.toMap),
-                    "size" -> total))
+    val cache = config.get[String]("geostream.cache")
+    val files = collection.mutable.Map.empty[String, JsValue]
+    var total = 0l
+    for (file <- new File(cache).listFiles) {
+      val jsonFile = new File(file.getAbsolutePath + ".json")
+      if (jsonFile.exists()) {
+        val data = Json.parse(Source.fromFile(jsonFile).mkString)
+        files.put(file.getName, data.as[JsObject] ++ Json.obj("filesize" -> file.length,
+          "created" -> ISODateTimeFormat.dateTime.print(new DateTime(jsonFile.lastModified))))
       }
-      case None => {
-        NotFound("Cache is not enabled")
-      }
+      total += file.length()
     }
+    Ok(Json.obj("files" -> Json.toJson(files.toMap), "size" -> total))
   }
 
   /**
@@ -1526,41 +1512,31 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
    * will return a Enumerator of that file, otherwise it will return None.
    */
   def cacheFetch(description: JsObject) = {
-    play.api.Play.configuration.getString("geostream.cache") match {
-      case Some(x) => {
-        val filename = MessageDigest.getInstance("MD5").digest(description.toString().getBytes).map("%02X".format(_)).mkString
-        val cacheFile = new File(x, filename)
-        if (cacheFile.exists)
-          Some(Enumerator.fromFile(cacheFile))
-        else
-          None
-      }
-      case None => None
-    }
+    val cache = config.get[String]("geostream.cache")
+    val filename = MessageDigest.getInstance("MD5").digest(description.toString().getBytes).map("%02X".format(_)).mkString
+    val cacheFile = new File(cache, filename)
+    if (cacheFile.exists)
+      Some(Enumerator.fromFile(cacheFile))
+    else
+      None
   }
 
   /**
    * Return the file with the given name.
    */
   def cacheFetchAction(filename: String) =  PermissionAction(Permission.ViewGeoStream) { implicit request =>
-    play.api.Play.configuration.getString("geostream.cache") match {
-      case Some(x) => {
-        val file = new File(x, filename)
-        if (file.exists) {
-          val data = Json.parse(Source.fromFile(new File(x, filename + ".json")).mkString)
-          Parsers.parseString((data \ "format").get) match {
-            case "csv" => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(withCharset("text/csv"))
-            case "json" => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(JSON)
-            case "geojson" => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(JSON)
-            case _ => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(TEXT)
-          }
-        } else {
-          NotFound("File not found in cache")
-        }
+    val cache = config.get[String]("geostream.cache")
+    val file = new File(cache, filename)
+    if (file.exists) {
+      val data = Json.parse(Source.fromFile(new File(x, filename + ".json")).mkString)
+      Parsers.parseString((data \ "format").get) match {
+        case "csv" => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(withCharset("text/csv"))
+        case "json" => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(JSON)
+        case "geojson" => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(JSON)
+        case _ => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(TEXT)
       }
-      case None => {
-        NotFound("Cache is not enabled")
-      }
+    } else {
+      NotFound("File not found in cache")
     }
   }
 
@@ -1569,18 +1545,14 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
    * the associated json file.
    */
   def cacheInvalidate(description: JsObject) {
-    play.api.Play.configuration.getString("geostream.cache") match {
-      case Some(x) => {
-        val filename = MessageDigest.getInstance("MD5").digest(description.toString().getBytes).map("%02X".format(_)).mkString
-        val cacheFile = new File(x, filename)
-        if (cacheFile.exists)
-          cacheFile.delete
-        val cacheFileJson = new File(x, filename + ".json")
-        if (cacheFileJson.exists)
-          cacheFileJson.delete
-      }
-      case None => // do nothing
-    }
+    val cache = config.get[String]("geostream.cache")
+    val filename = MessageDigest.getInstance("MD5").digest(description.toString().getBytes).map("%02X".format(_)).mkString
+    val cacheFile = new File(cache, filename)
+    if (cacheFile.exists)
+      cacheFile.delete
+    val cacheFileJson = new File(cache, filename + ".json")
+    if (cacheFileJson.exists)
+      cacheFileJson.delete
   }
 
   /**
@@ -1589,94 +1561,83 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
    * Specifying sensor_id and stream_id will only remove caching where both are present
    */
   def cacheInvalidate(sensor_id: Option[String] = None, stream_id: Option[String] = None) = {
-    play.api.Play.configuration.getString("geostream.cache") match {
-      case Some(x) => {
-        val existingFiles = new File(x).listFiles
-        val filesToRemove = collection.mutable.ListBuffer.empty[String]
-        val streams = new ListBuffer[String]()
-        val sensors = new ListBuffer[String]()
-        val errors = new ListBuffer[String]()
+    val cache = config.get[String]("geostream.cache")
+    val existingFiles = new File(cache).listFiles
+    val filesToRemove = collection.mutable.ListBuffer.empty[String]
+    val streams = new ListBuffer[String]()
+    val sensors = new ListBuffer[String]()
+    val errors = new ListBuffer[String]()
 
-        if (sensor_id.isDefined) {
-          sensors += sensor_id.get.toString
-          if (current.configuration.getBoolean("geostream.enabled").getOrElse(false)) {
-            geostreamsService.getSensorStreams(sensor_id.get.toString) match {
-              case Some(d) => {
-                val responseJson : JsValue = Json.parse(d)
-                (responseJson \\ "stream_id").foreach(streams += _.toString)
-              }
-              case None => errors += "Sensor " + sensor_id.get.toString + " does not exist"
-            }
-          } else pluginNotEnabled
-        }
-
-        if (stream_id.isDefined) {
-          streams += stream_id.get.toString
-          if (current.configuration.getBoolean("geostream.enabled").getOrElse(false)) {
-            geostreamsService.getStream(stream_id.get.toString) match {
-              case Some(d) => {
-                val responseJson : JsValue = Json.parse(d)
-                (responseJson \\ "sensor_id").foreach(sensors += _.asInstanceOf[JsString].value.toString)
-              }
-              case None => errors += "Stream " + stream_id.get.toString + " does not exist"
-            }
-          } else pluginNotEnabled
-        }
-
-        for (file <- existingFiles) {
-          val jsonFile = new File(file.getAbsolutePath + ".json")
-          if (jsonFile.exists()) {
-            val data = Json.parse(Source.fromFile(jsonFile).mkString)
-            (Parsers.parseString((data \ "sensor_id").get), Parsers.parseString((data \ "stream_id").get)) match {
-              case (sensor_value, stream_value) =>
-                if (sensor_id.isDefined && !stream_id.isDefined) {
-                  if (sensors.contains(sensor_value) || streams.contains(stream_value)) {
-                    filesToRemove += file.getAbsolutePath
-                    filesToRemove += jsonFile.getAbsolutePath
-                  }
-                }
-                if (!sensor_id.isDefined && stream_id.isDefined) {
-                  if (streams.contains(stream_value) || (sensors.contains(sensor_value) && stream_value.isEmpty)) {
-                    filesToRemove += file.getAbsolutePath
-                    filesToRemove += jsonFile.getAbsolutePath
-                  }
-                }
-              case _ => None
-            }
+    if (sensor_id.isDefined) {
+      sensors += sensor_id.get.toString
+      if (current.configuration.getBoolean("geostream.enabled").getOrElse(false)) {
+        geostreamsService.getSensorStreams(sensor_id.get.toString) match {
+          case Some(d) => {
+            val responseJson : JsValue = Json.parse(d)
+            (responseJson \\ "stream_id").foreach(streams += _.toString)
           }
+          case None => errors += "Sensor " + sensor_id.get.toString + " does not exist"
         }
-
-        if (sensor_id.isEmpty && stream_id.isEmpty) {
-          for (f <- existingFiles) {
-            filesToRemove += f.getAbsolutePath
-          }
-        }
-        for (f <- filesToRemove) {
-          val file = new File(f)
-          if (!file.delete) {
-            errors += "Could not delete cache file: " + file.getAbsolutePath
-            Logger.error("Could not delete cache file " + file.getAbsolutePath)
-          }
-        }
-        (filesToRemove.toArray, errors.toArray)
-      }
-      case None => (Array.empty[String], Array.empty[String])
+      } else pluginNotEnabled
     }
+
+    if (stream_id.isDefined) {
+      streams += stream_id.get.toString
+      if (current.configuration.getBoolean("geostream.enabled").getOrElse(false)) {
+        geostreamsService.getStream(stream_id.get.toString) match {
+          case Some(d) => {
+            val responseJson : JsValue = Json.parse(d)
+            (responseJson \\ "sensor_id").foreach(sensors += _.asInstanceOf[JsString].value.toString)
+          }
+          case None => errors += "Stream " + stream_id.get.toString + " does not exist"
+        }
+      } else pluginNotEnabled
+    }
+
+    for (file <- existingFiles) {
+      val jsonFile = new File(file.getAbsolutePath + ".json")
+      if (jsonFile.exists()) {
+        val data = Json.parse(scala.io.Source.fromFile(jsonFile).mkString)
+        (Parsers.parseString((data \ "sensor_id").get), Parsers.parseString((data \ "stream_id").get)) match {
+          case (sensor_value, stream_value) =>
+            if (sensor_id.isDefined && !stream_id.isDefined) {
+              if (sensors.contains(sensor_value) || streams.contains(stream_value)) {
+                filesToRemove += file.getAbsolutePath
+                filesToRemove += jsonFile.getAbsolutePath
+              }
+            }
+            if (!sensor_id.isDefined && stream_id.isDefined) {
+              if (streams.contains(stream_value) || (sensors.contains(sensor_value) && stream_value.isEmpty)) {
+                filesToRemove += file.getAbsolutePath
+                filesToRemove += jsonFile.getAbsolutePath
+              }
+            }
+          case _ => None
+        }
+      }
+    }
+
+    if (sensor_id.isEmpty && stream_id.isEmpty) {
+      for (f <- existingFiles) {
+        filesToRemove += f.getAbsolutePath
+      }
+    }
+    for (f <- filesToRemove) {
+      val file = new File(f)
+      if (!file.delete) {
+        errors += "Could not delete cache file: " + file.getAbsolutePath
+        Logger.error("Could not delete cache file " + file.getAbsolutePath)
+      }
+    }
+    (filesToRemove.toArray, errors.toArray)
   }
 
   /**
    * Removes all files from the cache
    */
   def cacheInvalidateAction(sensor_id: Option[String] = None, stream_id: Option[String] = None) =  PermissionAction(Permission.DeleteGeoStream) { implicit request =>
-    play.api.Play.configuration.getString("geostream.cache") match {
-      case Some(x) => {
-        val (files, errors) = cacheInvalidate(sensor_id, stream_id)
-        Ok(Json.obj("files" -> Json.toJson(files), "errors" -> Json.toJson(errors)))
-      }
-      case None => {
-        NotFound("Cache is not enabled")
-      }
-    }
+    val (files, errors) = cacheInvalidate(sensor_id, stream_id)
+    Ok(Json.obj("files" -> Json.toJson(files), "errors" -> Json.toJson(errors)))
   }
 
   // ----------------------------------------------------------------------
@@ -1696,11 +1657,10 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
   def jsonToCSV(data: Iterator[JsObject]): Enumerator[String] = {
     val headers = ListBuffer.empty[Header]
 
-    val configuration = play.api.Play.configuration
-    val hidePrefix = configuration.getBoolean("json2csv.hideprefix").getOrElse(false)
-    val ignore = configuration.getString("json2csv.ignore").getOrElse("").split(",")
-    val prefixSeperator = configuration.getString("json2csv.seperator").getOrElse(" -> ")
-    val fixGeometry = configuration.getBoolean("json2csv.fixgeometry").getOrElse(true)
+    val hidePrefix = config.get[Boolean]("json2csv.hideprefix")
+    val ignore = config.get[String]("json2csv.ignore").split(",")
+    val prefixSeperator = config.get[String]("json2csv.seperator")
+    val fixGeometry = config.get[Boolean]("json2csv.fixgeometry")
 
     // load all values, we need to iterate over this list twice, once for headers, once for the data
     // create a new enumerator to return strings chunked.
@@ -1878,7 +1838,7 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
       (row(i), h.value) match {
         case (x: JsArray, Right(y)) => result += "," + printRow(x, y, getPrefix(prefix, h.key, prefixSeperator), prefixSeperator)
         case (x: JsObject, Right(y)) => result += "," + printRow(x, y, getPrefix(prefix, h.key, prefixSeperator), prefixSeperator)
-        case (x: JsUndefined, Left(_)) => result += ","
+        case (x: JsArray, Left(_)) => result += ","
         case (x, Right(y)) => result += "," + printRow(JsObject(Seq.empty), y, getPrefix(h.key, prefix, prefixSeperator), prefixSeperator)
         case (x, Left(y)) => result += "," + x
       }
@@ -1893,7 +1853,7 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService) extends ApiCon
 
   def getConfig = PermissionAction(Permission.ViewGeoStream) { implicit request =>
     Logger.debug("Getting config")
-    if (current.configuration.getBoolean("geostream.enabled").getOrElse(false)) {
+    if (config.get[Boolean]("geostream.enabled")) {
       Ok(Json.obj(
         "userAgreement" -> Json.toJson(AppConfiguration.getTermsOfServicesText),
         "sensorsTitle" -> Json.toJson(AppConfiguration.getSensorsTitle),
