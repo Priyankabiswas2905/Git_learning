@@ -47,7 +47,8 @@ class MongoDBDatasetService @Inject() (
   userService: UserService,
   folders: FolderService,
   metadatas:MetadataService,
-  events: EventService) extends DatasetService {
+  events: EventService,
+  indexService: IndexService) extends DatasetService {
 
   object MustBreak extends Exception {}
 
@@ -1353,11 +1354,7 @@ class MongoDBDatasetService @Inject() (
 
   def index(id: UUID) {
     Dataset.findOneById(new ObjectId(id.stringify)) match {
-      case Some(dataset) => {
-        current.plugin[ElasticsearchPlugin].foreach {
-          _.index(dataset, false)
-        }
-      }
+      case Some(dataset) => indexService.add(dataset, false)
       case None => Logger.error("Dataset not found: " + id)
     }
   }

@@ -59,7 +59,8 @@ class MongoDBFileService @Inject() (
   userService: UserService,
   folders: FolderService,
   metadatas: MetadataService,
-  events: EventService) extends FileService {
+  events: EventService,
+  indexService: IndexService) extends FileService {
 
   object MustBreak extends Exception {}
 
@@ -213,11 +214,7 @@ class MongoDBFileService @Inject() (
 
   def index(id: UUID) {
     get(id) match {
-      case Some(file) => {
-        current.plugin[ElasticsearchPlugin].foreach {
-          _.index(file)
-        }
-      }
+      case Some(file) => indexService.add(file)
       case None => Logger.error("File not found: " + id)
     }
   }

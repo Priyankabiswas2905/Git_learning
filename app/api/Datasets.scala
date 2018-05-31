@@ -48,7 +48,8 @@ class  Datasets @Inject()(
   relations: RelationService,
   userService: UserService,
   thumbnailService : ThumbnailService,
-  appConfig: AppConfigurationService) extends ApiController {
+  appConfig: AppConfigurationService,
+  indexService: IndexService) extends ApiController {
 
   def get(id: UUID) = PermissionAction(Permission.ViewDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     datasets.get(id) match {
@@ -222,13 +223,9 @@ class  Datasets @Inject()(
                   if (!file.xmlMetadata.isEmpty) {
                     val xmlToJSON = files.getXMLMetadataJSON(UUID(file_id))
                     datasets.addXMLMetadata(UUID(id), UUID(file_id), xmlToJSON)
-                    current.plugin[ElasticsearchPlugin].foreach {
-                      _.index(SearchUtils.getElasticsearchObject(d))
-                    }
+                    indexService.add(d, false)
                   } else {
-                    current.plugin[ElasticsearchPlugin].foreach {
-                      _.index(SearchUtils.getElasticsearchObject(d))
-                    }
+                    indexService.add(d, false)
                   }
 
                   current.plugin[AdminsNotifierPlugin].foreach {
@@ -392,9 +389,7 @@ class  Datasets @Inject()(
   def reindex(id: UUID, recursive: Boolean) = PermissionAction(Permission.CreateDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     datasets.get(id) match {
       case Some(ds) => {
-        current.plugin[ElasticsearchPlugin].foreach {
-          _.index(ds, recursive)
-        }
+        indexService.add(ds, recursive)
         Ok(toJson(Map("status" -> "success")))
       }
       case None => {
@@ -1773,9 +1768,7 @@ class  Datasets @Inject()(
         datasets.removeDataset(id)
         appConfig.incrementCount('datasets, -1)
 
-        current.plugin[ElasticsearchPlugin].foreach {
-          _.delete("data", "dataset", id.stringify)
-        }
+        indexService.delete(dataset)
 
         for(file <- dataset.files)
           files.index(file)
@@ -1830,9 +1823,7 @@ class  Datasets @Inject()(
           events.addObjectEvent(request.user, ds.id, ds.name, "delete_dataset")
           datasets.removeDataset(ds.id)
           appConfig.incrementCount('datasets, -1)
-          current.plugin[ElasticsearchPlugin].foreach {
-            _.delete("data", "dataset", ds.id.stringify)
-          }
+          indexService.delete(ds)
         }
       }
       case None =>

@@ -52,7 +52,8 @@ class Files @Inject() (
   contextLDService: ContextLDService,
   spaces: SpaceService,
   folders: FolderService,
-  appConfig: AppConfigurationService) extends SecuredController {
+  appConfig: AppConfigurationService,
+  indexService: IndexService) extends SecuredController {
 
   /**
    * Upload form.
@@ -460,14 +461,10 @@ class Files @Inject() (
                   val xmlToJSON = FilesUtils.readXMLgetJSON(uploadedFile.ref.file)
                   files.addXMLMetadata(id, xmlToJSON)
 
-                  current.plugin[ElasticsearchPlugin].foreach {
-                    _.index(SearchUtils.getElasticsearchObject(f))
-                  }
+                  indexService.add(f)
                 }
                 else {
-                  current.plugin[ElasticsearchPlugin].foreach {
-                    _.index(SearchUtils.getElasticsearchObject(f))
-                  }
+                  indexService.add(f)
                 }
                 current.plugin[VersusPlugin].foreach {
                   _.index(f.id.toString, fileType)
@@ -596,15 +593,11 @@ class Files @Inject() (
 	            if(fileType.equals("application/xml") || fileType.equals("text/xml")){
 	              val xmlToJSON = FilesUtils.readXMLgetJSON(uploadedFile.ref.file)
 	              files.addXMLMetadata(id, xmlToJSON)
-	              
-	              current.plugin[ElasticsearchPlugin].foreach{
-		              _.index(SearchUtils.getElasticsearchObject(f))
-                }
+
+                indexService.add(f)
 	            }
 	            else{
-		            current.plugin[ElasticsearchPlugin].foreach{
-		              _.index(SearchUtils.getElasticsearchObject(f))
-                }
+                indexService.add(f)
 	            }
 
               current.plugin[VersusPlugin].foreach { _.indexFile(f.id, fileType) }
@@ -1070,14 +1063,10 @@ class Files @Inject() (
               val xmlToJSON = FilesUtils.readXMLgetJSON(uploadedFile.ref.file)
               files.addXMLMetadata(id, xmlToJSON)
 
-              current.plugin[ElasticsearchPlugin].foreach {
-                _.index(SearchUtils.getElasticsearchObject(f))
-              }
+              indexService.add(f)
             }
             else {
-              current.plugin[ElasticsearchPlugin].foreach {
-                _.index(SearchUtils.getElasticsearchObject(f))
-              }
+              indexService.add(f)
             }
             //add file to RDF triple store if triple store is used
             if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
@@ -1198,14 +1187,10 @@ class Files @Inject() (
                       val xmlToJSON = FilesUtils.readXMLgetJSON(uploadedFile.ref.file)
                       files.addXMLMetadata(id, xmlToJSON)
 
-                      current.plugin[ElasticsearchPlugin].foreach {
-                        _.index(SearchUtils.getElasticsearchObject(f))
-                      }
+                      indexService.add(f)
                     }
                     else {
-                      current.plugin[ElasticsearchPlugin].foreach {
-                        _.index(SearchUtils.getElasticsearchObject(f))
-                      }
+                      indexService.add(f)
                     }
 
                     // add file to dataset

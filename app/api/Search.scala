@@ -1,13 +1,14 @@
 package api
 
-import services.{RdfSPARQLService, DatasetService, FileService, CollectionService, PreviewService, MultimediaQueryService, ElasticsearchPlugin}
+import services._
 import play.Logger
-import scala.collection.mutable.{ListBuffer, HashMap}
+
+import scala.collection.mutable.{HashMap, ListBuffer}
 import scala.collection.JavaConversions.mapAsScalaMap
 import edu.illinois.ncsa.isda.lsva.ImageMeasures
 import edu.illinois.ncsa.isda.lsva.ImageDescriptors.FeatureType
-import util.{SearchUtils, SearchResult}
-import play.api.libs.json.{JsObject, Json, JsValue}
+import util.{SearchResult, SearchUtils}
+import play.api.libs.json.{JsObject, JsValue, Json}
 import play.api.libs.json.Json.toJson
 import javax.inject.{Inject, Singleton}
 import play.api.Play.current
@@ -21,37 +22,22 @@ class Search @Inject() (
    collections: CollectionService,
    previews: PreviewService,
    queries: MultimediaQueryService,
-   sparql: RdfSPARQLService)  extends ApiController {
+   sparql: RdfSPARQLService,
+   indexService: IndexService)  extends ApiController {
 
   /** Search using a simple text string */
   def search(query: String) = PermissionAction(Permission.ViewDataset) { implicit request =>
-    current.plugin[ElasticsearchPlugin] match {
-      case Some(plugin) => {
-        var filesFound = ListBuffer.empty[String]
-        var datasetsFound = ListBuffer.empty[String]
-        var collectionsFound = ListBuffer.empty[String]
+    val response = indexService.search(query.replaceAll("([:/\\\\])", "\\\\$1"))
 
-        val response = plugin.search(query.replaceAll("([:/\\\\])", "\\\\$1"))
+    val filesFound = response.filter(_.resourceType == ResourceRef.file).map(_.id.stringify)
+    val datasetsFound = response.filter(_.resourceType == ResourceRef.dataset).map(_.id.stringify)
+    val collectionsFound = response.filter(_.resourceType == ResourceRef.collection).map(_.id.stringify)
 
-        for (resource <- response) {
-          resource.resourceType match {
-            case ResourceRef.file => filesFound += resource.id.stringify
-            case ResourceRef.dataset => datasetsFound += resource.id.stringify
-            case ResourceRef.collection => collectionsFound += resource.id.stringify
-          }
-        }
-
-        Ok(toJson( Map[String,JsValue](
-          "files" -> toJson(filesFound),
-          "datasets" -> toJson(datasetsFound),
-          "collections" -> toJson(collectionsFound)
-        )))
-      }
-     case None => {
-       Logger.debug("Search plugin not enabled")
-          Ok(views.html.pluginNotEnabled("Text search"))
-       }
-    }
+    Ok(toJson( Map[String,JsValue](
+      "files" -> toJson(filesFound),
+      "datasets" -> toJson(datasetsFound),
+      "collections" -> toJson(collectionsFound)
+    )))
   }
 
   /** Search using string-encoded Json object (e.g. built by Advanced Search form) */
@@ -59,33 +45,19 @@ class Search @Inject() (
     implicit request =>
       implicit val user = request.user
 
-      current.plugin[ElasticsearchPlugin] match {
-        case Some(plugin) => {
-          val queryList = Json.parse(query).as[List[JsValue]]
-          val results = plugin.search(queryList, grouping, from, size)
+      val response = indexService.search(query.replaceAll("([:/\\\\])", "\\\\$1"))
 
-          val collectionsResults = results.flatMap { c =>
-            if (c.resourceType == ResourceRef.collection) collections.get(c.id) else None
-          }
-          val datasetsResults = results.flatMap { d =>
-            if (d.resourceType == ResourceRef.dataset) datasets.get(d.id) else None
-          }
-          val filesResults = results.flatMap { f =>
-            if (f.resourceType == ResourceRef.file) files.get(f.id) else None
-          }
+      val filesFound = response.filter(_.resourceType == ResourceRef.file).flatMap(x => files.get(x.id))
+      val datasetsFound = response.filter(_.resourceType == ResourceRef.dataset).flatMap(x => datasets.get(x.id))
+      val collectionsFound = response.filter(_.resourceType == ResourceRef.collection).flatMap(x => collections.get(x.id))
 
-          // Use "distinct" to remove duplicate results.
-          Ok(JsObject(Seq(
-            "datasets" -> toJson(datasetsResults.distinct),
-            "files" -> toJson(filesResults.distinct),
-            "collections" -> toJson(collectionsResults.distinct),
-            "count" -> toJson(results.length)
-          )))
-        }
-        case None => {
-          BadRequest("Elasticsearch plugin could not be reached")
-        }
-      }
+      // Use "distinct" to remove duplicate results.
+      Ok(JsObject(Seq(
+        "datasets" -> toJson(datasetsFound.distinct),
+        "files" -> toJson(filesFound.distinct),
+        "collections" -> toJson(collectionsFound.distinct),
+        "count" -> toJson(response.length)
+      )))
   }
 
   def querySPARQL() = PermissionAction(Permission.ViewMetadata) { implicit request =>

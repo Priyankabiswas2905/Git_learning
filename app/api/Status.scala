@@ -20,7 +20,8 @@ class Status @Inject()(spaces: SpaceService,
                        files: FileService,
                        users: UserService,
                        appConfig: AppConfigurationService,
-                       extractors: ExtractorService) extends ApiController {
+                       extractors: ExtractorService,
+                       indexService: IndexService) extends ApiController {
   val jsontrue = Json.toJson(true)
   val jsonfalse = Json.toJson(false)
 
@@ -48,22 +49,6 @@ class Status @Inject()(spaces: SpaceService,
             } else {
               jsontrue
             })
-      }
-
-      // elasticsearch
-      case p: ElasticsearchPlugin => {
-        val status = if (p.isEnabled()) {
-          "connected"
-        } else {
-          "disconnected"
-        }
-        result.put("elasticsearch", if (Permission.checkServerAdmin(user)) {
-          Json.obj("server" -> p.serverAddress,
-            "clustername" -> p.nameOfCluster,
-            "status" -> status)
-        } else {
-          Json.obj("status" -> status)
-        })
       }
 
       // rabbitmq
@@ -137,6 +122,19 @@ class Status @Inject()(spaces: SpaceService,
         }
       }
     }
+
+    // elasticsearch
+    val status = if (indexService.isConnected) {
+      "connected"
+    } else {
+      "disconnected"
+    }
+    result.put("index_service", if (Permission.checkServerAdmin(user)) {
+      Json.obj("connection" -> indexService.connectionInfo(),
+        "status" -> status)
+    } else {
+      Json.obj("status" -> status)
+    })
 
     Json.toJson(result.toMap[String, JsValue])
   }

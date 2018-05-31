@@ -24,18 +24,55 @@ class Search @Inject() (
   files: FileService,
   collections: CollectionService,
   queries: MultimediaQueryService,
-  previews: PreviewService) extends SecuredController {
+  previews: PreviewService,
+  indexService: IndexService) extends SecuredController {
 
   /** Search using a simple text string */
   def search(query: String) = PermissionAction(Permission.ViewDataset) { implicit request =>
     implicit val user = request.user
+
+    if (query == "") {
+      return Ok(views.html.searchResults(query,
+        Array.empty[models.File], Array.empty[models.Dataset], Array.empty[models.Collection],
+        scala.collection.mutable.HashMap.empty[String,scala.collection.mutable.ListBuffer[(String, String)]],
+        scala.collection.mutable.HashMap.empty[String,scala.collection.mutable.ListBuffer[(String, String)]]))
+    }
+
+    val response = indexService.search(query.replaceAll("([:/\\\\])", "\\\\$1"))
+
+    val mapdatasetIds = new HashMap[String, List[(String, String)]]
+    val mapcollectionIds = new HashMap[String, List[(String, String)]]
+
+    val filesFound = response.filter(_.resourceType == ResourceRef.file).flatMap(x => {
+      if (Permission.checkPermission(Permission.ViewFile, x)) {
+        val fileDatasets = datasets.findByFileId(x.id).map(ds => (ds.id.stringify, ds.name))
+        mapdatasetIds.put(x.id.stringify, fileDatasets)
+        files.get(x.id)
+      } else {
+        None
+      }
+    })
+
+    val datasetsFound = response.filter(_.resourceType == ResourceRef.dataset).flatMap(x => {
+      if (Permission.checkPermission(Permission.ViewFile, x)) {
+        datasets.get(x.id).flatMap(ds => {
+          ds.collections.map(collections.get(_).map(_.id.toString, _.name))
+          val datasetCollections = ds. collections.findByFileId(x.id).map(ds => (ds.id.stringify, ds.name))
+          mapdatasetIds.put(x.id.stringify, fileDatasets)
+        })
+      } else {
+        None
+      }
+    })
+
+    val datasetsFound = response.filter(_.resourceType == ResourceRef.dataset).flatMap(x => datasets.get(x.id))
+    val collectionsFound = response.filter(_.resourceType == ResourceRef.collection).flatMap(x => collections.get(x.id))
+
     current.plugin[ElasticsearchPlugin] match {
       case Some(plugin) => {
         var listOfFiles = ListBuffer.empty[models.File]
         var listOfdatasets = ListBuffer.empty[models.Dataset]
         var listOfcollections = ListBuffer.empty[models.Collection]
-        val mapdatasetIds = new HashMap[String, ListBuffer[(String, String)]]
-        val mapcollectionIds = new HashMap[String, ListBuffer[(String, String)]]
 
         if (query != "") {
           // Execute query

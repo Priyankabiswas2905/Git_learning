@@ -26,14 +26,15 @@ class Admin @Inject() (userService: UserService,
     datasets: DatasetService,
     collections: CollectionService,
     files: FileService,
-    events: EventService) extends Controller with ApiController {
+    events: EventService,
+    indexService: IndexService) extends Controller with ApiController {
 
   /**
    * DANGER: deletes all data, keep users.
    */
   def deleteAllData(resetAll: Boolean) = ServerAdminAction { implicit request =>
     current.plugin[MongoSalatPlugin].map(_.dropAllData(resetAll))
-    current.plugin[ElasticsearchPlugin].map(_.deleteAll)
+    indexService.resetIndex()
 
     Ok(toJson("done"))
   }
@@ -166,22 +167,15 @@ class Admin @Inject() (userService: UserService,
 
   def reindex = ServerAdminAction { implicit request =>
     Akka.system.scheduler.scheduleOnce(1 seconds) {
-      current.plugin[ElasticsearchPlugin] match {
-        case Some(plugin) => {
-          // Delete & recreate index
-          plugin.deleteAll
-          plugin.createIndex()
+      indexService.resetIndex()
 
-          // Reindex everything
-          Logger.debug("Reindexing collections...")
-          collections.index(None)
-          Logger.debug("Reindexing datasets...")
-          datasets.index(None)
-          Logger.debug("Reindexing files...")
-          files.index(None)
-        }
-        case None => { BadRequest(toJson(Map("error" -> "Elasticsearch not connected"))) }
-      }
+      // Reindex everything
+      Logger.debug("Reindexing collections...")
+      collections.index(None)
+      Logger.debug("Reindexing datasets...")
+      datasets.index(None)
+      Logger.debug("Reindexing files...")
+      files.index(None)
     }
 
     Ok(toJson(Map("status" -> "Success")))

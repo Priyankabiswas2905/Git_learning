@@ -53,7 +53,8 @@ class Files @Inject()(
   folders: FolderService,
   spaces: SpaceService,
   userService: UserService,
-  appConfig: AppConfigurationService) extends ApiController {
+  appConfig: AppConfigurationService,
+  indexService: IndexService) extends ApiController {
 
   def get(id: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
     Logger.debug("GET file with id " + id)
@@ -487,9 +488,7 @@ class Files @Inject()(
   def reindex(id: UUID) = PermissionAction(Permission.AddFile, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
     files.get(id) match {
       case Some(file) => {
-        current.plugin[ElasticsearchPlugin].foreach {
-          _.index(file)
-        }
+        indexService.add(file)
         Ok(toJson(Map("status" -> "success")))
       }
       case None => {
@@ -1545,9 +1544,7 @@ class Files @Inject()(
           appConfig.incrementCount('files, -1)
           appConfig.incrementCount('bytes, -file.length)
 
-          current.plugin[ElasticsearchPlugin].foreach {
-            _.delete("data", "file", id.stringify)
-          }
+          indexService.delete(file)
           //remove file from RDF triple store if triple store is used
           configuration.getString("userdfSPARQLStore").getOrElse("no") match {
             case "yes" => {
@@ -1636,9 +1633,7 @@ class Files @Inject()(
   def index(id: UUID) {
     files.get(id) match {
       case Some(file) => {
-        current.plugin[ElasticsearchPlugin].foreach {
-          _.index(SearchUtils.getElasticsearchObject(file))
-        }
+        indexService.add(file)
       }
       case None => Logger.error("File not found: " + id)
     }

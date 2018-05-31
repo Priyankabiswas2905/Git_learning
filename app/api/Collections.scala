@@ -42,7 +42,8 @@ class Collections @Inject() (datasets: DatasetService,
                              appConfig: AppConfigurationService,
                              folders : FolderService,
                              files: FileService,
-                             metadataService : MetadataService) extends ApiController {
+                             metadataService : MetadataService,
+                             indexService: IndexService) extends ApiController {
 
   def createCollection() = PermissionAction(Permission.CreateCollection) (parse.json) { implicit request =>
     Logger.debug("Creating new collection")
@@ -116,9 +117,7 @@ class Collections @Inject() (datasets: DatasetService,
   def reindex(id: UUID, recursive: Boolean) = PermissionAction(Permission.CreateCollection, Some(ResourceRef(ResourceRef.collection, id))) {  implicit request =>
       collections.get(id) match {
         case Some(coll) => {
-          current.plugin[ElasticsearchPlugin].foreach {
-            _.index(coll, recursive)
-          }
+          indexService.add(coll, recursive)
           Ok(toJson(Map("status" -> "success")))
         }
         case None => {

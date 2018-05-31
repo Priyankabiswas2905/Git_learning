@@ -40,7 +40,8 @@ class MongoDBCollectionService @Inject() (
   userService: UserService,
   spaceService: SpaceService,
   events:EventService,
-  spaces:SpaceService )  extends CollectionService {
+  spaces:SpaceService,
+  indexService: IndexService)  extends CollectionService {
   /**
    * Count all collections
    */
@@ -858,9 +859,7 @@ class MongoDBCollectionService @Inject() (
 
         Collection.remove(MongoDBObject("_id" -> new ObjectId(collection.id.stringify)))
 
-        current.plugin[ElasticsearchPlugin].foreach {
-          _.delete("data", "collection", collection.id.stringify)
-        }
+        indexService.delete(collection)
 
         Success
       }
@@ -922,9 +921,7 @@ class MongoDBCollectionService @Inject() (
   def index(id: UUID) {
     Collection.findOneById(new ObjectId(id.stringify)) match {
       case Some(collection) => {
-        current.plugin[ElasticsearchPlugin].foreach {
-          _.index(collection, false)
-        }
+        indexService.add(collection, false)
       }
       case None => Logger.error("Collection not found: " + id.stringify)
     }

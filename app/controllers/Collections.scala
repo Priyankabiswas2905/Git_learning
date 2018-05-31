@@ -21,8 +21,9 @@ import play.api.i18n.Messages
 
 @Singleton
 class Collections @Inject() (datasets: DatasetService, collections: CollectionService, previewsService: PreviewService,
-                            spaceService: SpaceService, users: UserService, events: EventService,
-                            appConfig: AppConfigurationService, selections: SelectionService) extends SecuredController {
+                             spaceService: SpaceService, users: UserService, events: EventService,
+                             appConfig: AppConfigurationService, selections: SelectionService,
+                             indexService: IndexService) extends SecuredController {
 
   /**
    * String name of the Space such as 'Project space' etc. parsed from conf/messages
@@ -458,9 +459,7 @@ class Collections @Inject() (datasets: DatasetService, collections: CollectionSe
           }
 
           //index collection
-            current.plugin[ElasticsearchPlugin].foreach{
-              _.index(SearchUtils.getElasticsearchObject(collection))
-            }
+          indexService.add(collection, false)
 
           //Add to Events Table
           val option_user = users.findByIdentity(identity)

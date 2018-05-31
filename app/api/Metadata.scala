@@ -36,7 +36,8 @@ class Metadata @Inject() (
     files: FileService,
     curations: CurationService,
     events: EventService,
-    spaceService: SpaceService) extends ApiController {
+    spaceService: SpaceService,
+    indexService: IndexService) extends ApiController {
 
   def getDefinitions() = PermissionAction(Permission.ViewDataset) {
     implicit request =>
@@ -67,21 +68,14 @@ class Metadata @Inject() (
     }
 
     // Next get Elasticsearch metadata fields if plugin available
-    current.plugin[ElasticsearchPlugin] match {
-      case Some(plugin) => {
-        val mdTerms = plugin.getAutocompleteMetadataFields(query)
-        for (term <- mdTerms) {
-          // e.g. "metadata.http://localhost:9000/clowder/api/extractors/terra.plantcv.angle",
-          //      "metadata.Jane Doe.Alternative Title"
-          if (!(listOfTerms contains term))
-            listOfTerms.append(term)
-        }
-        Ok(toJson(listOfTerms.distinct))
-      }
-      case None => {
-        BadRequest("Elasticsearch plugin is not enabled")
-      }
+    val mdTerms = indexService.listMetadataFields(query)
+    for (term <- mdTerms) {
+      // e.g. "metadata.http://localhost:9000/clowder/api/extractors/terra.plantcv.angle",
+      //      "metadata.Jane Doe.Alternative Title"
+      if (!(listOfTerms contains term))
+        listOfTerms.append(term)
     }
+    Ok(toJson(listOfTerms.distinct))
   }
 
   def getDefinitionsByDataset(id: UUID) = PermissionAction(Permission.AddMetadata, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
@@ -382,20 +376,18 @@ class Metadata @Inject() (
               }
 
               Logger.debug("re-indexing after metadata removal")
-              current.plugin[ElasticsearchPlugin].foreach { p =>
-                // Delete existing index entry and re-index
-                m.attachedTo.resourceType match {
-                  case ResourceRef.file => {
-                    p.delete("data", "file", m.attachedTo.id.stringify)
-                    files.index(m.attachedTo.id)
-                  }
-                  case ResourceRef.dataset => {
-                    p.delete("data", "dataset", m.attachedTo.id.stringify)
-                    datasets.index(m.attachedTo.id)
-                  }
-                  case _ => {
-                    Logger.error("unknown attached resource type for metadata - not reindexing")
-                  }
+              // Delete existing index entry and re-index
+              m.attachedTo.resourceType match {
+                case ResourceRef.file => {
+                  indexService.delete(m.attachedTo)
+                  files.index(m.attachedTo.id)
+                }
+                case ResourceRef.dataset => {
+                  indexService.delete(m.attachedTo)
+                  datasets.index(m.attachedTo.id)
+                }
+                case _ => {
+                  Logger.error("unknown attached resource type for metadata - not reindexing")
                 }
               }
 
