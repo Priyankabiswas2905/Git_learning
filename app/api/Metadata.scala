@@ -193,7 +193,8 @@ class Metadata @Inject() (
       }
   }
 
-  //On GUI, URI is not required, however URI is required in DB. a default one will be generated when needed.
+  // On GUI, URI is not required, however URI is required in DB. a default one
+  // will be generated when needed.
   private def addDefinitionHelper(uri: String, label: String, body: JsValue, spaceId: Option[UUID], user: User, space: Option[ProjectSpace]): Result = {
     current.plugin[StagingAreaPlugin] match {
       case Some(plugin) if (plugin.isRestrictedLabel(label)) => {
