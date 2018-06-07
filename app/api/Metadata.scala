@@ -22,14 +22,14 @@ import scala.concurrent.Future
  */
 @Singleton
 class Metadata @Inject() (
-    metadataService: MetadataService,
-    contextService: ContextLDService,
-    userService: UserService,
-    datasets: DatasetService,
-    files: FileService,
-    curations: CurationService,
-    events: EventService,
-    spaceService: SpaceService) extends ApiController {
+  metadataService: MetadataService,
+  contextService: ContextLDService,
+  userService: UserService,
+  datasets: DatasetService,
+  files: FileService,
+  curations: CurationService,
+  events: EventService,
+  spaceService: SpaceService) extends ApiController {
 
   def getDefinitions() = PermissionAction(Permission.ViewDataset) {
     implicit request =>
@@ -185,7 +185,8 @@ class Metadata @Inject() (
       }
   }
 
-  //On GUI, URI is not required, however URI is required in DB. a default one will be generated when needed.
+  // On GUI, URI is not required, however URI is required in DB. a default one
+  // will be generated when needed.
   private def addDefinitionHelper(uri: String, body: JsValue, spaceId: Option[UUID], user: User, space: Option[ProjectSpace]): Result = {
     metadataService.getDefinitionByUriAndSpace(uri, space map { _.id.toString() }) match {
       case Some(metadata) => BadRequest(toJson("Metadata definition with same uri exists."))
@@ -205,7 +206,7 @@ class Metadata @Inject() (
     }
   }
 
-  def editDefinition(id: UUID, spaceId: Option[String]) = ServerAdminAction(parse.json) {
+  def editDefinition(id: UUID, spaceId: Option[String]) = AuthenticatedAction(parse.json) {
     implicit request =>
       request.user match {
         case Some(user) => {
@@ -216,19 +217,26 @@ class Metadata @Inject() (
               case Some(metadata) => if (metadata.id != id) {
                 BadRequest(toJson("Metadata definition with same uri exists."))
               } else {
-                metadataService.editDefinition(id, body)
+
                 metadata.spaceId match {
-                  case Some(spaceId) => {
+                  case Some(spaceId) if Permission.checkPermission(Some(user), Permission.EditSpace, Some(ResourceRef(ResourceRef.space, spaceId))) => {
+                    metadataService.editDefinition(id, body)
                     spaceService.get(spaceId) match {
                       case Some(s) => events.addObjectEvent(Some(user), s.id, s.name, "edit_metadata_space")
                       case None =>
                     }
+                    Ok(JsObject(Seq("status" -> JsString("ok"))))
                   }
-                  case None => {
+                  case None if Permission.checkServerAdmin(Some(user)) => {
+                    metadataService.editDefinition(id, body)
                     events.addEvent(new Event(user.getMiniUser, None, None, None, None, None, "edit_metadata_instance", new Date()))
+                    Ok(JsObject(Seq("status" -> JsString("ok"))))
+                  }
+                  case _ => {
+                    Unauthorized(" Not Authorized")
                   }
                 }
-                Ok(JsObject(Seq("status" -> JsString("ok"))))
+
               }
               case None => {
                 metadataService.editDefinition(id, body)
@@ -244,26 +252,32 @@ class Metadata @Inject() (
       }
   }
 
-  def deleteDefinition(id: UUID) = ServerAdminAction { implicit request =>
+  def deleteDefinition(id: UUID) = AuthenticatedAction { implicit request =>
     implicit val user = request.user
     user match {
       case Some(user) => {
         metadataService.getDefinition(id) match {
           case Some(md) => {
-            metadataService.deleteDefinition(id)
 
             md.spaceId match {
-              case Some(spaceId) => {
+              case Some(spaceId) if Permission.checkPermission(Some(user), Permission.EditSpace, Some(ResourceRef(ResourceRef.space, spaceId))) => {
+                metadataService.deleteDefinition(id)
                 spaceService.get(spaceId) match {
                   case Some(s) => events.addObjectEvent(Some(user), s.id, s.name, "delete_metadata_space")
                   case None =>
                 }
+                Ok(JsObject(Seq("status" -> JsString("ok"))))
               }
-              case None => {
+              case None if Permission.checkServerAdmin(Some(user)) => {
+                metadataService.deleteDefinition(id)
                 events.addEvent(new Event(user.getMiniUser, None, None, None, None, None, "delete_metadata_instance", new Date()))
+                Ok(JsObject(Seq("status" -> JsString("ok"))))
+              }
+              case _ => {
+                Unauthorized(" Not Authorized")
               }
             }
-            Ok(JsObject(Seq("status" -> JsString("ok"))))
+
           }
           case None => BadRequest(toJson("Invalid metadata definition"))
         }
@@ -576,7 +590,7 @@ class Metadata @Inject() (
       }
       result
     } else { //TBD - just get list of Clowder users
-    /*  val lcTerm = term.toLowerCase()
+      /*  val lcTerm = term.toLowerCase()
       Future(Ok(Json.toJson(userService.list.map(jsonPerson).filter((x) => {
         if (term.length == 0) {
           true
@@ -599,4 +613,33 @@ class Metadata @Inject() (
       "@id" -> user.id.stringify,
       "email" -> user.email)
   }
+
+  def getRepository(id: String) = PermissionAction(Permission.ViewMetadata).async { implicit request =>
+
+    implicit val context = scala.concurrent.ExecutionContext.Implicits.global
+    val repoEndpoint = (play.Play.application().configuration().getString("SEADservices.uri")) + "repositories"
+    if (repoEndpoint != null) {
+      val endpoint = (repoEndpoint + "/" + URLEncoder.encode(id, "UTF-8"))
+      val futureResponse = WS.url(endpoint).get()
+      var success = false
+      val result = futureResponse.map {
+        case response =>
+          if (response.status >= 200 && response.status < 300 || response.status == 304) {
+            Ok(response.json).as("application/json")
+          } else {
+            if (response.status == 404) {
+
+              NotFound(toJson(Map("failure" -> { "Repository with identifier " + id + " not found" }))).as("application/json")
+
+            } else {
+              InternalServerError(toJson(Map("failure" -> { "Status: " + response.status.toString() + " returned from SEAD /api/repository/<id> service" }))).as("application/json")
+            }
+          }
+      }
+      result
+    } else {
+      Future(NotFound(toJson(Map("failure" -> { "Repository with identifier " + id + " not found" }))).as("application/json"))
+    }
+  }
+
 }
