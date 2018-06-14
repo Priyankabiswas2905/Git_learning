@@ -787,7 +787,7 @@ class Files @Inject() (
                           //Cponverted file is initially empty. Have to wait for Polyglot to finish conversion.
                           //keep checking until file exists or until too many tries
                           //returns future success only if file is found and downloaded
-                          polyglotService.checkForFileAndDownload(triesLeft, convertedFileURL, outputStream)
+                          polyglotService.checkForFileAndDownload(triesLeft, convertedFileURL, outputStream, tempFile)
                       }.map {
                         x =>
                           //successfuly completed future - get here only after polyglotPlugin.getConvertedFileURL is done executing
