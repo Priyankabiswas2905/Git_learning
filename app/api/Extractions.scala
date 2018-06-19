@@ -5,6 +5,7 @@ import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 import akka.NotUsed
+import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Source, StreamConverters}
 import akka.util.ByteString
 import controllers.Utils
@@ -83,6 +84,7 @@ class Extractions @Inject()(
             val futureResponse = ws.url(fileurl).get()
             val fid = for {response <- futureResponse} yield {
               if (response.status == 200) {
+                implicit val materializer = ActorMaterializer()
                 val inputStream: InputStream = response.bodyAsSource.runWith(
                   StreamConverters.asInputStream(FiniteDuration(3, TimeUnit.SECONDS))
                 )

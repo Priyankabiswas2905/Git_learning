@@ -1,7 +1,7 @@
 package services
 
+import akka.actor.ActorSystem
 import javax.inject.Inject
-
 import play.api.inject.ApplicationLifecycle
 import play.api.{Application, Logger}
 import play.libs.Akka
@@ -16,14 +16,14 @@ trait TempFilesService
 /**
  * Plugin for TempFiles.
  */
-class TempFilesServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends TempFilesService {
+class TempFilesServiceImpl @Inject() (lifecycle: ApplicationLifecycle, actorSystem: ActorSystem) extends TempFilesService {
 
   val files: FileService =  DI.injector.instanceOf[FileService]
 
   Logger.debug("Starting up Temp Files Plugin")
   //Delete garbage files (ie past intermediate extractor results files) from DB
-  var timeInterval = play.Play.application().configuration().getInt("intermediateCleanup.checkEvery")
-  Akka.system().scheduler.schedule(0.hours, timeInterval.intValue().hours) {
+  var timeInterval = configuration.get[Int]("intermediateCleanup.checkEvery")
+  actorSystem.scheduler.schedule(0.hours, timeInterval.intValue().hours) {
     files.removeOldIntermediates()
   }
 

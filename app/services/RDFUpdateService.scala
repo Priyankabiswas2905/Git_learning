@@ -4,12 +4,13 @@ import java.io._
 import java.util.ArrayList
 
 import Transformation.LidoToCidocConvertion
+import akka.actor.ActorSystem
 import javax.inject.Inject
 import models._
 import org.apache.commons.io.FileUtils
 import org.bson.types.ObjectId
 import org.json.JSONObject
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import play.api.Play.current
 import play.api.inject.ApplicationLifecycle
 import play.api.libs.concurrent.Execution.Implicits._
@@ -25,7 +26,8 @@ trait RDFUpdateService
  *
  *
  */
-class RDFUpdateServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends RDFUpdateService {
+class RDFUpdateServiceImpl @Inject() (lifecycle: ApplicationLifecycle, actorSystem: ActorSystem,
+	configuration: Configuration) extends RDFUpdateService {
 
   val files: FileService = DI.injector.instanceOf[FileService]
   val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
@@ -35,8 +37,8 @@ class RDFUpdateServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends R
 
 	Logger.debug("Starting RDF updater Plugin")
 
-	var timeInterval = play.Play.application().configuration().getInt("rdfRepoUpdate.updateEvery")
-	Akka.system().scheduler.schedule(0.hours, timeInterval.intValue().hours) {
+	var timeInterval = configuration.get[Int]("rdfRepoUpdate.updateEvery")
+	actorSystem.scheduler.schedule(0.hours, timeInterval.intValue().hours) {
 		modifyRDFOfMetadataChangedFiles()
 		modifyRDFOfMetadataChangedDatasets()
 	}
@@ -86,7 +88,7 @@ class RDFUpdateServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends R
 	              
 	              if(!theJSON.replaceAll(" ","").equals("{}")){
 		              val xmlFile = jsonToXML(theJSON)
-		              new LidoToCidocConvertion(play.api.Play.configuration.getString("filesxmltordfmapping.dir_"+mappingNumber).getOrElse(""), xmlFile.getAbsolutePath(), resultDir)	                            
+		              new LidoToCidocConvertion(configuration.get[String]("filesxmltordfmapping.dir_"+mappingNumber).getOrElse(""), xmlFile.getAbsolutePath(), resultDir)
 		              xmlFile.delete()
 	              }
 	              else{
@@ -96,7 +98,7 @@ class RDFUpdateServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends R
 	              
 	              //Connecting RDF metadata with the entity describing the original file
 					val rootNodes = new ArrayList[String]()
-					val rootNodesFile = play.api.Play.configuration.getString("rootNodesFile").getOrElse("")
+					val rootNodesFile = configuration.get[String]("rootNodesFile")
 					Logger.debug(rootNodesFile)
 					if(!rootNodesFile.equals("*")){
 						val rootNodesReader = new BufferedReader(new FileReader(new java.io.File(rootNodesFile)))						
@@ -143,7 +145,7 @@ class RDFUpdateServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends R
 							
 							if(isInRootNodes){
 								val theResource = rdfDescriptions(i).substring(rdfDescriptions(i).indexOf("\"")+1, rdfDescriptions(i).indexOf("\"", rdfDescriptions(i).indexOf("\"")+1))
-								val theHost = "http://" + play.Play.application().configuration().getString("hostIp").replaceAll("/$", "") + ":" + play.Play.application().configuration().getString("http.port")
+								val theHost = "http://" + configuration.get[String]("hostIp").replaceAll("/$", "") + ":" + configuration.get[String]("http.port")
 								var connection = "<rdf:Description rdf:about=\"" + theHost +"/api/files/"+ id
 								connection = connection	+ "\"><P129_is_about xmlns=\"http://www.cidoc-crm.org/rdfs/cidoc_crm_v5.0.2.rdfs#\" rdf:resource=\"" + theResource
 								connection = connection	+ "\"/></rdf:Description>"
@@ -185,7 +187,7 @@ class RDFUpdateServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends R
 	              
 	              if(!theJSON.replaceAll(" ","").equals("{}")){
 		              val xmlFile = jsonToXML(theJSON)
-		              new LidoToCidocConvertion(play.api.Play.configuration.getString("datasetsxmltordfmapping.dir_"+mappingNumber).getOrElse(""), xmlFile.getAbsolutePath(), resultDir)	                            
+		              new LidoToCidocConvertion(configuration.get[String]("datasetsxmltordfmapping.dir_"+mappingNumber), xmlFile.getAbsolutePath(), resultDir)
 		              xmlFile.delete()
 	              }
 	              else{
@@ -195,7 +197,7 @@ class RDFUpdateServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends R
 	              
 	              //Connecting RDF metadata with the entity describing the original file
 					val rootNodes = new ArrayList[String]()
-					val rootNodesFile = play.api.Play.configuration.getString("datasetRootNodesFile").getOrElse("")
+					val rootNodesFile = configuration.getString("datasetRootNodesFile").getOrElse("")
 					Logger.debug(rootNodesFile)
 					if(!rootNodesFile.equals("*")){
 						val rootNodesReader = new BufferedReader(new FileReader(new java.io.File(rootNodesFile)))						
@@ -242,7 +244,7 @@ class RDFUpdateServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends R
 							
 							if(isInRootNodes){
 								val theResource = rdfDescriptions(i).substring(rdfDescriptions(i).indexOf("\"")+1, rdfDescriptions(i).indexOf("\"", rdfDescriptions(i).indexOf("\"")+1))
-								val theHost = "http://" + play.Play.application().configuration().getString("hostIp").replaceAll("/$", "") + ":" + play.Play.application().configuration().getString("http.port")
+								val theHost = "http://" + configuration.get[String]("hostIp").replaceAll("/$", "") + ":" + configuration.get[String]("http.port")
 								var connection = "<rdf:Description rdf:about=\"" + theHost +"/api/datasets/"+ id
 								connection = connection	+ "\"><P129_is_about xmlns=\"http://www.cidoc-crm.org/rdfs/cidoc_crm_v5.0.2.rdfs#\" rdf:resource=\"" + theResource
 								connection = connection	+ "\"/></rdf:Description>"

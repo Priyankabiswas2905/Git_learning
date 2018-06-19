@@ -85,7 +85,7 @@
 			Configuration.iipZoomPath = "@(routes.Assets.at("plugins") + "/" + "IIPZoom.swf")";
 			Configuration.jsPath = "@(routes.Assets.at("javascripts"))";
 			Configuration.imagesPath = "@(routes.Assets.at("images"))";
-			Configuration.appContext = "@play.api.Play.configuration.getString("application.context").getOrElse("")";
+			Configuration.appContext = "@configuration.get[String]("application.context").getOrElse("")";
 			var cur_description;
 			function updateFileDescription() {
 				cur_description = $('#ds_description').html().trim();

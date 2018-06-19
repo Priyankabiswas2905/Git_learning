@@ -2,6 +2,7 @@ package services
 
 import java.io._
 
+import akka.actor.ActorSystem
 import akka.stream.scaladsl.{FileIO, Sink, Source}
 import akka.util.ByteString
 import javax.inject.Inject
@@ -26,7 +27,11 @@ trait PolyglotService {
  * Polyglot Plugin
  *
  */
-class PolyglotServiceImpl @Inject() (lifecycle: ApplicationLifecycle, configuration: Configuration, wsClient: WSClient)
+class PolyglotServiceImpl @Inject() (
+  lifecycle: ApplicationLifecycle,
+  configuration: Configuration,
+  wsClient: WSClient,
+  actorSystem: ActorSystem)
   extends PolyglotService {
 
   val polyglotUser = configuration.get[String]("polyglot.username")
@@ -84,7 +89,8 @@ class PolyglotServiceImpl @Inject() (lifecycle: ApplicationLifecycle, configurat
           futureResponse
         } else {
           Logger.debug("Checking if file exists on Polyglot, status = " + res.status + " " + res.statusText + ", call again in 3 sec")
-          akka.pattern.after(3 seconds, using = Akka.system.scheduler)(checkForFileAndDownload((triesLeft - 1), url, outputStream))
+          akka.pattern.after(3 seconds, using = actorSystem.scheduler)(checkForFileAndDownload((triesLeft - 1), url, outputStream))
+          Future.failed(throw new RuntimeException("Error connecting to Polyglot."))
         }
       }
   }

@@ -3,13 +3,12 @@ package services
 import java.util.Calendar
 
 import akka.actor.{ActorSystem, Cancellable}
-
-import scala.concurrent.{ExecutionContext, Future}
 import javax.inject._
 import models._
 import play.api.Logger
 import play.api.inject.ApplicationLifecycle
-import play.libs.Akka
+import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 
 // This creates an `ApplicationStart` object once at start-up and registers hook for shut-down.
 @Singleton

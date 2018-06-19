@@ -55,7 +55,7 @@ class MongoDBUserService @Inject() (
     // If account does not exist, add enabled option
     if (UserDAO.count(query) == 0) {
       val register = play.Play.application().configuration().getBoolean("registerThroughAdmins", true)
-      val admins = play.Play.application().configuration().getString("initialAdmins").split("\\s*,\\s*")
+      val admins = configuration.get[String]("initialAdmins").split("\\s*,\\s*")
       // enable account. Admins are always enabled.
       model.email match {
         case Some(e) if admins.contains(e) => {
@@ -95,7 +95,7 @@ class MongoDBUserService @Inject() (
   }
 
   override def updateAdmins() {
-    play.Play.application().configuration().getString("initialAdmins").trim.split("\\s*,\\s*").filter(_ != "").foreach{e =>
+    configuration.get[String]("initialAdmins").trim.split("\\s*,\\s*").filter(_ != "").foreach{e =>
       UserDAO.dao.update(MongoDBObject("email" -> e), $set("serverAdmin" -> true, "active" -> true), upsert=false, multi=true)
     }
   }
@@ -657,7 +657,7 @@ class MongoDBSecureSocialUserService @Inject() (lifecycle: ApplicationLifecycle)
     // If account does not exist, add enabled option
     if (UserDAO.count(query) == 0) {
       val register = play.Play.application().configuration().getBoolean("registerThroughAdmins", true)
-      val admins = play.Play.application().configuration().getString("initialAdmins").split("\\s*,\\s*")
+      val admins = configuration.get[String]("initialAdmins").split("\\s*,\\s*")
       // enable account. Admins are always enabled.
       user.email match {
         case Some(e) if admins.contains(e) => {

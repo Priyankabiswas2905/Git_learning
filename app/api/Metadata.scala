@@ -5,22 +5,14 @@ import java.util.Date
 
 import javax.inject.{Inject, Singleton}
 import models.{ResourceRef, UUID, UserAgent, _}
-import org.elasticsearch.action.search.SearchResponse
 import org.apache.commons.lang.WordUtils
-import play.api.Play.current
-import play.api.Logger
-import play.api.Play._
 import play.api.libs.json.Json._
-import play.api.libs.json._
-import play.api.libs.ws.WS
+import play.api.libs.json.{JsValue, _}
+import play.api.libs.ws.WSClient
 import play.api.mvc.Result
+import play.api.{Configuration, Logger}
 import services._
-import play.api.i18n.Messages
-import play.api.libs.json.JsValue
-import play.libs.ws.WS
 
-import scala.collection.JavaConversions._
-import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 
@@ -38,7 +30,9 @@ class Metadata @Inject() (
     events: EventService,
     spaceService: SpaceService,
     elasticsearchService: ElasticsearchService,
-    rabbitMQService: RabbitMQService) extends ApiController {
+    rabbitMQService: RabbitMQService,
+  wsClient: WSClient,
+  configuration: Configuration) extends ApiController {
 
   def getDefinitions() = PermissionAction(Permission.ViewDataset) {
     implicit request =>
@@ -69,7 +63,7 @@ class Metadata @Inject() (
     }
 
     // Next get Elasticsearch metadata fields if plugin available
-    if (current.configuration.getBoolean("elasticsearchSettings.enabled").getOrElse(false)) {
+    if (configuration.get[Boolean]("elasticsearchSettings.enabled")) {
       val mdTerms = elasticsearchService.getAutocompleteMetadataFields(query)
       for (term <- mdTerms) {
         // e.g. "metadata.http://localhost:9000/clowder/api/extractors/terra.plantcv.angle",
@@ -103,20 +97,21 @@ class Metadata @Inject() (
     }
   }
 
-  def getDefinition(id: UUID) = PermissionAction(Permission.AddMetadata).async { implicit request =>
+  def getDefinition(id: UUID) = PermissionAction(Permission.AddMetadata).async { implicit request: UserRequest[JsValue] =>
     implicit val context = scala.concurrent.ExecutionContext.Implicits.global
     val foo = for {
       md <- metadataService.getDefinition(id)
       url <- (md.json \ "definitions_url").asOpt[String]
     } yield {
-      WS.url(url).get().map(response => Ok(response.body.trim))
+      wsClient.url(url).get().map(response => Ok(response.body.trim))
     }
     foo.getOrElse {
       Future(InternalServerError)
     }
   }
 
-  def getUrl(inUrl: String) = PermissionAction(Permission.AddMetadata).async { implicit request =>
+  def getUrl(inUrl: String) = PermissionAction(Permission.AddMetadata).async {
+    implicit request: UserRequest[JsValue] =>
     // Use java.net.URI instead of URLDecoder.decode to decode the path.
     import java.net.URI
     Logger.debug("Metadata getUrl: inUrl = '" + inUrl + "'.")
@@ -124,7 +119,7 @@ class Metadata @Inject() (
     val url = new URI(inUrl).getPath().replaceAll(" ", "+")
     Logger.debug("Metadata getUrl decoded: url = '" + url + "'.")
     implicit val context = scala.concurrent.ExecutionContext.Implicits.global
-    WS.url(url).get().map {
+    wsClient.url(url).get().map {
       response => Ok(response.body.trim)
     }
   }
@@ -141,7 +136,7 @@ class Metadata @Inject() (
               // assign a default uri if not specified
               if (uri == "") {
                 // http://clowder.ncsa.illinois.edu/metadata/{uuid}#CamelCase
-                uri = play.Play.application().configuration().getString("metadata.uri.prefix") + "/" + space.id.stringify + "#" + WordUtils.capitalize((body \ "label").as[String]).replaceAll("\\s", "")
+                uri = configuration.get[String]("metadata.uri.prefix") + "/" + space.id.stringify + "#" + WordUtils.capitalize((body \ "label").as[String]).replaceAll("\\s", "")
                 body = body.as[JsObject] + ("uri" -> Json.toJson(uri))
               }
               addDefinitionHelper(uri, body, Some(space.id), u, Some(space))
@@ -166,7 +161,7 @@ class Metadata @Inject() (
             // assign a default uri if not specified
             if (uri == "") {
               // http://clowder.ncsa.illinois.edu/metadata#CamelCase
-              uri = play.Play.application().configuration().getString("metadata.uri.prefix") + "#" + WordUtils.capitalize((body \ "label").as[String]).replaceAll("\\s", "")
+              uri = configuration.get[String]("metadata.uri.prefix") + "#" + WordUtils.capitalize((body \ "label").as[String]).replaceAll("\\s", "")
               body = body.as[JsObject] + ("uri" -> Json.toJson(uri))
             }
             addDefinitionHelper(uri, body, None, user, None)
@@ -401,10 +396,10 @@ class Metadata @Inject() (
   def getPerson(pid: String) = PermissionAction(Permission.ViewMetadata).async { implicit request: UserRequest[JsValue] =>
 
     implicit val context = scala.concurrent.ExecutionContext.Implicits.global
-    val peopleEndpoint = (play.Play.application().configuration().getString("people.uri"))
+    val peopleEndpoint = (configuration.get[String]("people.uri"))
     if (peopleEndpoint != null) {
       val endpoint = (peopleEndpoint + "/" + URLEncoder.encode(pid, "UTF-8"))
-      val futureResponse = WS.url(endpoint).get()
+      val futureResponse = wsClient.url(endpoint).get()
       var jsonResponse: play.api.libs.json.JsValue = new JsArray()
       var success = false
       val result = futureResponse.map {
@@ -428,13 +423,14 @@ class Metadata @Inject() (
     }
   }
 
-  def listPeople(term: String, limit: Int) = PermissionAction(Permission.ViewMetadata).async { implicit request =>
+  def listPeople(term: String, limit: Int) = PermissionAction(Permission.ViewMetadata).async {
+    implicit request: UserRequest[JsValue] =>
 
     implicit val context = scala.concurrent.ExecutionContext.Implicits.global
-    val endpoint = (play.Play.application().configuration().getString("people.uri"))
+    val endpoint = (configuration.get[String]("people.uri"))
     if (play.api.Play.current.configuration.getBoolean("stagingarea.enabled").getOrElse(false) && endpoint != null) {
 
-      val futureResponse = WS.url(endpoint).get()
+      val futureResponse = wsClient.url(endpoint).get()
       var jsonResponse: play.api.libs.json.JsValue = new JsArray()
       var success = false
       val lcTerm = term.toLowerCase()

@@ -3,13 +3,13 @@
  */
 package api
 
-import java.io.{File, PrintStream}
+import java.io.{File, FileInputStream, InputStream, PrintStream}
 import java.security.MessageDigest
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 
 import _root_.util.{Parsers, PeekIterator}
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Source, StreamConverters}
 import javax.inject.Inject
 import org.joda.time.format.{DateTimeFormat, ISODateTimeFormat}
 import org.joda.time.{DateTime, IllegalInstantException}
@@ -756,7 +756,7 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService, config: Config
         cacheFetch(description) match {
           case Some(data) => {
             if (format == "csv") {
-              Ok.chunked(data &> Gzip.gzip())
+              Ok.chunked(Source.fromPublisher(play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(data)))
                 .withHeaders(("Content-Disposition", "attachment; filename=datapoints.csv"),
                              ("Content-Encoding", "gzip"))
                 .as(withCharset("text/csv"))
@@ -783,7 +783,8 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService, config: Config
               Ok(toJson(Map("datapointsLength" -> data.length)))
             } else if (format == "csv") {
               val toByteArray: Enumeratee[String, Array[Byte]] = Enumeratee.map[String]{ s => s.getBytes }
-              Ok.chunked(cacheWrite(description, jsonToCSV(data)) &> toByteArray  &> Gzip.gzip())
+              Ok.chunked(Source.fromPublisher(
+                play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(cacheWrite(description, jsonToCSV(data)) &> toByteArray)))
                 .withHeaders(("Content-Disposition", "attachment; filename=datapoints.csv"),
                              ("Content-Encoding", "gzip"))
                 .as(withCharset("text/csv"))
@@ -1449,10 +1450,10 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService, config: Config
   def jsonp(data:Enumerator[String], request: Request[Any]) = {
     val toByteArray: Enumeratee[String, Array[Byte]] = Enumeratee.map[String]{ s => s.getBytes }
     request.getQueryString("callback") match {
-      case Some(callback) => Ok.chunked(Source.fromPublisher(play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(Enumerator(s"$callback(") >>> data >>> Enumerator(");") &> toByteArray &> GzipFlow.gzip())))
+      case Some(callback) => Ok.chunked(Source.fromPublisher(play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(Enumerator(s"$callback(") >>> data >>> Enumerator(");") &> toByteArray)))
         .withHeaders(("Content-Encoding", "gzip"))
         .as(JAVASCRIPT)
-      case None => Ok.chunked(Source.fromPublisher(play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(data &> toByteArray &> GzipFlow.gzip())))
+      case None => Ok.chunked(Source.fromPublisher(play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(data &> toByteArray)))
         .withHeaders(("Content-Encoding", "gzip"))
         .as(JSON)
     }
@@ -1498,7 +1499,7 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService, config: Config
     for (file <- new File(cache).listFiles) {
       val jsonFile = new File(file.getAbsolutePath + ".json")
       if (jsonFile.exists()) {
-        val data = Json.parse(Source.fromFile(jsonFile).mkString)
+        val data = Json.parse(scala.io.Source.fromFile(jsonFile).mkString)
         files.put(file.getName, data.as[JsObject] ++ Json.obj("filesize" -> file.length,
           "created" -> ISODateTimeFormat.dateTime.print(new DateTime(jsonFile.lastModified))))
       }
@@ -1527,13 +1528,15 @@ class Geostreams @Inject() (geostreamsService: GeostreamsService, config: Config
   def cacheFetchAction(filename: String) =  PermissionAction(Permission.ViewGeoStream) { implicit request =>
     val cache = config.get[String]("geostream.cache")
     val file = new File(cache, filename)
+    val inputStream: InputStream = new FileInputStream(file)
     if (file.exists) {
-      val data = Json.parse(Source.fromFile(new File(x, filename + ".json")).mkString)
+      val data = Json.parse(scala.io.Source.fromFile(new File(x, filename + ".json")).mkString)
       Parsers.parseString((data \ "format").get) match {
-        case "csv" => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(withCharset("text/csv"))
-        case "json" => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(JSON)
-        case "geojson" => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(JSON)
-        case _ => Ok.chunked(Enumerator.fromFile(file) &> Gzip.gzip()).as(TEXT)
+
+        case "csv" => Ok.chunked(StreamConverters.fromInputStream(() => inputStream)).as(withCharset("text/csv"))
+        case "json" => Ok.chunked(StreamConverters.fromInputStream(() => inputStream)).as(JSON)
+        case "geojson" => Ok.chunked(StreamConverters.fromInputStream(() => inputStream)).as(JSON)
+        case _ => Ok.chunked(StreamConverters.fromInputStream(() => inputStream)).as(TEXT)
       }
     } else {
       NotFound("File not found in cache")

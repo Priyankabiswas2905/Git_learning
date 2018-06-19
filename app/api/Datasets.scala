@@ -1956,7 +1956,7 @@ class  Datasets @Inject()(
       case Some(followeeModel) => {
         val sourceFollowerIDs = followeeModel.followers
         val excludeIDs = follower.followedEntities.map(typedId => typedId.id) ::: List(followeeUUID, follower.id)
-        val num = play.api.Play.configuration.getInt("number_of_recommendations").getOrElse(10)
+        val num = config.get[Int]("number_of_recommendations")
         userService.getTopRecommendations(sourceFollowerIDs, excludeIDs, num)
       }
       case None => {
@@ -2360,7 +2360,7 @@ class  Datasets @Inject()(
     implicit val user = request.user
         datasets.get(id) match {
           case Some(dataset) => {
-            val bagit = play.api.Play.configuration.getBoolean("downloadDatasetBagit").getOrElse(true)
+            val bagit = config.get[Boolean]("downloadDatasetBagit")
             // Use custom enumerator to create the zip file on the fly
             // Use a 1MB in memory byte array
             Ok.chunked(Source.fromPublisher(play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(enumeratorFromDataset(dataset,1024*1024, compression,bagit,user)))).withHeaders(

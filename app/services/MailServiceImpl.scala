@@ -1,28 +1,27 @@
 package services
 
-import play.api.{Application, Logger}
+import play.api.{Application, Configuration, Logger}
 import play.api.Play.current
 import javax.mail._
 import javax.mail.internet._
 import javax.activation._
 import javax.inject.Inject
-
 import play.api.inject.ApplicationLifecycle
 
 import scala.concurrent.Future
 
 trait MailService
 
-class MailServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends MailService {
+class MailServiceImpl @Inject() (lifecycle: ApplicationLifecycle, configuration: Configuration) extends MailService {
   Logger.debug("Starting Mailer Plugin")
-   val from = play.Play.application().configuration().getString("smtp.from")  
-   val host =  play.Play.application().configuration().getString("smtp.host")
+   val from = configuration.get[String]("smtp.from")
+   val host =  configuration.get[String]("smtp.host")
    val properties = System.getProperties()
    properties.setProperty("mail.smtp.host", host)
    
    //SSL or regular SMTP
-      var port = play.api.Play.configuration.getInt("smtp.port").getOrElse(0)
-      if(play.api.Play.configuration.getBoolean("smtp.ssl").getOrElse(false)){
+      var port = configuration.get[Int]("smtp.port")
+      if(configuration.get[Boolean]("smtp.ssl")){
         if(port == 0)
           port = 465
           
@@ -35,7 +34,7 @@ class MailServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends MailSe
       }
       properties.setProperty("mail.smtp.port", port.toString)
     
-      val user = play.api.Play.configuration.getString("smtp.user").getOrElse("")  
+      val user = configuration.get[String]("smtp.user")
    
       if(!user.equals("")){
         properties.setProperty("mail.smtp.auth", "true")
@@ -61,7 +60,7 @@ class MailServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends MailSe
         session = Session.getInstance(properties,
 			  new javax.mail.Authenticator() {
 				override def getPasswordAuthentication(): PasswordAuthentication = {
-					return new PasswordAuthentication(user, play.api.Play.configuration.getString("smtp.password").getOrElse(""))
+					return new PasswordAuthentication(user, configuration.get[String]("smtp.password"))
 				}
 			  })
       }

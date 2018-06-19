@@ -30,15 +30,17 @@ trait ElasticsearchService {
   def index(collection: Collection, recursive: Boolean)
   def index(file: File)
   def index(section: Section)
+  def index(esObj: Option[models.ElasticsearchObject], index: String)
+  def index(esObj: Option[models.ElasticsearchObject])
   def search(query: List[JsValue], grouping: String): List[ResourceRef]
-  def search(query: String, index: String = nameOfIndex): List[ResourceRef]
-  def getAutocompleteMetadataFields(query: String, index: String = nameOfIndex): List[String]
-  def listTags(resourceType: String = "", index: String = nameOfIndex): Map[String, Long]
+  def search(query: String, index: String): List[ResourceRef]
+  def getAutocompleteMetadataFields(query: String, index: String): List[String]
+  def listTags(resourceType: String = "", index: String): Map[String, Long]
   def delete(index: String, docType: String, id: String)
-  def deleteAll
-  def index(esObj: Option[models.ElasticsearchObject], index: String = nameOfIndex)
+  def deleteAll()
   def isEnabled(): Boolean
-  def createIndex(index: String = nameOfIndex): Unit
+  def createIndex(index: String)
+  def createIndex()
 }
 
 /**
@@ -228,8 +230,9 @@ class ElasticsearchServiceImpl @Inject() (lifecycle: ApplicationLifecycle, conf:
       }
       case None =>
     }
-
   }
+
+  def createIndex(index: String) = createIndex(nameOfIndex)
 
   /** Delete all indices */
   def deleteAll {
@@ -428,6 +431,9 @@ class ElasticsearchServiceImpl @Inject() (lifecycle: ApplicationLifecycle, conf:
       case None => Logger.error("No ElasticsearchObject found to index")
     }
   }
+
+  def index(esObj: Option[models.ElasticsearchObject]) =
+    index(esObj, nameOfIndex)
 
   /** Return map of distinct value/count for tags **/
   def listTags(resourceType: String = "", index: String = nameOfIndex): Map[String, Long] = {

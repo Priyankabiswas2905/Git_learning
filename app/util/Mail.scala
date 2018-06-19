@@ -1,7 +1,7 @@
 package util
 
+import akka.actor.ActorSystem
 import javax.inject.Inject
-
 import models.User
 import play.api.libs.concurrent.Akka
 import play.twirl.api.Html
@@ -20,7 +20,7 @@ import play.api.libs.mailer._
   */
 object Mail {
 
-//  val mailerClient: MailerAPI = DI.injector.instanceOf[MailerAPI]
+  val actorSystem: ActorSystem = DI.injector.instanceOf[ActorSystem]
 
   /**
    * Send email to a single recipient
@@ -70,7 +70,7 @@ object Mail {
       Logger.debug("Sending email to %s".format(recipients.toList:_*))
       Logger.debug("Mail = [%s]".format(text))
     }
-    Akka.system.scheduler.scheduleOnce(1.seconds) {
+    actorSystem.scheduler.scheduleOnce(1.seconds) {
       val email = Email(subject, from, to=recipients.toSeq, bodyText=Some(text))
       MailerPlugin.send(email)
     }

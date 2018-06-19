@@ -21,7 +21,7 @@ import models.{File, _}
 import org.apache.commons.io.FileUtils
 import org.bson.types.ObjectId
 import org.json.JSONObject
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import play.api.Play._
 import play.api.libs.json.Json._
 import play.api.libs.json.{JsArray, JsValue, Json}
@@ -48,7 +48,8 @@ class MongoDBDatasetService @Inject() (
   folders: Provider[FolderService],
   metadatas: Provider[MetadataService],
   events: Provider[EventService],
-  elasticsearchService: Provider[ElasticsearchService]) extends DatasetService {
+  elasticsearchService: Provider[ElasticsearchService],
+  configuration: Configuration) extends DatasetService {
 
   object MustBreak extends Exception {}
 
@@ -296,13 +297,13 @@ class MongoDBDatasetService @Inject() (
     // - access  == show all datasets the user can see
     // - default == public only
     val public = MongoDBObject("public" -> true)
-    val enablePublic = play.Play.application().configuration().getBoolean("enablePublic")
+    val enablePublic = configuration.get[Boolean]("enablePublic")
     //emptySpaces should not be used in most cases since your dataset maybe in a space, then you are changed to viewer or kicked off.
     val emptySpaces = MongoDBObject("spaces" -> List.empty)
     val publicSpaces = spaces.get().listByStatus(SpaceStatus.PUBLIC.toString).map(s => new ObjectId(s.id.stringify))
 
     // create access filter
-    val filterAccess = if (showAll || configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public" && permissions.contains(Permission.ViewDataset)) {
+    val filterAccess = if (showAll || configuration.get[String]("permissions") == "public" && permissions.contains(Permission.ViewDataset)) {
       MongoDBObject()
     } else {
       user match {
@@ -490,7 +491,7 @@ class MongoDBDatasetService @Inject() (
 
         if(!theJSON.replaceAll(" ","").equals("{}")){
           val xmlFile = jsonToXML(theJSON)
-          new LidoToCidocConvertion(play.api.Play.configuration.getString("datasetsxmltordfmapping.dir_"+mappingNumber).getOrElse(""), xmlFile.getAbsolutePath(), resultDir)
+          new LidoToCidocConvertion(configuration.get[String]("datasetsxmltordfmapping.dir_"+mappingNumber), xmlFile.getAbsolutePath(), resultDir)
           xmlFile.delete()
         }
         else{
@@ -500,7 +501,7 @@ class MongoDBDatasetService @Inject() (
 
         //Connecting RDF metadata with the entity describing the original file
         val rootNodes = new ArrayList[String]()
-        val rootNodesFile = play.api.Play.configuration.getString("datasetRootNodesFile").getOrElse("")
+        val rootNodesFile = configuration.get[String]("datasetRootNodesFile")
         Logger.debug(rootNodesFile)
         if(!rootNodesFile.equals("*")){
           val rootNodesReader = new BufferedReader(new FileReader(new java.io.File(rootNodesFile)))
@@ -547,7 +548,7 @@ class MongoDBDatasetService @Inject() (
 
             if(isInRootNodes){
               val theResource = rdfDescriptions(i).substring(rdfDescriptions(i).indexOf("\"")+1, rdfDescriptions(i).indexOf("\"", rdfDescriptions(i).indexOf("\"")+1))
-              val theHost = "http://" + play.Play.application().configuration().getString("hostIp").replaceAll("/$", "") + ":" + play.Play.application().configuration().getString("http.port")
+              val theHost = "http://" + configuration.get[String]("hostIp").replaceAll("/$", "") + ":" + configuration.get[String]("http.port")
               var connection = "<rdf:Description rdf:about=\"" + theHost +"/api/datasets/"+ id
               connection = connection	+ "\"><P129_is_about xmlns=\"http://www.cidoc-crm.org/rdfs/cidoc_crm_v5.0.2.rdfs#\" rdf:resource=\"" + theResource
               connection = connection	+ "\"/></rdf:Description>"
@@ -608,7 +609,7 @@ class MongoDBDatasetService @Inject() (
    * Return a list of tags and counts found in sections
    */
   def getTags(user: Option[User]): Map[String, Long] = {
-    if(configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public"){
+    if(configuration.get[String]("permissions") == "public"){
       val x = Dataset.dao.collection.aggregate( MongoDBObject("$unwind" -> "$tags"),
         MongoDBObject("$group" -> MongoDBObject("_id" -> "$tags.name", "count" -> MongoDBObject("$sum" -> 1L))))
       x.results.map(x => (x.getAsOrElse[String]("_id", "??"), x.getAsOrElse[Long]("count", 0L))).toMap
@@ -623,7 +624,7 @@ class MongoDBDatasetService @Inject() (
 
   private def buildTagFilter(user: Option[User]): MongoDBObject = {
     val orlist = collection.mutable.ListBuffer.empty[MongoDBObject]
-    if(!(configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public")){
+    if(!(configuration.get[String]("permissions") == "public")){
       user match {
         case Some(u)  => {
           orlist += MongoDBObject("status" -> DatasetStatus.PUBLIC.toString )
@@ -707,7 +708,7 @@ class MongoDBDatasetService @Inject() (
   }
 
   def findByTag(tag: String, user: Option[User]): List[Dataset] = {
-    if(configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public"){
+    if(configuration.get[String]("permissions") == "public"){
       Dataset.dao.find(MongoDBObject("tags.name" -> tag)).toList
     } else {
       Dataset.dao.find(buildTagFilter(user) ++
@@ -922,7 +923,7 @@ class MongoDBDatasetService @Inject() (
     val dataset = get(id).get
     val existingTags = dataset.tags.filter(x => userIdStr == x.userId && eid == x.extractor_id).map(_.name)
     val createdDate = new Date
-    val maxTagLength = play.api.Play.configuration.getInt("clowder.tagLength").getOrElse(100)
+    val maxTagLength = configuration.get[Int]("clowder.tagLength")
     tags.foreach(tag => {
       val shortTag = if (tag.length > maxTagLength) {
         Logger.error("Tag is truncated to " + maxTagLength + " chars : " + tag)
@@ -1343,10 +1344,10 @@ class MongoDBDatasetService @Inject() (
 
 		    val fileSep = System.getProperty("file.separator")
 		    val lineSep = System.getProperty("line.separator")
-		    var dsMdDumpDir = play.api.Play.configuration.getString("datasetdump.dir").getOrElse("")
+		    var dsMdDumpDir = configuration.get[String]("datasetdump.dir")
 			if(!dsMdDumpDir.endsWith(fileSep))
 				dsMdDumpDir = dsMdDumpDir + fileSep
-			var dsMdDumpMoveDir = play.api.Play.configuration.getString("datasetdumpmove.dir").getOrElse("")
+			var dsMdDumpMoveDir = configuration.get[String]("datasetdumpmove.dir")
 			if(dsMdDumpMoveDir.equals("")){
 				Logger.warn("Will not move dumped datasets metadata to staging directory. No staging directory set.")
 			}
@@ -1410,10 +1411,10 @@ class MongoDBDatasetService @Inject() (
 
 		    val fileSep = System.getProperty("file.separator")
 		    val lineSep = System.getProperty("line.separator")
-		    var datasetsDumpDir = play.api.Play.configuration.getString("datasetdump.dir").getOrElse("")
+		    var datasetsDumpDir = configuration.get[String]("datasetdump.dir").getOrElse("")
 			if(!datasetsDumpDir.endsWith(fileSep))
 				datasetsDumpDir = datasetsDumpDir + fileSep
-			var dsDumpMoveDir = play.api.Play.configuration.getString("datasetdumpmove.dir").getOrElse("")
+			var dsDumpMoveDir = configuration.get[String]("datasetdumpmove.dir").getOrElse("")
 			if(dsDumpMoveDir.equals("")){
 				Logger.warn("Will not move dumped dataset groupings to staging directory. No staging directory set.")
 			}

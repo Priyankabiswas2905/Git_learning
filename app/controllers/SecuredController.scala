@@ -63,9 +63,9 @@ trait SecuredController extends BaseController with I18nSupport {
   }
 
   /** call code iff user is logged in */
-  def AuthenticatedAction = new ActionBuilder[UserRequest, String] {
+  def AuthenticatedAction = new ActionBuilder[UserRequest, AnyContent] {
     override protected def executionContext: ExecutionContext = controllerComponents.executionContext
-    override def parser: BodyParser[String] = controllerComponents.parsers.text
+    override def parser: BodyParser[AnyContent] = controllerComponents.parsers.anyContent
     def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {

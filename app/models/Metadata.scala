@@ -111,7 +111,7 @@ object Agent {
       //if creator is still None - wrong user input
       creator match {
         case Some(c) => JsSuccess(c)
-        case None => JsError(ValidationError("could not get creator"))
+        case None => JsError("could not get creator")
       }
     }
   }
@@ -157,10 +157,10 @@ object RDFModel {
 
     def reads(json: JsValue) = {
       var model: Option[models.RDFModel] = None
-      var in: java.io.InputStream = new java.io.ByteArrayInputStream( Json.stringify(json).getBytes )
+      val in: java.io.InputStream = new java.io.ByteArrayInputStream( Json.stringify(json).getBytes )
       
       // Parse JSON-LD
-      var m: Model = ModelFactory.createDefaultModel()
+      val m: Model = ModelFactory.createDefaultModel()
       var error: String = null
       try {
         m.read(in, "http://example/base", "JSON-LD")
@@ -168,11 +168,11 @@ object RDFModel {
       } catch {
         case e: Exception => error = e.getLocalizedMessage
       }
-      if(error != null) JsError(ValidationError(error))
+      if(error != null) JsError(error)
       else
         model match {
           case Some(c) => JsSuccess(c)
-          case None => JsError(ValidationError("Parse succeeded, but JSON-LD RDF model was empty. Try setting a default @vocab in your @context node."))
+          case None => JsError("Parse succeeded, but JSON-LD RDF model was empty. Try setting a default @vocab in your @context node.")
         }
     }
     

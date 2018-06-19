@@ -1176,11 +1176,12 @@ class Files @Inject() (
                     // TODO RK need to replace unknown with the server name and dataset type
                     val dtkey = "unknown." + "dataset." + "unknown"
 
-                    rabbitMQService.extract(ExtractorMessage(dataset_id, dataset_id, host, dtkey, Map.empty, f.length.toString, dataset_id, ""))
+                    rabbitMQService.extract(ExtractorMessage(dataset_id, dataset_id, host, dtkey, Map.empty,
+                      f.length.toString, dataset_id, ""))
 
                     //add file to RDF triple store if triple store is used
                     if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
-                      play.api.Play.configuration.getString("userdfSPARQLStore").getOrElse("no") match {
+                      conf.get[String]("userdfSPARQLStore") match {
                         case "yes" => {
                           sparql.addFileToGraph(f.id)
                           sparql.linkFileToDataset(f.id, dataset_id)

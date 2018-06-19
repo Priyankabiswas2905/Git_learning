@@ -282,7 +282,7 @@ class CurationObjects @Inject()(datasets: DatasetService,
       implicit val user = request.user
       curations.get(curationId) match {
         case Some(c) => {
-          val endpoint =play.Play.application().configuration().getString("stagingarea.uri").replaceAll("/$","")
+          val endpoint =configuration.get[String]("stagingarea.uri").replaceAll("/$","")
           val httpDelete = new HttpDelete(endpoint + "/urn:uuid:" + curationId.toString())
           val client = new DefaultHttpClient
           val response = client.execute(httpDelete)

@@ -1,5 +1,6 @@
 package services
 
+import akka.actor.ActorSystem
 import javax.inject.Inject
 import play.api.{Application, Logger}
 import play.libs.Akka
@@ -16,15 +17,15 @@ trait RDFExporterService
 /**
  * Plugin for RDF Exporter
  */
-class RDFExporterPlugin @Inject() (lifecycle: ApplicationLifecycle) extends RDFExporterService {
+class RDFExporterPlugin @Inject() (lifecycle: ApplicationLifecycle, actorSystem: ActorSystem) extends RDFExporterService {
 
   val files: FileService =  DI.injector.instanceOf[FileService]
 
   Logger.debug("Starting up RDF Exporter Plugin")
   //Clean temporary RDF files if RDF exporter is activated
   if(current.configuration.getBoolean("isRDFExportEnabled").getOrElse(false)){
-    val timeInterval = play.Play.application().configuration().getInt("rdfTempCleanup.checkEvery")
-    Akka.system().scheduler.schedule(0.minutes, timeInterval.intValue().minutes){
+    val timeInterval = configuration.get[Int]("rdfTempCleanup.checkEvery")
+    actorSystem.scheduler.schedule(0.minutes, timeInterval.intValue().minutes){
       files.removeTemporaries()
     }
   }

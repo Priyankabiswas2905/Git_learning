@@ -2,9 +2,9 @@ package controllers
 
 import java.net.URL
 import java.util.{Calendar, Date}
-import javax.inject.Inject
 
-import api.Permission
+import javax.inject.Inject
+import api.{Permission, UserRequest}
 import api.Permission._
 import models._
 import org.joda.time.DateTime
@@ -17,9 +17,9 @@ import util.{Formatters, Mail}
 
 import scala.collection.immutable.List
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
-
 import play.api.Play.current
 import play.api.i18n.Messages.Implicits._
+import play.api.mvc.{AnyContent, Request}
 
 /**
  * Spaces allow users to partition the data into realms only accessible to users with the right permissions.
@@ -42,7 +42,8 @@ case class spaceInviteData(
   message: Option[String])
 
 class Spaces @Inject()(spaces: SpaceService, users: UserService, events: EventService, curationService: CurationService,
-  extractors: ExtractorService, datasets:DatasetService, collections:CollectionService, selections: SelectionService) extends SecuredController {
+  extractors: ExtractorService, datasets:DatasetService, collections:CollectionService, selections: SelectionService)
+  extends SecuredController with play.api.i18n.I18nSupport {
 
   /**
    * New/Edit project space form bindings.

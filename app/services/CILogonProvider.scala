@@ -1,7 +1,6 @@
 package services
 
 import play.api.libs.json.JsObject
-import play.api.libs.ws.WS
 import play.api.{Application, Logger}
 
 import scala.collection.JavaConverters._

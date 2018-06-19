@@ -21,7 +21,7 @@ import play.api.{Play, Application}
 //@DoNotDiscover
 class PreviewsAPIAppSpec extends PlaySpec with ConfiguredApp with FakeMultipartUpload {
 
-  lazy val secretKey = play.api.Play.configuration.getString("commKey").getOrElse("")
+  lazy val secretKey = configuration.get[String]("commKey").getOrElse("")
   lazy val workingDir = System.getProperty("user.dir")
   lazy val emptyJson = new JsObject(List.empty)
 
@@ -187,7 +187,7 @@ class PreviewsAPIAppSpec extends PlaySpec with ConfiguredApp with FakeMultipartU
     }
 
     "respond to the list() function routed by GET /api/previews" in {
-      val secretKey = play.api.Play.configuration.getString("commKey").getOrElse("")
+      val secretKey = configuration.get[String]("commKey").getOrElse("")
       val Some(result) = route(FakeRequest(GET, "/api/previews?key=" + secretKey))
       info("Status=" + status(result))
       status(result) mustEqual OK

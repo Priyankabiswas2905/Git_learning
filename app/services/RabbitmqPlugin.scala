@@ -4,24 +4,24 @@ import java.io.IOException
 import java.net.{URI, URLEncoder}
 import java.text.SimpleDateFormat
 
-import akka.actor.{Actor, ActorRef, PoisonPill, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client._
 import javax.inject.Inject
 import models.{Extraction, UUID}
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import play.api.Play.current
 import play.api.inject.ApplicationLifecycle
 import play.api.libs.json.{JsValue, Json}
-import play.api.libs.ws.{WSAuthScheme, WSResponse}
+import play.api.libs.ws.{WSAuthScheme, WSClient, WSResponse}
 import play.libs.Akka
 
 import scala.concurrent.Future
 import scala.util.Try
 
 
-// TODO make optional fields Option[UUID]
-
+// FIXME make optional fields Option[UUID]
+// FIXME get rid of default secretKey value
 case class ExtractorMessage(
   fileId: UUID,
   intermediateId: UUID,
@@ -31,7 +31,7 @@ case class ExtractorMessage(
   fileSize: String,
   datasetId: UUID,
   flags: String,
-  secretKey: String = play.api.Play.configuration.getString("commKey").getOrElse(""))
+  secretKey: String = DI.injector.instanceOf[Configuration].get[String]("commKey"))
 
 trait RabbitMQService {
   var exchange: String = ""
@@ -49,7 +49,8 @@ trait RabbitMQService {
  * Rabbitmq service.
  *
  */
-class RabbitmqPlugin @Inject() (lifecycle: ApplicationLifecycle) extends RabbitMQService {
+class RabbitmqPlugin @Inject() (lifecycle: ApplicationLifecycle, actorSystem: ActorSystem, wsClient: WSClient,
+  configuration: Configuration) extends RabbitMQService {
   val files: FileService = DI.injector.instanceOf[FileService]
 
   var extractQueue: Option[ActorRef] = None
@@ -65,10 +66,9 @@ class RabbitmqPlugin @Inject() (lifecycle: ApplicationLifecycle) extends RabbitM
 
 
   Logger.debug("Starting Rabbitmq Plugin")
-  val configuration = play.api.Play.configuration
-  rabbitmquri = configuration.getString("clowder.rabbitmq.uri").getOrElse("amqp://guest:guest@localhost:5672/%2f")
-  exchange = configuration.getString("clowder.rabbitmq.exchange").getOrElse("clowder")
-  mgmtPort = configuration.getString("clowder.rabbitmq.managmentPort").getOrElse("15672")
+  rabbitmquri = configuration.get[String]("clowder.rabbitmq.uri")
+  exchange = configuration.get[String]("clowder.rabbitmq.exchange")
+  mgmtPort = configuration.get[String]("clowder.rabbitmq.managmentPort")
   Logger.debug("uri= "+ rabbitmquri)
 
   try {
@@ -133,8 +133,6 @@ class RabbitmqPlugin @Inject() (lifecycle: ApplicationLifecycle) extends RabbitM
     if (channel.isDefined) return true
     if (!factory.isDefined) return true
 
-    val configuration = play.api.Play.configuration
-
     try {
       val protocol = if (factory.get.isSSL) "https://" else "http://"
       restURL = Some(protocol + factory.get.getHost +  ":" + mgmtPort)
@@ -159,7 +157,7 @@ class RabbitmqPlugin @Inject() (lifecycle: ApplicationLifecycle) extends RabbitM
       // status consumer
       Logger.info("Starting extraction status receiver")
 
-      event_filter = Some(Akka.system.actorOf(
+      event_filter = Some(actorSystem.actorOf(
         Props(new EventFilter(channel.get, replyQueueName)),
         name = "EventFilter"
       ))
@@ -173,9 +171,11 @@ class RabbitmqPlugin @Inject() (lifecycle: ApplicationLifecycle) extends RabbitM
       )
 
       // setup akka for sending messages
-      extractQueue = Some(Akka.system.actorOf(Props(new SendingActor(channel = channel.get,
+      val appHttpPort = configuration.get[String]("http.port")
+      val appHttpsPort = configuration.get[String]("https.port")
+      extractQueue = Some(actorSystem.actorOf(Props(new SendingActor(channel = channel.get,
         exchange = exchange,
-        replyQueueName = replyQueueName))))
+        replyQueueName = replyQueueName, appHttpPort, appHttpsPort))))
 
       true
     } catch {
@@ -209,7 +209,7 @@ class RabbitmqPlugin @Inject() (lifecycle: ApplicationLifecycle) extends RabbitM
       case Some(x) => {
         val url = x + path
         Logger.trace("RESTURL: "+ url)
-        WS.url(url).withHeaders("Accept" -> "application/json").withAuth(username, password, WSAuthScheme.BASIC).get()
+        wsClient.url(url).withHeaders("Accept" -> "application/json").withAuth(username, password, WSAuthScheme.BASIC).get()
       }
       case None => {
         Logger.warn("Could not get bindings")
@@ -280,9 +280,8 @@ class RabbitmqPlugin @Inject() (lifecycle: ApplicationLifecycle) extends RabbitM
    * Send message on specified channel and exchange, and tells receiver to reply
    * on specified queue.
    */
-class SendingActor(channel: Channel, exchange: String, replyQueueName: String) extends Actor {
-  val appHttpPort = play.api.Play.configuration.getString("http.port").getOrElse("")
-  val appHttpsPort = play.api.Play.configuration.getString("https.port").getOrElse("")
+class SendingActor(channel: Channel, exchange: String, replyQueueName: String, appHttpPort: String,
+    appHttpsPort: String) extends Actor {
   val rabbitmqService: RabbitMQService = DI.injector.instanceOf[RabbitMQService]
 
   def receive = {

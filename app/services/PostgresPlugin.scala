@@ -1,23 +1,15 @@
-/**
- *
- */
 package services
 
+import java.sql.{DriverManager, Statement, Timestamp}
 import java.text.SimpleDateFormat
-
-import play.api.{Application, Logger}
-import play.api.Play.current
-import java.sql.DriverManager
 import java.util.Properties
-import java.sql.Timestamp
-import java.sql.Statement
-import javax.inject.{Inject, Singleton}
 
+import javax.inject.{Inject, Singleton}
 import play.api.inject.ApplicationLifecycle
+import play.api.{Configuration, Logger}
 import util.Parsers
 import play.api.libs.json._
 
-import scala.collection.mutable.Map
 import scala.concurrent.Future
 
 trait GeostreamsService {
@@ -94,7 +86,8 @@ trait GeostreamsService {
  *
  */
 @Singleton
-class GeostreamsServicePostgresImpl @Inject() (lifecycle: ApplicationLifecycle) extends GeostreamsService {
+class GeostreamsServicePostgresImpl @Inject() (lifecycle: ApplicationLifecycle, configuration: Configuration)
+  extends GeostreamsService {
 
   var conn: java.sql.Connection = null
 
@@ -110,18 +103,17 @@ class GeostreamsServicePostgresImpl @Inject() (lifecycle: ApplicationLifecycle) 
   }
 
   lazy val enabled = {
-    !current.configuration.getString("postgresplugin").filter(_ == "disabled").isDefined
+    !(configuration.get[String]("postgresplugin")== "disabled")
   }
 
   def connect() = {
     conn = null
 
-    val configuration = play.api.Play.configuration
-    val host = configuration.getString("postgres.host").getOrElse("localhost")
-    val port = configuration.getString("postgres.port").getOrElse("5432")
-    val db = configuration.getString("postgres.db").getOrElse("geostream")
-    val user = configuration.getString("postgres.user").getOrElse("")
-    val password = configuration.getString("postgres.password").getOrElse("")
+    val host = configuration.get[String]("postgres.host")
+    val port = configuration.get[Int]("postgres.port")
+    val db = configuration.get[String]("postgres.db")
+    val user = configuration.get[String]("postgres.user")
+    val password = configuration.get[String]("postgres.password")
 
     try {
       Class.forName("org.postgresql.Driver")
@@ -521,7 +513,7 @@ class GeostreamsServicePostgresImpl @Inject() (lifecycle: ApplicationLifecycle) 
    * @return a list of tuples, first element is sensor name, second is sensor url on dashboard
    */
   def getDashboardSensorURLs(ids: List[String]): List[(String, String)] = {
-    val base = play.api.Play.configuration.getString("geostream.dashboard.url").getOrElse("http://localhost:9000")
+    val base = configuration.get[String]("geostream.dashboard.url")
     val sensorsJson = ids.map(id => Json.parse(getSensor(id).getOrElse("{}")))
     List.tabulate(sensorsJson.size) { i =>
       val name = (sensorsJson(i) \ "name").as[String]

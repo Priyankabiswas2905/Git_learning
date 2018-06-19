@@ -24,7 +24,7 @@ import collection.JavaConverters._
 import scala.collection.JavaConversions._
 import javax.inject.{Inject, Singleton}
 import com.mongodb.casbah.WriteConcern
-import play.api.Logger
+import play.api.{Configuration, Logger}
 
 import scala.util.parsing.json.JSONArray
 import play.api.libs.json.JsArray
@@ -60,7 +60,8 @@ class MongoDBFileService @Inject() (
   folders: Provider[FolderService],
   metadatas: Provider[MetadataService],
   events: EventService,
-  elasticsearchService: Provider[ElasticsearchService]) extends FileService {
+  elasticsearchService: Provider[ElasticsearchService],
+  configuration: Configuration) extends FileService {
 
   object MustBreak extends Exception {}
 
@@ -283,7 +284,7 @@ class MongoDBFileService @Inject() (
 
         if (!theJSON.replaceAll(" ", "").equals("{}")) {
           val xmlFile = jsonToXML(theJSON)
-          new LidoToCidocConvertion(play.api.Play.configuration.getString("filesxmltordfmapping.dir_" + mappingNumber).getOrElse(""), xmlFile.getAbsolutePath(), resultDir)
+          new LidoToCidocConvertion(configuration.get[String]("filesxmltordfmapping.dir_" + mappingNumber), xmlFile.getAbsolutePath(), resultDir)
           xmlFile.delete()
         }
         else {
@@ -293,7 +294,7 @@ class MongoDBFileService @Inject() (
 
         //Connecting RDF metadata with the entity describing the original file
         val rootNodes = new ArrayList[String]()
-        val rootNodesFile = play.api.Play.configuration.getString("rootNodesFile").getOrElse("")
+        val rootNodesFile = configuration.get[String]("rootNodesFile")
         Logger.debug(rootNodesFile)
         if (!rootNodesFile.equals("*")) {
           val rootNodesReader = new BufferedReader(new FileReader(new java.io.File(rootNodesFile)))
@@ -746,7 +747,7 @@ class MongoDBFileService @Inject() (
   }
   def removeTemporaries(){
     val cal = Calendar.getInstance()
-    val timeDiff = play.Play.application().configuration().getInt("rdfTempCleanup.removeAfter")
+    val timeDiff = configuration.get[Int]("rdfTempCleanup.removeAfter")
     cal.add(Calendar.MINUTE, -timeDiff)
     val oldDate = cal.getTime()
 
@@ -932,7 +933,7 @@ class MongoDBFileService @Inject() (
 
   def removeOldIntermediates(){
     val cal = Calendar.getInstance()
-    val timeDiff = play.Play.application().configuration().getInt("intermediateCleanup.removeAfter")
+    val timeDiff = configuration.get[Int]("intermediateCleanup.removeAfter")
     cal.add(Calendar.HOUR, -timeDiff)
     val oldDate = cal.getTime()
     val fileList = FileDAO.find($and("isIntermediate" $eq true, "uploadDate" $lt oldDate)).toList
@@ -953,10 +954,10 @@ class MongoDBFileService @Inject() (
 
 		    val fileSep = System.getProperty("file.separator")
 		    val lineSep = System.getProperty("line.separator")
-		    var fileMdDumpDir = play.api.Play.configuration.getString("filedump.dir").getOrElse("")
+		    var fileMdDumpDir = configuration.get[String]("filedump.dir").getOrElse("")
 			if(!fileMdDumpDir.endsWith(fileSep))
 				fileMdDumpDir = fileMdDumpDir + fileSep
-			var fileMdDumpMoveDir = play.api.Play.configuration.getString("filedumpmove.dir").getOrElse("")
+			var fileMdDumpMoveDir = configuration.get[String]("filedumpmove.dir").getOrElse("")
 			if(fileMdDumpMoveDir.equals("")){
 				Logger.warn("Will not move dumped files metadata to staging directory. No staging directory set.")
 			}

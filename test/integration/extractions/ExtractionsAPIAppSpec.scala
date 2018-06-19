@@ -22,7 +22,7 @@ import play.api.{Play, Application}
 //@DoNotDiscover
 class ExtractionsAPIAppSpec extends PlaySpec with ConfiguredApp with FakeMultipartUpload {
 
-  lazy val secretKey = play.api.Play.configuration.getString("commKey").getOrElse("")
+  lazy val secretKey = configuration.get[String]("commKey").getOrElse("")
   lazy val workingDir = System.getProperty("user.dir")
 
   var ncsaLogoFileId: String = ""

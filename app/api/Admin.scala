@@ -13,7 +13,7 @@ import play.api.libs.json.Json.toJson
 import play.twirl.api.Html
 import services._
 import services.mongodb.{MongoSalatPlugin, MongoService}
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import util.Mail
 
 import scala.concurrent.duration._
@@ -31,7 +31,8 @@ class Admin @Inject()(userService: UserService,
   events:EventService,
   elasticsearchService: ElasticsearchService,
   mongoService: MongoService,
-  actorSystem: ActorSystem) extends Controller with ApiController {
+  actorSystem: ActorSystem,
+  configuration: Configuration) extends Controller with ApiController {
 
   /**
    * DANGER: deletes all data, keep users.
@@ -181,7 +182,7 @@ class Admin @Inject()(userService: UserService,
 
   def reindex = ServerAdminAction { implicit request =>
     actorSystem.scheduler.scheduleOnce(1 seconds) {
-      if (current.configuration.getBoolean("elasticsearchSettings.enabled").getOrElse(false)) {
+      if (configuration.get[Boolean]("elasticsearchSettings.enabled")) {
         // Delete & recreate index
         elasticsearchService.deleteAll
         elasticsearchService.createIndex()

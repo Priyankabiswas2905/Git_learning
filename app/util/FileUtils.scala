@@ -10,7 +10,7 @@ import controllers.Utils
 import fileutils.FilesUtils
 import models._
 import org.apache.commons.codec.digest.DigestUtils
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import play.api.Play._
 import play.api.libs.Files
 import play.api.libs.json._
@@ -23,6 +23,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 import javax.mail.internet.MimeUtility
 import java.net.URLEncoder
+
+import akka.actor.ActorSystem
 
 object FileUtils {
   val appConfig: AppConfigurationService = DI.injector.instanceOf[AppConfigurationService]
@@ -41,6 +43,8 @@ object FileUtils {
   lazy val elasticsearchService : ElasticsearchService = DI.injector.instanceOf[ElasticsearchService]
   lazy val rabbitmqService: RabbitMQService = DI.injector.instanceOf[RabbitMQService]
   lazy val fileDumpService: FileDumpService = DI.injector.instanceOf[FileDumpServiceImpl]
+  lazy val actorSystem = DI.injector.instanceOf[ActorSystem]
+  lazy val configuration = DI.injector.instanceOf[Configuration]
 
   def getContentType(filename: Option[String], contentType: Option[String]): String = {
     getContentType(filename.getOrElse(""), contentType)
@@ -368,7 +372,7 @@ object FileUtils {
     associateDataset(file, dataset, folder, user, multipleFile)
 
     // process rest of file in background
-    val fileExecutionContext: ExecutionContext = Akka.system().dispatchers.lookup("akka.actor.contexts.file-processing")
+    val fileExecutionContext: ExecutionContext = actorSystem.dispatchers.lookup("akka.actor.contexts.file-processing")
     Future {
       try {
         saveFile(file, f.ref.file, originalZipFile).foreach { fixedfile =>
@@ -424,7 +428,7 @@ object FileUtils {
     associateDataset(file, fileds, folder, user)
 
     // process rest of file in background
-    val fileExecutionContext: ExecutionContext = Akka.system().dispatchers.lookup("akka.actor.contexts.file-processing")
+    val fileExecutionContext: ExecutionContext = actorSystem.dispatchers.lookup("akka.actor.contexts.file-processing")
     Future {
       saveURL(file, url).foreach { fixedfile =>
         processFileBytes(fixedfile, new java.io.File(path), fileds)
@@ -451,7 +455,7 @@ object FileUtils {
     }
 
     // getStringList returns a java.util.List as opposed to the kind of List we want, thus the conversion
-    val sourcelist = play.api.Play.configuration.getStringList("filesystem.sourcepaths").map(_.toList).getOrElse(List.empty[String])
+    val sourcelist = configuration.get[List[String]]("filesystem.sourcepaths")
 
     // Is the current path included in the source whitelist?
     if (sourcelist.exists(s => path.startsWith(s))) {
@@ -484,7 +488,7 @@ object FileUtils {
       associateDataset(file, fileds, folder, user)
 
       // process rest of file in background
-      val fileExecutionContext: ExecutionContext = Akka.system().dispatchers.lookup("akka.actor.contexts.file-processing")
+      val fileExecutionContext: ExecutionContext = actorSystem.dispatchers.lookup("akka.actor.contexts.file-processing")
       Future {
         savePath(file, path).foreach { fixedfile =>
           processFileBytes(fixedfile, new java.io.File(path), fileds)

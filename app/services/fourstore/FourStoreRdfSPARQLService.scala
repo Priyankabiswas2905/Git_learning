@@ -17,19 +17,21 @@ import org.apache.http.client.entity.UrlEncodedFormEntity
 import services.{DI, DatasetService, FileService, RdfSPARQLService}
 import javax.inject.{Inject, Singleton}
 import models.UUID
+import play.api.Configuration
 
 @Singleton
-class FourStoreRdfSPARQLService @Inject() (datasets: Provider[DatasetService], files: Provider[FileService]) extends RdfSPARQLService {
+class FourStoreRdfSPARQLService @Inject() (datasets: Provider[DatasetService],
+  files: Provider[FileService], configuration: Configuration) extends RdfSPARQLService {
 
   def addFileToGraph(fileId: UUID, selectedGraph:String = "rdfXMLGraphName"): Null = {
     	
-		val queryUrl = play.api.Play.configuration.getString("rdfEndpoint").getOrElse("") + "/data/"
-		val graphName = play.api.Play.configuration.getString(selectedGraph).getOrElse("")
+		val queryUrl = configuration.get[String]("rdfEndpoint") + "/data/"
+		val graphName = configuration.get[String](selectedGraph)
         val httpclient = new DefaultHttpClient()
         val httpPost = new HttpPost(queryUrl)
                 
         val urlParameters = new ArrayList[NameValuePair]()
-        var updateQuery = "<http://" + play.Play.application().configuration().getString("hostIp").replaceAll("/$", "") + ":" + play.Play.application().configuration().getString("http.port") +"/api/files/" + fileId
+        var updateQuery = "<http://" + configuration.get[String]("hostIp").replaceAll("/$", "") + ":" + configuration.get[String]("http.port") +"/api/files/" + fileId
         updateQuery = updateQuery + "> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <" + graphName + "_file" + "> ."        
         
         Logger.debug("the query: "+updateQuery)
@@ -51,13 +53,13 @@ class FourStoreRdfSPARQLService @Inject() (datasets: Provider[DatasetService], f
 
   def addDatasetToGraph(datasetId: UUID, selectedGraph: String = "rdfXMLGraphName"): Null = {
     
-		val queryUrl = play.api.Play.configuration.getString("rdfEndpoint").getOrElse("") + "/data/"
-		val graphName = play.api.Play.configuration.getString(selectedGraph).getOrElse("")
+		val queryUrl = configuration.get[String]("rdfEndpoint") + "/data/"
+		val graphName = configuration.get[String](selectedGraph)
         val httpclient = new DefaultHttpClient()
         val httpPost = new HttpPost(queryUrl)
                 
         val urlParameters = new ArrayList[NameValuePair]()
-        var updateQuery = "<http://" + play.Play.application().configuration().getString("hostIp").replaceAll("/$", "") + ":" + play.Play.application().configuration().getString("http.port") +"/api/datasets/" + datasetId
+        var updateQuery = "<http://" + configuration.get[String]("hostIp").replaceAll("/$", "") + ":" + configuration.get[String]("http.port") +"/api/datasets/" + datasetId
         updateQuery = updateQuery + "> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <" + graphName + "_dataset" + "> ."
         
         Logger.debug("the query: "+updateQuery)
@@ -79,13 +81,13 @@ class FourStoreRdfSPARQLService @Inject() (datasets: Provider[DatasetService], f
   
   def linkFileToDataset(fileId: UUID, datasetId: UUID, selectedGraph: String = "rdfXMLGraphName"): Null = {
     
-		val queryUrl = play.api.Play.configuration.getString("rdfEndpoint").getOrElse("") + "/data/"
-		val graphName = play.api.Play.configuration.getString(selectedGraph).getOrElse("")
+		val queryUrl = configuration.get[String]("rdfEndpoint") + "/data/"
+		val graphName = configuration.get[String](selectedGraph)
         val httpclient = new DefaultHttpClient()
         val httpPost = new HttpPost(queryUrl)
                 
         val urlParameters = new ArrayList[NameValuePair]()
-        val hostIp = play.Play.application().configuration().getString("hostIp").replaceAll("/$", "") + ":" + play.Play.application().configuration().getString("http.port")
+        val hostIp = configuration.get[String]("hostIp").replaceAll("/$", "") + ":" + configuration.get[String]("http.port")
         var updateQuery = "<http://" + hostIp +"/api/datasets/" + datasetId
         updateQuery = updateQuery + "> <http://www.cidoc-crm.org/rdfs/cidoc_crm_v5.0.2.rdfs#P148_has_component> <http://"+ hostIp +"/api/files/" + fileId + "> ."
         
@@ -108,8 +110,8 @@ class FourStoreRdfSPARQLService @Inject() (datasets: Provider[DatasetService], f
   
   def removeFileFromGraphs(fileId: UUID, selectedGraph:String = "rdfXMLGraphName"): Null = {
     
-	    val graphName = play.api.Play.configuration.getString(selectedGraph).getOrElse("")
-        val queryUrl = play.api.Play.configuration.getString("rdfEndpoint").getOrElse("")  + "/data/" + graphName + "_file_" + fileId        
+	    val graphName = configuration.get[String](selectedGraph)
+        val queryUrl = configuration.get[String]("rdfEndpoint")  + "/data/" + graphName + "_file_" + fileId
         val httpclient = new DefaultHttpClient()
    	    
         val httpDelete = new HttpDelete(queryUrl)
@@ -126,8 +128,8 @@ class FourStoreRdfSPARQLService @Inject() (datasets: Provider[DatasetService], f
   
   def removeDatasetFromUserGraphs(datasetId: UUID): Null = {
     
-	    val graphName = play.api.Play.configuration.getString("rdfCommunityGraphName").getOrElse("")
-        val queryUrl = play.api.Play.configuration.getString("rdfEndpoint").getOrElse("")  + "/data/" + graphName + "_dataset_" + datasetId        
+	    val graphName = configuration.get[String]("rdfCommunityGraphName")
+        val queryUrl = configuration.get[String]("rdfEndpoint")  + "/data/" + graphName + "_dataset_" + datasetId
         val httpclient = new DefaultHttpClient()
    
         val httpDelete = new HttpDelete(queryUrl)
@@ -144,13 +146,13 @@ class FourStoreRdfSPARQLService @Inject() (datasets: Provider[DatasetService], f
   
   def detachFileFromDataset(fileId: UUID, datasetId: UUID, selectedGraph:String = "rdfXMLGraphName"): Null = {
     
-		val queryUrl = play.api.Play.configuration.getString("rdfEndpoint").getOrElse("") + "/update/"
-		val graphName = play.api.Play.configuration.getString(selectedGraph).getOrElse("")
+		val queryUrl = configuration.get[String]("rdfEndpoint") + "/update/"
+		val graphName = configuration.get[String](selectedGraph)
         val httpclient = new DefaultHttpClient()
         val httpPost = new HttpPost(queryUrl)
                 
         val urlParameters = new ArrayList[NameValuePair]()
-        val hostIp = play.Play.application().configuration().getString("hostIp").replaceAll("/$", "") + ":" + play.Play.application().configuration().getString("http.port")
+        val hostIp = configuration.get[String]("hostIp").replaceAll("/$", "") + ":" + configuration.get[String]("http.port")
         var updateQuery = "DELETE { <http://" + hostIp +"/api/datasets/" + datasetId
         updateQuery = updateQuery + "> <http://www.cidoc-crm.org/rdfs/cidoc_crm_v5.0.2.rdfs#P148_has_component> <http://"+ hostIp +"/api/files/" + fileId + "> }"
         updateQuery = updateQuery + "WHERE { <http://" + hostIp +"/api/datasets/" + datasetId
@@ -216,7 +218,7 @@ class FourStoreRdfSPARQLService @Inject() (datasets: Provider[DatasetService], f
       
   def sparqlQuery(queryText: String): String = {
     
-	    val queryUrl = play.api.Play.configuration.getString("rdfEndpoint").getOrElse("") + "/sparql/"
+	    val queryUrl = configuration.get[String]("rdfEndpoint") + "/sparql/"
         val httpclient = new DefaultHttpClient()
 	    Logger.debug("query text: "+ queryText)
         val httpPost = new HttpPost(queryUrl)
@@ -236,8 +238,8 @@ class FourStoreRdfSPARQLService @Inject() (datasets: Provider[DatasetService], f
   
   def addFromFile(id: UUID, tempFile: java.io.File, fileOrDataset: String, selectedGraph:String = "rdfCommunityGraphName") : Null = {
     
-        val queryUrl = play.api.Play.configuration.getString("rdfEndpoint").getOrElse("") + "/data/"
-		val graphName = play.api.Play.configuration.getString(selectedGraph).getOrElse("")
+        val queryUrl = configuration.get[String]("rdfEndpoint") + "/data/"
+		val graphName = configuration.get[String](selectedGraph)
         val httpclient = new DefaultHttpClient()
         val httpPost = new HttpPost(queryUrl)
                 

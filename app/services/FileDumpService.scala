@@ -23,8 +23,8 @@ trait FileDumpService {
 class FileDumpServiceImpl @Inject()(lifecycle: ApplicationLifecycle) extends FileDumpService {
   Logger.debug("Starting file dumper Plugin")
   val fileSep = System.getProperty("file.separator")
-  var fileDumpDir = play.api.Play.configuration.getString("filedump.dir")
-  var fileDumpMoveDir = play.api.Play.configuration.getString("filedumpmove.dir")
+  var fileDumpDir = configuration.get[String]("filedump.dir")
+  var fileDumpMoveDir = configuration.get[String]("filedumpmove.dir")
 
   lifecycle.addStopHook { () =>
     Logger.debug("Shutting down file dumper Plugin")

@@ -1,6 +1,6 @@
 package services
 
-import play.api.{Application, Logger}
+import play.api.{Application, Configuration, Logger}
 import play.api.Play.current
 import org.bson.types.ObjectId
 import org.json.JSONObject
@@ -8,6 +8,7 @@ import java.io.BufferedWriter
 import java.io.FileWriter
 
 import Transformation.LidoToCidocConvertion
+import akka.actor.ActorSystem
 import javax.inject.Inject
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
@@ -34,23 +35,24 @@ trait RDFExportService {
  *
  *
  */
-class RDFExportServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends RDFExportService {
-  
-  val files: FileService =  DI.injector.instanceOf[FileService]
-  val datasets: DatasetService =  DI.injector.instanceOf[DatasetService]
-  val previews: PreviewService =  DI.injector.instanceOf[PreviewService]
-  
+class RDFExportServiceImpl @Inject() (lifecycle: ApplicationLifecycle,
+	files: FileService,
+	datasets: DatasetService,
+	previews: PreviewService,
+	actorSystem: ActorSystem,
+	configuration: Configuration) extends RDFExportService {
+
   val resultsDir = System.getProperty("java.io.tmpdir") + System.getProperty("file.separator") + "clowder__rdfdumptemporaryfiles" + System.getProperty("file.separator")
-  val filesMappingsQuantity = Integer.parseInt(play.api.Play.configuration.getString("filesxmltordfmapping.dircount").getOrElse("1"))
-  val datasetsMappingsQuantity = Integer.parseInt(play.api.Play.configuration.getString("datasetsxmltordfmapping.dircount").getOrElse("1"))
+  val filesMappingsQuantity = Integer.parseInt(configuration.get[String]("filesxmltordfmapping.dircount"))
+  val datasetsMappingsQuantity = Integer.parseInt(configuration.get[String]("datasetsxmltordfmapping.dircount"))
   
-  val hostUrl = "http://" + play.Play.application().configuration().getString("hostIp").replaceAll("/$", "") + ":" + play.Play.application().configuration().getString("http.port")
+  val hostUrl = "http://" + configuration.get[String]("hostIp").replaceAll("/$", "") + ":" + configuration.get[String]("http.port")
 
 
 	Logger.debug("Starting RDF exporter Plugin")
 	//Clean temporary RDF files
-	var timeInterval = play.Play.application().configuration().getInt("rdfTempCleanup.checkEvery")
-	Akka.system().scheduler.schedule(0.minutes, timeInterval.intValue().minutes){
+	var timeInterval = configuration.get[Int]("rdfTempCleanup.checkEvery")
+	actorSystem.scheduler.schedule(0.minutes, timeInterval.intValue().minutes){
 		files.removeTemporaries()
 	}
 
@@ -83,7 +85,7 @@ class RDFExportServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends R
 	              
 	              if(!theJSON.replaceAll(" ","").equals("{}")){
 		              val xmlFile = jsonToXML(theJSON)
-		              new LidoToCidocConvertion(play.api.Play.configuration.getString("filesxmltordfmapping.dir_"+mappingNumber).getOrElse(""), xmlFile.getAbsolutePath(), resultDir)	                            
+		              new LidoToCidocConvertion(configuration.get[String]("filesxmltordfmapping.dir_"+mappingNumber), xmlFile.getAbsolutePath(), resultDir)
 		              xmlFile.delete()
 	              }
 	              else{
@@ -142,7 +144,7 @@ class RDFExportServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends R
 	              
 	              if(!theJSON.replaceAll(" ","").equals("{}")){
 		              val xmlFile = jsonToXML(theJSON)
-		              new LidoToCidocConvertion(play.api.Play.configuration.getString("datasetsxmltordfmapping.dir_"+mappingNumber).getOrElse(""), xmlFile.getAbsolutePath(), resultDir)	                            
+		              new LidoToCidocConvertion(configuration.get[String]("datasetsxmltordfmapping.dir_"+mappingNumber), xmlFile.getAbsolutePath(), resultDir)
 		              xmlFile.delete()
 	              }
 	              else{

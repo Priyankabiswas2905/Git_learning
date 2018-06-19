@@ -6,7 +6,7 @@
 
 <script>
 var Configuration = {};
-Configuration.hostIp = "@play.Play.application().configuration().getString("hostIp")";
+Configuration.hostIp = "@configuration.get[String]("hostIp")";
 </script>
 
 <link rel="stylesheet" media="screen" href="@routes.Assets.at("stylesheets/dragdrop.css")">

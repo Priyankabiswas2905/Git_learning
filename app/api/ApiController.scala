@@ -169,7 +169,7 @@ trait ApiController extends BaseController with I18nSupport {
     //    key it will assume you are anonymous!
     request.queryString.get("key").foreach { key =>
       val userservice = DI.injector.instanceOf[services.UserService]
-      val commkey = play.Play.application().configuration().getString("commKey")
+      val commkey = configuration.get[String]("commKey")
       key.foreach { realkey =>
         // check to see if this is the global key
         if (realkey == commkey) {

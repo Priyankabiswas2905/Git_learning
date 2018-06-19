@@ -1,5 +1,6 @@
 package services
 
+import akka.actor.ActorSystem
 import javax.inject.Inject
 import play.api.inject.ApplicationLifecycle
 import play.api.{Application, Logger}
@@ -16,14 +17,15 @@ class FileMetadataAutodumpService
  * File metadata automatic dump service.
  *
  */
-class FileMetadataAutodumpServiceImpl @Inject() (lifecycle: ApplicationLifecycle) extends FileMetadataAutodumpService {
+class FileMetadataAutodumpServiceImpl @Inject() (lifecycle: ApplicationLifecycle, actorSystem: ActorSystem)
+  extends FileMetadataAutodumpService {
 
   val files: FileService = DI.injector.instanceOf[FileService]
 
-    Logger.debug("Starting file metadata autodumper Plugin")
-    //Dump metadata of all files periodically
-    val timeInterval = play.Play.application().configuration().getInt("filemetadatadump.dumpEvery") 
-	Akka.system().scheduler.schedule(0.days, timeInterval.intValue().days){
+  Logger.debug("Starting file metadata autodumper Plugin")
+  //Dump metadata of all files periodically
+  val timeInterval = configuration.get[Int]("filemetadatadump.dumpEvery")
+	actorSystem.scheduler.schedule(0.days, timeInterval.intValue().days){
 	      dumpAllFileMetadata
 	}
 

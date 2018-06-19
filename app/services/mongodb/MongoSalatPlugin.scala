@@ -46,11 +46,11 @@ class MongoSalatPlugin @Inject() (lifecycle: ApplicationLifecycle) extends Mongo
   var mongoConnection: MongoConnection = null
 
 
-  mongoURI = if (play.api.Play.configuration.getString("mongodbURI").isDefined) {
-    MongoURI(play.api.Play.configuration.getString("mongodbURI").get)
-  } else if (play.api.Play.configuration.getString("mongodb.default").isDefined) {
+  mongoURI = if (configuration.get[String]("mongodbURI").isDefined) {
+    MongoURI(configuration.get[String]("mongodbURI").get)
+  } else if (configuration.get[String]("mongodb.default").isDefined) {
     Logger.info("mongodb.default is deprecated, please use mongodbURI")
-    MongoURI(play.api.Play.configuration.getString("mongodb.default").get)
+    MongoURI(configuration.get[String]("mongodb.default").get)
   } else {
     Logger.info("no connection to mongo specified in , will use default URI mongodb://127.0.0.1:27017/clowder")
     MongoURI("mongodb://127.0.0.1:27017/clowder")
