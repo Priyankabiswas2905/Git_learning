@@ -44,7 +44,9 @@ object Proxy {
       val bytes = data.asBytes(90000000).orNull
       println("Body:", bytes)
       if (bytes != null) {
-        val str = new String(bytes)
+        // FIXME: CATS-898 - This pattern seems to coerce the request body into a String
+        // Varying this charsetName seems to change the final encoding of the proxied request body
+        val str = new String(bytes, "utf-8")
         println("String Body:", str)
         codec.encode(str)
       } else {
