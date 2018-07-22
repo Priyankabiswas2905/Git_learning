@@ -87,14 +87,14 @@ class Spaces @Inject() (spaces: SpaceService, users: UserService, events: EventS
   val spaceTitle: String = Messages("space.title")
 
   /**
-   * Gets list of extractors from mongo. Displays the page to add/remove extractors.
+   * Gets list of extractors from mongo. Displays the page to enable/disable extractors.
    */
   def selectExtractors(id: UUID) = AuthenticatedAction {
     implicit request =>
       implicit val user = request.user
       spaces.get(id) match {
         case Some(s) => {
-          val runningExtractors: List[String] = extractors.getExtractorNames()
+          val runningExtractors: List[ExtractorInfo] = extractors.listExtractorsInfo()
           val selectedExtractors: List[String] = spaces.getAllExtractors(id)
           Ok(views.html.spaces.updateExtractors(runningExtractors, selectedExtractors, id, s.name))
         }
