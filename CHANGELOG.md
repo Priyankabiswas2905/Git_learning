@@ -28,7 +28,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   [CATS-881](https://opensource.ncsa.illinois.edu/jira/browse/CATS-881)
 - In private mode, users used to be able to see the list of spaces. Now they cannot.
   [CATS-887](https://opensource.ncsa.illinois.edu/jira/browse/CATS-887)
-
+- Extractors printing the private key in error messages
+  [CATS-903](https://opensource.ncsa.illinois.edu/jira/browse/CATS-887)
+  
 ## 1.4.0 - 2018-05-04
 
 ### Added
