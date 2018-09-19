@@ -21,7 +21,8 @@ case class Collection(
   metadataCount: Long = 0,
   trash: Boolean = false,
   dateMovedToTrash : Option[Date] = None,
-  childCollectionsCount: Integer = 0
+  childCollectionsCount: Integer = 0,
+  stats: Statistics = new Statistics()
 )
 
 object Collection {

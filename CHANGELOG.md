@@ -5,9 +5,17 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+**Warning: This update will reset all permissions assigned to roles. 
+Please review the current roles match your use case.**
 
 ### Added
 
+- Ability to send events to extractors only if they are enabled in a space. Refactored some of the extraction code.
+  Added more explicit fields to the extraction message regarding event type, source and target. Tried to keep backward
+  compatibility.
+  [CATS-799](https://opensource.ncsa.illinois.edu/jira/browse/CATS-799)
+- Update Docker image's `custom.conf` to allow for override of Mongo and RabbitMQ URIs.
+  [BD-2181](https://opensource.ncsa.illinois.edu/jira/browse/BD-2128)
 - Script to create the mongo command to add a service account.
 - Modified zenodo.json file to include more Orcid Ids.
   [CATS-884](https://opensource.ncsa.illinois.edu/jira/browse/CATS-884)
@@ -21,22 +29,53 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   [CATS-890](https://opensource.ncsa.illinois.edu/jira/browse/CATS-890)
 - Ability to enable disable extractors at the instance level (versus space level).
   [CATS-891](https://opensource.ncsa.illinois.edu/jira/browse/CATS-891)
+- Add flag to specify not to run any extraction on uploaded files to dataset. By default, we always run extraction on 
+  uploaded files to dataset.
+  [BD-2191] https://opensource.ncsa.illinois.edu/jira/browse/BD-2191
+- Tracking of view and download counts for Files, Datasets and Collections.
+  [CATS-374](https://opensource.ncsa.illinois.edu/jira/browse/CATS-374)
+  [CATS-375](https://opensource.ncsa.illinois.edu/jira/browse/CATS-375)
+- Ability to provide API key in HTTP X-API-Key request header.
+  [CATS-919](https://opensource.ncsa.illinois.edu/jira/browse/CATS-919)
   
 ### Changed 
 - User Metadata updates to improve semantics, editing, display, and search 
+- If no local password and only 1 provider, redirect to the provider login page immediately.
+  [CATS-868](https://opensource.ncsa.illinois.edu/jira/browse/CATS-868)
+- Changing gravatar picture to be https in the database
+  [CATS-882](https://opensource.ncsa.illinois.edu/jira/browse/CATS-882)
 
 ### Fixed
 - In a private mode, a superadmin can now see datasets in a space that he/she is not part of.
   [CATS-881](https://opensource.ncsa.illinois.edu/jira/browse/CATS-881)
 - In private mode, users used to be able to see the list of spaces. Now they cannot.
   [CATS-887](https://opensource.ncsa.illinois.edu/jira/browse/CATS-887)
+- In DatasetService, rename function of findByFileID to findByFileIdDirectlyContain. Add a new function 
+  findByFileIdAllContain to return back datasets directly and indirectly contain the given file. 
+  [CATS-897](https://opensource.ncsa.illinois.edu/jira/projects/CATS/issues/CATS-897)
+- Parameters subdocument is escaped in rabbitmq message.
+  [CATS-906](https://opensource.ncsa.illinois.edu/jira/browse/CATS-906)
+- Removed erroneous occurrences of .{format} from swagger.yml.
+  [CATS-910](https://opensource.ncsa.illinois.edu/jira/browse/CATS-910)
+
+## 1.4.2 - 2018-08-21
+
+### Fixed 
+- Extractors printing the private key in error extraction status messages.
+  [CATS-903](https://opensource.ncsa.illinois.edu/jira/browse/CATS-887)
+
+## 1.4.1 - 2018-08-21
+
+### Fixed
+- LDAP provider now properly sets identityId.userId.
+  [CATS-911](https://opensource.ncsa.illinois.edu/jira/browse/CATS-911)
 
 ## 1.4.0 - 2018-05-04
 
 ### Added
-- Ability to disable username/password login provider. 
+- Ability to disable username/password login provider.
   [CATS-803](https://opensource.ncsa.illinois.edu/jira/browse/CATS-803)
-- Track original file name used when file was originally uploaded. 
+- Track original file name used when file was originally uploaded.
   [SEAD-1173](https://opensource.ncsa.illinois.edu/jira/browse/SEAD-1173)
 - LDAP authentication.
   [CATS-54](https://opensource.ncsa.illinois.edu/jira/browse/CATS-54)
@@ -65,6 +104,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - When the metadata.jsonld has a contextURL instead of a JsObject or JsArray show a popup with the link of the 
   context instead of creating a link.
   [CATS-842](https://opensource.ncsa.illinois.edu/jira/browse/CATS-842)
+- Changed permissions for the editor role
+  [CATS-921](https://opensource.ncsa.illinois.edu/jira/browse/CATS-921)
 
 ### Fixed
 - Space admins can now delete metadata definitions.

@@ -1,6 +1,7 @@
 package services
 
 import java.io.InputStream
+import java.util.Date
 
 import models._
 import com.mongodb.casbah.Imports._
@@ -47,7 +48,7 @@ trait FileService {
   /**
    * Remove the file from mongo
    */
-  def removeFile(id: UUID)
+  def removeFile(id: UUID, host: String)
 
   /**
    * List all files in the system.
@@ -193,4 +194,7 @@ trait FileService {
 
   def updateAuthorFullName(userId: UUID, fullName: String)
 
+  def incrementViews(id: UUID, user: Option[User]): (Int, Date)
+
+  def incrementDownloads(id: UUID, user: Option[User])
 }

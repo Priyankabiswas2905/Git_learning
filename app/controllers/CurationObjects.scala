@@ -205,8 +205,7 @@ class CurationObjects @Inject() (
 
                 //send RabbitMQ message
                 current.plugin[RabbitmqPlugin].foreach { p =>
-                  val dtkey = s"${p.exchange}.metadata.added"
-                  p.extract(ExtractorMessage(cfid, UUID(""), controllers.Utils.baseEventUrl(request), dtkey, mdMap, "", UUID(""), ""))
+                  p.metadataAddedToResource(ResourceRef(ResourceRef.dataset, dataset.id), mdMap, Utils.baseUrl(request))
                 }
 
               }
@@ -219,8 +218,7 @@ class CurationObjects @Inject() (
 
               //send RabbitMQ message
               current.plugin[RabbitmqPlugin].foreach { p =>
-                val dtkey = s"${p.exchange}.metadata.added"
-                p.extract(ExtractorMessage(newCuration.id, UUID(""), controllers.Utils.baseEventUrl(request), dtkey, mdMap, "", UUID(""), ""))
+               p.metadataAddedToResource(ResourceRef(ResourceRef.dataset, dataset.id), mdMap, Utils.baseUrl(request))
               }
               Redirect(routes.CurationObjects.getCurationObject(newCuration.id))
             } else {
@@ -285,9 +283,7 @@ class CurationObjects @Inject() (
 
           //send RabbitMQ message
           current.plugin[RabbitmqPlugin].foreach { p =>
-            val dtkey = s"${p.exchange}.metadata.added"
-            p.extract(ExtractorMessage(cfid, UUID(""), requestHost, dtkey, mdMap, "", UUID(""), ""))
-          }
+		    p.metadataAddedToResource(ResourceRef(ResourceRef.dataset, dataset.id), mdMap, Utils.baseUrl(request))          }
 
         }
 
@@ -345,7 +341,7 @@ class CurationObjects @Inject() (
           Logger.debug("delete Publication Request / Curation object: " + c.id)
           val spaceId = c.space
 
-          curations.remove(id)
+          curations.remove(id, Utils.baseUrl(request))
           //spaces.get(spaceId) is checked in Space.stagingArea
           Redirect(routes.Spaces.stagingArea(spaceId))
         }

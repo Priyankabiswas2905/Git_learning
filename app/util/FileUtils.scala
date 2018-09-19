@@ -359,7 +359,7 @@ object FileUtils {
     val file = File(UUID.generate(), "", f.filename, f.filename, user, new Date(),
       FileUtils.getContentType(f.filename, f.contentType), f.ref.file.length(), "",
       isIntermediate = intermediateUpload, showPreviews = showPreviews,
-      licenseData = License.fromAppConfig(), status = FileStatus.CREATED.toString)
+      licenseData = License.fromAppConfig(), stats = new Statistics(), status = FileStatus.CREATED.toString)
     files.save(file)
     Logger.debug(s"created file ${file.id}")
 
@@ -370,7 +370,7 @@ object FileUtils {
     val fileExecutionContext: ExecutionContext = Akka.system().dispatchers.lookup("akka.actor.contexts.file-processing")
     Future {
       try {
-        saveFile(file, f.ref.file, originalZipFile).foreach { fixedfile =>
+        saveFile(file, f.ref.file, originalZipFile, clowderurl).foreach { fixedfile =>
           processFileBytes(fixedfile, f.ref.file, dataset)
           files.setStatus(fixedfile.id, FileStatus.UPLOADED)
           processFile(fixedfile, clowderurl, index, flagsFromPrevious, showPreviews, dataset, runExtractors)
@@ -403,7 +403,7 @@ object FileUtils {
     val file = File(UUID.generate(), path, filename, filename, user, new Date(),
       FileUtils.getContentType(filename, None), -1, "",
       isIntermediate=intermediateUpload, showPreviews=showPreviews,
-      licenseData=License.fromAppConfig(), status = FileStatus.CREATED.toString)
+      licenseData=License.fromAppConfig(), stats = new Statistics(), status = FileStatus.CREATED.toString)
     files.save(file)
 
     // extract metadata
@@ -425,7 +425,7 @@ object FileUtils {
     // process rest of file in background
     val fileExecutionContext: ExecutionContext = Akka.system().dispatchers.lookup("akka.actor.contexts.file-processing")
     Future {
-      saveURL(file, url).foreach { fixedfile =>
+      saveURL(file, url, clowderurl).foreach { fixedfile =>
         processFileBytes(fixedfile, new java.io.File(path), fileds)
         files.setStatus(fixedfile.id, FileStatus.UPLOADED)
         processFile(fixedfile, clowderurl, index, flagsFromPrevious, showPreviews, fileds, runExtractors)
@@ -463,7 +463,7 @@ object FileUtils {
       val file = File(UUID.generate(), path, filename, filename, user, new Date(),
         FileUtils.getContentType(filename, None), length, loader,
         isIntermediate=intermediateUpload, showPreviews=showPreviews,
-        licenseData=License.fromAppConfig(), status = FileStatus.CREATED.toString)
+        licenseData=License.fromAppConfig(), stats = new Statistics(), status = FileStatus.CREATED.toString)
       files.save(file)
 
       // extract metadata
@@ -533,8 +533,7 @@ object FileUtils {
 
       //send RabbitMQ message
       current.plugin[RabbitmqPlugin].foreach { p =>
-        val dtkey = s"${p.exchange}.metadata.added"
-        p.extract(ExtractorMessage(metadata.attachedTo.id, UUID(""), requestHost, dtkey, mdMap, "", UUID(""), ""))
+        p.metadataAddedToResource(metadata.attachedTo, mdMap, requestHost)
       }
     }
   }
@@ -562,7 +561,7 @@ object FileUtils {
   }
 
   /** stream the data from the uploaded path to final resting spot, this can be slow */
-  private def saveFile(file: File, path: java.io.File, originalZipFile: String): Option[File] = {
+  private def saveFile(file: File, path: java.io.File, originalZipFile: String, host: String): Option[File] = {
     // If intermediate upload, get flags from originalIdAndFlags
     var nameOfFile = file.filename
     if (!file.isIntermediate) {
@@ -627,7 +626,7 @@ object FileUtils {
       }
       case None => {
         Logger.error(s"Could not save bytes, deleting file ${file.id}")
-        files.removeFile(file.id)
+        files.removeFile(file.id, host)
         None
       }
     }
@@ -650,7 +649,7 @@ object FileUtils {
   }
 
   /** Fix file object based on path file, no uploading just compute sha512 */
-  private def saveURL(file: File, url: URL): Option[File] = {
+  private def saveURL(file: File, url: URL, host: String): Option[File] = {
     // actually save the file
     val conn = url.openConnection()
     ByteStorageService.save(conn.getInputStream, "uploads") match {
@@ -672,7 +671,7 @@ object FileUtils {
       }
       case None => {
         Logger.error(s"Could not save bytes, deleting file ${file.id}")
-        files.removeFile(file.id)
+        files.removeFile(file.id, host)
         None
       }
     }
@@ -742,9 +741,7 @@ object FileUtils {
     // send file to rabbitmq for processing
     if (runExtractors) {
       current.plugin[RabbitmqPlugin].foreach { p =>
-        val key = s"${p.exchange}.file.${file.contentType.replace(".", "_").replace("/", ".")}"
-        val extra = Map("filename" -> file.filename)
-        p.extract(ExtractorMessage(new UUID(originalId), new UUID(file.id.toString()), clowderurl, key, extra, file.length.toString, dataset.fold[UUID](null)(_.id), newFlags))
+        p.fileCreated(file, dataset, clowderurl)
       }
     }
 
@@ -769,8 +766,7 @@ object FileUtils {
 
       if (runExtractors) {
         current.plugin[RabbitmqPlugin].foreach { p =>
-          val dtkey = s"${p.exchange}.dataset.file.added"
-          p.extract(ExtractorMessage(file.id, file.id, clowderurl, dtkey, Map.empty, file.length.toString, ds.id, ""))
+          p.fileAddedToDataset(file, ds, clowderurl)
         }
       }
 

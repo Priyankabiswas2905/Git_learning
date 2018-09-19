@@ -1,6 +1,8 @@
 package api
 
 import java.net.URI
+
+import controllers.Utils
 import javax.inject.{ Inject, Singleton }
 import models._
 import util.JSONLD
@@ -327,7 +329,7 @@ class CurationObjects @Inject() (datasets: DatasetService,
             } else {
               curations.removeCurationFile("folder", parentId, curationFileId)
             }
-            curations.deleteCurationFile(curationFileId)
+            curations.deleteCurationFile(curationFileId, Utils.baseUrl(request))
             Ok(toJson("Success"))
           }
           case _ => InternalServerError("Cannot modify Publication Request")
@@ -347,7 +349,7 @@ class CurationObjects @Inject() (datasets: DatasetService,
             } else {
               curations.removeCurationFolder("folder", parentId, curationFolderId)
             }
-            curations.deleteCurationFolder(curationFolderId)
+            curations.deleteCurationFolder(curationFolderId, Utils.baseUrl(request))
             Ok(toJson("Success"))
           }
           case _ => InternalServerError("Cannot modify Publication Request")

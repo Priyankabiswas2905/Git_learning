@@ -1,18 +1,19 @@
 package services.mongodb
 
 import java.net.URL
-import java.util.{ Calendar, Date }
+import java.util.{Calendar, Date}
 
-import com.mongodb.{ BasicDBObject, CommandFailureException }
+import com.mongodb.{BasicDBObject, CommandFailureException}
 import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.commons.MongoDBObject
 import MongoContext.context
+import api.Permission
 import models._
 import org.apache.commons.codec.digest.DigestUtils
 import org.apache.commons.io.input.CountingInputStream
 import org.bson.BSONException
 import play.api.libs.json._
-import play.api.{ Play, Plugin, Logger, Application }
+import play.api.{Application, Logger, Play, Plugin}
 import play.api.Play.current
 import com.mongodb.casbah.MongoURI
 import com.mongodb.casbah.MongoConnection
@@ -22,7 +23,8 @@ import com.mongodb.casbah.gridfs.GridFS
 import com.mongodb.casbah.Imports.DBObject
 import org.bson.types.ObjectId
 import services.filesystem.DiskByteStorageService
-import services.{ ByteStorageService, MetadataService, DI, AppConfigurationService }
+import services.{AppConfigurationService, ByteStorageService, DI, MetadataService}
+
 import scala.collection.JavaConverters._
 
 /**
@@ -416,7 +418,7 @@ class MongoSalatPlugin(app: Application) extends Plugin {
     // Change repository in extractors.info collection into a list
     updateMongo("update-repository-type-in-extractors-info", updateRepositoryType)
 
-    // Change existing 'In Curation' curation objects/pub requests to 'In Prepaparation'
+    // Change existing 'In Curation' curation objects/pub requests to 'In Prepaparation' 
     updateMongo("change-in-curation-status-to-in-preparation", updateInCurationStatus)
 
     // Change from User active and serverAdmin flags to single status 
@@ -427,7 +429,15 @@ class MongoSalatPlugin(app: Application) extends Plugin {
     
     // Capture original filename from FRBR metadata supplied by SEAD Migrator 
     updateMongo("populate-original-filename", updateOriginalFilename)
-    
+
+    // Removes the private key from extraction logs
+    updateMongo("remove-key-extraction-log", removeKeyFromExtractorLogs)
+
+    // Updates gravatar url's from http to https
+    updateMongo("update-avatar-url-to-https", updateAvatarUrl)
+
+    // Updates permissions for the editor Role
+    updateMongo("update-editor-role", updateEditorRole)
   }
 
   private def updateMongo(updateKey: String, block: () => Unit): Unit = {
@@ -1422,6 +1432,157 @@ class MongoSalatPlugin(app: Application) extends Plugin {
     collection("datasetxmlmetadata").drop()
 
   }
+  private def updateAvatarUrl() {
+    val q =  MongoDBObject("avatarUrl" -> "^http://www.gravatar.com".r)
+    collection("social.users").find(q).foreach { user =>
+      val avatar_url = user.getAsOrElse[String]("avatarUrl", "")
+      if(avatar_url.indexOf("http://www.gravatar.com") == 0 ) {
+        val index = avatar_url.lastIndexOf("/")
+        val new_gravatar = "https://www.gravatar.com/avatar" + avatar_url.substring(index)
+        user.put("avatarUrl", new_gravatar)
+      }
+      collection("social.users").save(user, WriteConcern.Safe)
+    }
+    collection("events").find(MongoDBObject("user.avatarURL" -> "^http://www.gravatar.com".r)).foreach{ event =>
+      event.getAs[DBObject]("user") match {
+        case Some(mini_user) => {
+          val avatar_url = mini_user.getAsOrElse("avatarURL", "")
+          if(avatar_url.indexOf("http://www.gravatar.com") == 0 ) {
+            val index = avatar_url.lastIndexOf("/")
+            val new_gravatar = "https://www.gravatar.com/avatar" + avatar_url.substring(index)
+            mini_user.put("avatarURL", new_gravatar)
+          }
+        }
+        case _ => Logger.info("No miniuser associated with the event")
+      }
+      event.getAs[DBObject]("targetuser") match {
+        case Some(mini_user) => {
+          val avatar_url = mini_user.getAsOrElse("avatarURL", "")
+          if(avatar_url.indexOf("http://www.gravatar.com") == 0 ) {
+            val index = avatar_url.lastIndexOf("/")
+            val new_gravatar = "https://www.gravatar.com/avatar" + avatar_url.substring(index)
+            mini_user.put("avatarURL", new_gravatar)
+          }
+        }
+        case _ => Logger.info("No targetuser associated with the event")
+      }
+      collection("events").save(event, WriteConcern.Safe)
+    }
+    collection("collections").find(MongoDBObject("author.avatarURL" -> "^http://www.gravatar.com".r)).foreach{ c =>
+      c.getAs[DBObject]("author") match {
+        case Some(mini_user) => {
+          val avatar_url = mini_user.getAsOrElse("avatarURL", "")
+          if(avatar_url.indexOf("http://www.gravatar.com") == 0 ) {
+            val index = avatar_url.lastIndexOf("/")
+            val new_gravatar = "https://www.gravatar.com/avatar" + avatar_url.substring(index)
+            mini_user.put("avatarURL", new_gravatar)
+          }
+          collection("collections").save(c, WriteConcern.Safe)
+        }
+        case _ => Logger.info("No miniuser associated with the collection ")
+      }
+    }
+    collection("datasets").find(MongoDBObject("author.avatarURL" -> "^http://www.gravatar.com".r)).foreach{ dataset =>
+      dataset.getAs[DBObject]("author") match {
+        case Some(mini_user) => {
+          val avatar_url = mini_user.getAsOrElse("avatarURL", "")
+          if(avatar_url.indexOf("http://www.gravatar.com") == 0 ) {
+            val index = avatar_url.lastIndexOf("/")
+            val new_gravatar = "https://www.gravatar.com/avatar" + avatar_url.substring(index)
+            mini_user.put("avatarURL", new_gravatar)
+
+          }
+          collection("datasets").save(dataset, WriteConcern.Safe)
+        }
+        case _ => Logger.info("No miniuser associated with the dataset ")
+      }
+    }
+    collection("folders").find(MongoDBObject("author.avatarURL" -> "^http://www.gravatar.com".r))foreach{ folder =>
+      folder.getAs[DBObject]("author") match {
+        case Some(mini_user) => {
+          val avatar_url = mini_user.getAsOrElse("avatarURL", "")
+          if(avatar_url.indexOf("http://www.gravatar.com") == 0 ) {
+            val index = avatar_url.lastIndexOf("/")
+            val new_gravatar = "https://www.gravatar.com/avatar" + avatar_url.substring(index)
+            mini_user.put("avatarURL", new_gravatar)
+
+          }
+          collection("folders").save(folder, WriteConcern.Safe)
+        }
+        case _ => Logger.info("No miniuser associated with the folder")
+      }
+    }
+    collection("uploads").find(MongoDBObject("author.avatarURL" -> "^http://www.gravatar.com".r))foreach{ file =>
+      file.getAs[DBObject]("author") match {
+        case Some(mini_user) => {
+          val avatar_url = mini_user.getAsOrElse("avatarURL", "")
+          if(avatar_url.indexOf("http://www.gravatar.com") == 0 ) {
+            val index = avatar_url.lastIndexOf("/")
+            val new_gravatar = "https://www.gravatar.com/avatar" + avatar_url.substring(index)
+            mini_user.put("avatarURL", new_gravatar)
+
+          }
+          collection("uploads").save(file, WriteConcern.Safe)
+        }
+        case _ => Logger.info("No miniuser associated with the file")
+      }
+    }
+    collection("comments").find(MongoDBObject("author.avatarURL" -> "^http://www.gravatar.com".r))foreach{ comment =>
+      comment.getAs[DBObject]("author") match {
+        case Some(mini_user) => {
+          val avatar_url = mini_user.getAsOrElse("avatarURL", "")
+          if(avatar_url.indexOf("http://www.gravatar.com") == 0 ) {
+            val index = avatar_url.lastIndexOf("/")
+            val new_gravatar = "https://www.gravatar.com/avatar" + avatar_url.substring(index)
+            mini_user.put("avatarURL", new_gravatar)
+
+          }
+          collection("comments").save(comment, WriteConcern.Safe)
+        }
+        case _ => Logger.info("No miniuser associated with the comment ")
+      }
+    }
+    collection("curationObjects").find(MongoDBObject("author.avatarURL" -> "^http://www.gravatar.com".r))foreach{ event =>
+      event.getAs[DBObject]("author") match {
+        case Some(mini_user) => {
+          val avatar_url = mini_user.getAsOrElse("avatarURL", "")
+          if(avatar_url.indexOf("http://www.gravatar.com") == 0 ) {
+            val index = avatar_url.lastIndexOf("/")
+            val new_gravatar = "https://www.gravatar.com/avatar" + avatar_url.substring(index)
+            mini_user.put("avatarURL", new_gravatar)
+
+          }
+          collection("curationObjects").save(event, WriteConcern.Safe)
+        }
+        case _ => Logger.info("No miniuser associated with the curation Object ")
+      }
+    }
+    collection("metadata").find(MongoDBObject("creator.typeOfAgent" -> "cat:user", "creator.user.avatarURL" -> "^http://www.gravatar.com".r) )foreach{ metadata =>
+      metadata.getAs[DBObject]("creator") match {
+        case Some(creator) => {
+          val typeOfAgent = creator.getAsOrElse("typeOfAgent", "")
+          if(typeOfAgent == "cat:user") {
+            creator.getAs[DBObject]("user") match {
+              case Some(mini_user) => {
+                val avatar_url = mini_user.getAsOrElse("avatarURL", "")
+                if(avatar_url.indexOf("http://www.gravatar.com") == 0 ) {
+                  val index = avatar_url.lastIndexOf("/")
+                  val new_gravatar = "https://www.gravatar.com/avatar" + avatar_url.substring(index)
+                  mini_user.put("avatarURL", new_gravatar)
+
+                }
+                collection("metadata").save(metadata, WriteConcern.Safe)
+            }
+              case _ => Logger.info("No miniuser associated with the curation Object ")
+          }
+        }
+        }
+        case _ => Logger.info("No agent associated with the curation Object ")
+      }
+    }
+
+
+  }
 
   private def updateOriginalFilename(): Unit = {
 
@@ -1456,4 +1617,35 @@ class MongoSalatPlugin(app: Application) extends Plugin {
       }
     }
   }
+
+  private def removeKeyFromExtractorLogs(): Unit = {
+    collection("extractions").foreach { extraction =>
+      val status = extraction.getAs[String]("status").getOrElse("")
+      val commKey = "key=" + play.Play.application().configuration().getString("commKey")
+      val parsed_status = status.replace(commKey, "key=secretKey")
+      extraction.put("status", parsed_status)
+      collection("extractions").save(extraction, WriteConcern.Safe)
+    }
+  }
+
+  private def updateEditorRole(): Unit = {
+    val query = MongoDBObject("name" -> "Editor")
+    collection("roles").find(query).foreach {role =>
+      role.put("permissions", Permission.EDITOR_PERMISSIONS.map(_.toString).toSet)
+      collection("roles").save(role, WriteConcern.Safe)
+    }
+    collection("social.users").foreach{user =>
+      val userSpaceRoles = user.getAsOrElse[MongoDBList]("spaceandrole", MongoDBList.empty)
+      userSpaceRoles.foreach{ userSpaceRole =>
+        val tempUserSpace = userSpaceRole.asInstanceOf[BasicDBObject]
+        val tempRole = tempUserSpace.get("role").asInstanceOf[BasicDBObject]
+        if(tempRole.get("name") == "Editor") {
+          tempRole.put("permissions", Permission.EDITOR_PERMISSIONS.map(_.toString).toSet)
+        }
+      }
+      user.put("spaceandrole", userSpaceRoles)
+      collection("social.users").save(user, WriteConcern.Safe)
+    }
+  }
+
 }

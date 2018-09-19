@@ -1,12 +1,12 @@
 package api
 
 import api.Permission.Permission
-
-import java.net.{ URL, URLEncoder }
+import java.net.{URL, URLEncoder}
 import java.util.Date
-import javax.inject.{ Inject, Singleton }
 
-import models.{ ResourceRef, UUID, UserAgent, _ }
+import controllers.Utils
+import javax.inject.{Inject, Singleton}
+import models.{ResourceRef, UUID, UserAgent, _}
 import org.elasticsearch.action.search.SearchResponse
 import org.apache.commons.lang.WordUtils
 import play.api.Play.current
@@ -18,7 +18,6 @@ import play.api.libs.ws.WS
 import play.api.mvc.Result
 import services._
 import play.api.i18n.Messages
-
 import play.api.libs.json.JsValue
 
 import scala.collection.JavaConversions._
@@ -454,21 +453,18 @@ class Metadata @Inject() (
                         datasets.index(resource.id)
                         //send RabbitMQ message
                         current.plugin[RabbitmqPlugin].foreach { p =>
-                          val dtkey = s"${p.exchange}.metadata.added"
-                          p.extract(ExtractorMessage(UUID(""), UUID(""), controllers.Utils.baseEventUrl(request),
-                            dtkey, mdMap, "", metadata.attachedTo.id, ""))
+                          p.metadataAddedToResource(resource, mdMap, Utils.baseUrl(request))
                         }
                       }
                       case ResourceRef.file => {
                         files.index(resource.id)
                         //send RabbitMQ message
                         current.plugin[RabbitmqPlugin].foreach { p =>
-                          val dtkey = s"${p.exchange}.metadata.added"
-                          p.extract(ExtractorMessage(metadata.attachedTo.id, UUID(""), controllers.Utils.baseEventUrl(request),
-                            dtkey, mdMap, "", UUID(""), ""))
+                          p.metadataAddedToResource(resource, mdMap, Utils.baseUrl(request))
                         }
                       }
-                      case _ => {}
+                      case _ =>
+                        Logger.error("File resource type not recognized")
                     }
                   }
 
@@ -607,8 +603,7 @@ class Metadata @Inject() (
               val mdMap = m.getExtractionSummary
 
               current.plugin[RabbitmqPlugin].foreach { p =>
-                val dtkey = s"${p.exchange}.metadata.removed"
-                p.extract(ExtractorMessage(UUID(""), UUID(""), request.host, dtkey, mdMap, "", id, ""))
+                p.metadataRemovedFromResource(m.attachedTo, Utils.baseUrl(request))
               }
 
               Logger.debug("re-indexing after metadata removal")

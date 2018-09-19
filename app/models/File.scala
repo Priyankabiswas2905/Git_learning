@@ -30,6 +30,7 @@ case class File(
   isIntermediate: Boolean = false,
   licenseData: LicenseData = new LicenseData(),
   followers: List[UUID] = List.empty,
+  stats: Statistics = new Statistics(),
   status: String = FileStatus.UNKNOWN.toString) // can't use enums in salat
 
 // what is the status of the file

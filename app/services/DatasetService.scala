@@ -1,5 +1,7 @@
 package services
 
+import java.util.Date
+
 import api.Permission.Permission
 import models._
 import play.api.libs.json.JsValue
@@ -250,11 +252,13 @@ trait DatasetService {
 
   def searchAllMetadataFormulateQuery(requestedMetadataQuery: Any): List[Dataset]
 
-  def removeDataset(id: UUID)
+  def removeDataset(id: UUID, host: String)
 
   def findOneByFileId(file_id: UUID): Option[Dataset]
 
-  def findByFileId(file_id: UUID): List[Dataset]
+  def findByFileIdDirectlyContain(file_id: UUID): List[Dataset]
+
+  def findByFileIdAllContain(file_id: UUID): List[Dataset]
 
   def findNotContainingFile(file_id: UUID): List[Dataset]
 
@@ -344,6 +348,10 @@ trait DatasetService {
    * Move a creator to a new position in the dataset's list of creators
    */
   def moveCreator(id: UUID, creator: String, position: Integer)
+
+  def incrementViews(id: UUID, user: Option[User]): (Int, Date)
+
+  def incrementDownloads(id: UUID, user: Option[User])
 
 }
 

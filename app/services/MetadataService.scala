@@ -35,16 +35,16 @@ trait MetadataService {
   def removeMetadataById(metadataId: UUID)
 
   /** Remove metadata */
-  def removeMetadata(attachedTo: ResourceRef, term: String, itemId: String, deletedAt: Date, deletor: Agent, spaceId: Option[UUID]): JsValue
+  def removeMetadata(attachedTo: ResourceRef, term: String, itemId: String, deletedAt: Date, deletor: Agent, spaceId: Option[UUID], host: String): JsValue
 
   /** Update metadata value*/
   def updateMetadata(content_ld: JsValue, context: JsValue, attachedTo: ResourceRef, itemId: String, updatedAt: Date, updator: Agent, spaceId: Option[UUID]): JsValue
 
   /** Remove metadata by attachTo*/
-  def removeMetadataByAttachTo(resourceRef: ResourceRef): Long
+  def removeMetadataByAttachTo(resourceRef: ResourceRef, host: String): Long
 
   /** Remove metadata by attachTo from a specific extractor */
-  def removeMetadataByAttachToAndExtractor(resourceRef: ResourceRef, extractorName: String): Long
+  def removeMetadataByAttachToAndExtractor(resourceRef: ResourceRef, extractorName: String, host: String): Long
 
   /** Get the space (or None) holding the metadata definitions used for this resource */
   def getContextSpace(resourceRef: ResourceRef, space: Option[UUID]): Option[UUID]
@@ -82,7 +82,7 @@ trait MetadataService {
   def removeDefinitionsBySpace(spaceId: UUID)
 
   /** Add vocabulary definitions, leaving it unchanged if the update argument is set to false, defaults to update **/
-  def addDefinition(definition: MetadataDefinition)
+  def addDefinition(definition: MetadataDefinition, update: Boolean = true)
 
   /** Edit vocabulary definitions**/
   def editDefinition(id: UUID, json: JsValue)

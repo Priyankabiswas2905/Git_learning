@@ -10,7 +10,7 @@ import fileutils.FilesUtils
 import models._
 import org.apache.commons.lang.StringEscapeUtils._
 import play.api.Logger
-import play.api.Play.{ current, configuration }
+import play.api.Play.{configuration, current}
 import play.api.data.Form
 import play.api.data.Forms._
 import play.api.libs.iteratee._
@@ -25,9 +25,7 @@ import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import play.api.i18n.Messages
-
 import util.FileUtils
-
 import javax.mail.internet.MimeUtility
 import java.net.URLEncoder
 
@@ -122,7 +120,7 @@ class Files @Inject() (
         }
 
         //Decode the datasets so that their free text will display correctly in the view
-        val datasetsContainingFile = datasets.findByFileId(file.id).sortBy(_.name)
+        val datasetsContainingFile = datasets.findByFileIdDirectlyContain(file.id).sortBy(_.name)
         val allDatasets = (folders.findByFileId(id).map(folder => datasets.get(folder.parentDatasetId)).flatten ++ datasetsContainingFile)
 
         val access = if (allDatasets == Nil) {
@@ -229,6 +227,9 @@ class Files @Inject() (
           case Some(plugin) => {
             Logger.debug("Polyglot plugin found")
 
+            // Increment view count for file
+            val (view_count, view_date) = files.incrementViews(id, user)
+
             val fname = file.filename
             //use name of the file to get the extension (pdf or txt or jpg) to use an input type for Polyglot
             val lastDividerIndex = (fname.replace("/", ".").lastIndexOf(".")) + 1
@@ -239,14 +240,19 @@ class Files @Inject() (
             plugin.getOutputFormats(contentTypeEnding).map(outputFormats =>
               Ok(views.html.file(file, id.stringify, commentsByFile, previewsWithPreviewer, sectionsWithPreviews,
                 extractorsActive, decodedDatasetsContaining.toList, foldersContainingFile,
-                mds, metadataSummary, metadata.getDefinitions(metadataSummary.contextSpace), extractionsByFile, outputFormats, space, access, folderHierarchy.reverse.toList, decodedSpacesContaining.toList, allDecodedDatasets.toList)))
+                mds, metadataSummary, metadata.getDefinitions(metadataSummary.contextSpace), extractionsByFile, outputFormats, space, access, folderHierarchy.reverse.toList, decodedSpacesContaining.toList, allDecodedDatasets.toList, view_count, view_date)))
+                
           }
           case None =>
             Logger.debug("Polyglot plugin not found")
+
+            // Increment view count for file
+            val (view_count, view_date) = files.incrementViews(id, user)
+
             //passing None as the last parameter (list of output formats)
             Future(Ok(views.html.file(file, id.stringify, commentsByFile, previewsWithPreviewer, sectionsWithPreviews,
               extractorsActive, decodedDatasetsContaining.toList, foldersContainingFile,
-              mds, metadataSummary, metadata.getDefinitions(metadataSummary.contextSpace), extractionsByFile, None, space, access, folderHierarchy.reverse.toList, decodedSpacesContaining.toList, allDecodedDatasets.toList)))
+              mds, metadataSummary, metadata.getDefinitions(metadataSummary.contextSpace), extractionsByFile, None, space, access, folderHierarchy.reverse.toList, decodedSpacesContaining.toList, allDecodedDatasets.toList, view_count, view_date)))
         }
       }
 
@@ -443,15 +449,10 @@ class Files @Inject() (
                     InternalServerError(fileType.substring(7))
                   }
                 }
-
-                // TODO RK need to replace unknown with the server name
-                val key = "unknown." + "file." + fileType.replace(".", "_").replace("/", ".")
-
-                val host = Utils.baseEventUrl(request)
-                val id = f.id
-                val extra = Map("filename" -> f.filename)
+                // submit for extraction
                 current.plugin[RabbitmqPlugin].foreach {
-                  _.extract(ExtractorMessage(id, id, host, key, extra, f.length.toString, null, flags))
+                  // FIXME dataset not available?
+                  _.fileCreated(f, None, Utils.baseUrl(request))
                 }
                 /** *** Inserting DTS Requests   **/
                 val clientIP = request.remoteAddress
@@ -461,7 +462,7 @@ class Files @Inject() (
                 Logger.debug("clientIP:" + clientIP + "   domain:= " + domain + "  keysHeader=" + keysHeader.toString + "\n")
                 Logger.debug("Origin: " + request.headers.get("Origin") + "  Referer=" + request.headers.get("Referer") + " Connections=" + request.headers.get("Connection") + "\n \n")
                 val serverIP = request.host
-                dtsrequests.insertRequest(serverIP, clientIP, f.filename, id, fileType, f.length, f.uploadDate)
+                dtsrequests.insertRequest(serverIP, clientIP, f.filename, f.id, fileType, f.length, f.uploadDate)
 
                 current.plugin[ElasticsearchPlugin].foreach {
                   _.index(SearchUtils.getElasticsearchObject(f))
@@ -563,12 +564,6 @@ class Files @Inject() (
 
               current.plugin[FileDumpService].foreach { _.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile)) }
 
-              // TODO RK need to replace unknown with the server name
-              val key = "unknown." + "file." + fileType.replace(".", "_").replace("/", ".")
-
-              val host = Utils.baseUrl(request)
-              val id = f.id
-
               /***** Inserting DTS Requests   **/
 
               val clientIP = request.remoteAddress
@@ -584,11 +579,12 @@ class Files @Inject() (
               Logger.debug("----")
               val serverIP = request.host
               val extra = Map("filename" -> f.filename)
-              dtsrequests.insertRequest(serverIP, clientIP, f.filename, id, fileType, f.length, f.uploadDate)
+              dtsrequests.insertRequest(serverIP, clientIP, f.filename, f.id, fileType, f.length, f.uploadDate)
               /****************************/
-              // TODO replace null with None
-              current.plugin[RabbitmqPlugin].foreach { _.extract(ExtractorMessage(id, id, host, key, extra, f.length.toString, null, flags)) }
-
+	            current.plugin[RabbitmqPlugin].foreach{
+                // FIXME dataset not available?
+                _.fileCreated(f, None, Utils.baseUrl(request))
+            
               current.plugin[ElasticsearchPlugin].foreach {
                 _.index(SearchUtils.getElasticsearchObject(f))
               }
@@ -657,6 +653,8 @@ class Files @Inject() (
    * Download file using http://en.wikipedia.org/wiki/Chunked_transfer_encoding
    */
   def download(id: UUID) = PermissionAction(Permission.DownloadFiles, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
+    implicit val user = request.user
+
     if (UUID.isValid(id.stringify)) {
       //Check the license type before doing anything. 
       files.get(id) match {
@@ -664,6 +662,8 @@ class Files @Inject() (
           if (file.licenseData.isDownloadAllowed(request.user) || Permission.checkPermission(request.user, Permission.DownloadFiles, ResourceRef(ResourceRef.file, file.id))) {
             files.getBytes(id) match {
               case Some((inputStream, filename, contentType, contentLength)) => {
+                files.incrementDownloads(id, user)
+
                 request.headers.get(RANGE) match {
                   case Some(value) => {
                     val range: (Long, Long) = value.substring("bytes=".length).split("-") match {
@@ -740,6 +740,8 @@ class Files @Inject() (
    *
    */
   def downloadAsFormat(id: UUID, outputFormat: String) = PermissionAction(Permission.DownloadFiles, Some(ResourceRef(ResourceRef.file, id))).async { implicit request =>
+    implicit val user = request.user
+
     current.plugin[PolyglotPlugin] match {
       case Some(plugin) => {
         if (UUID.isValid(id.stringify)) {
@@ -765,6 +767,7 @@ class Files @Inject() (
                   val polyglotConvertURL: Option[String] = configuration.getString("polyglot.convertURL")
 
                   if (polyglotConvertURL.isDefined && polyglotUser.isDefined && polyglotPassword.isDefined) {
+                    files.incrementDownloads(id, user)
 
                     //first call to Polyglot to get url of converted file
                     plugin.getConvertedFileURL(filename, inputStream, outputFormat)
@@ -928,16 +931,8 @@ class Files @Inject() (
               _.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
             }
 
-            // TODO RK need to replace unknown with the server name
-            //key needs to contain 'query' when uploading a query
-            //since the thumbnail extractor during processing will need to upload to correct mongo collection.
-            val key = "unknown." + "query." + fileType.replace("/", ".")
-            val host = Utils.baseEventUrl(request)
-            val id = f.id
-
-            // TODO replace null with None
             current.plugin[RabbitmqPlugin].foreach {
-              _.extract(ExtractorMessage(id, id, host, key, Map.empty, f.length.toString, null, flags))
+              _.multimediaQuery(f.id, f.contentType, f.length.toString, Utils.baseUrl(request))
             }
 
             //add file to RDF triple store if triple store is used
@@ -963,7 +958,12 @@ class Files @Inject() (
     }
   }
 
-  /* Drag and drop */
+  /**
+    * When a user drag and drops in the GUI. This seems to only be used for multimedia queries to provide the input
+    * image. The next method `def uploaddnd(dataset_id: UUID)` is the one currently used by the GUI when uploading
+    * files to a dataset.
+    * @return
+    */
   def uploadDragDrop() = PermissionAction(Permission.ViewDataset)(parse.multipartFormData) { implicit request =>
     request.body.file("File").map { f =>
       var nameOfFile = f.filename
@@ -1018,13 +1018,12 @@ class Files @Inject() (
             // TODO RK need to replace unknown with the server name
             val key = "unknown." + "file." + fileType.replace(".", "_").replace("/", ".")
 
-            val host = Utils.baseEventUrl(request)
+            val host = Utils.baseUrl(request)
             val id = f.id
             val extra = Map("filename" -> f.filename, "action" -> "upload")
 
-            // TODO replace null with None
             current.plugin[RabbitmqPlugin].foreach {
-              _.extract(ExtractorMessage(id, id, host, key, extra, f.length.toString, null, flags))
+              _.fileCreated(f, host)
             }
 
             current.plugin[ElasticsearchPlugin].foreach {
@@ -1073,7 +1072,7 @@ class Files @Inject() (
 
                 Logger.debug("Uploading file " + nameOfFile)
                 val showPreviews = request.body.asFormUrlEncoded.get("datasetLevel").get(0)
-                // store file
+                // save file bytes
                 val file = files.save(new FileInputStream(f.ref.file), nameOfFile, f.contentType, identity, showPreviews)
                 val uploadedFile = f
 
@@ -1116,12 +1115,6 @@ class Files @Inject() (
                       _.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
                     }
 
-                    // TODO RK need to replace unknown with the server name
-                    val key = "unknown." + "file." + fileType.replace(".", "_").replace("/", ".")
-
-                    val host = Utils.baseEventUrl(request)
-                    val id = f.id
-
                     /** *** Inserting DTS Requests   **/
 
                     val clientIP = request.remoteAddress
@@ -1135,29 +1128,26 @@ class Files @Inject() (
 
                     Logger.debug("----")
                     val serverIP = request.host
-                    dtsrequests.insertRequest(serverIP, clientIP, f.filename, id, fileType, f.length, f.uploadDate)
-
+                    dtsrequests.insertRequest(serverIP, clientIP, f.filename, f.id, fileType, f.length, f.uploadDate)
                     /** **************************/
 
-                    val extra = Map("filename" -> f.filename)
-                    current.plugin[RabbitmqPlugin].foreach {
-                      _.extract(ExtractorMessage(id, id, host, key, extra, f.length.toString, dataset_id, flags))
-                    }
-
+                    // add file to dataset model
+                    // FIXME create a service instead of calling salat directly
+                    datasets.addFile(dataset.id, files.get(f.id).get)
+                    
+                    // index in Elasticsearch
                     current.plugin[ElasticsearchPlugin].foreach {
-                      _.index(SearchUtils.getElasticsearchObject(f))
+                      // index dataset
+                      datasets.index(dataset_id)
+                      // index file
+                      es.index(SearchUtils.getElasticsearchObject(f))
                     }
 
-                    // add file to dataset
-                    // TODO create a service instead of calling salat directly
-                    val theFile = files.get(f.id).get
-                    datasets.addFile(dataset.id, theFile)
 
-                    // TODO RK need to replace unknown with the server name and dataset type
-                    val dtkey = "unknown." + "dataset." + "unknown"
-
-                    current.plugin[RabbitmqPlugin].foreach {
-                      _.extract(ExtractorMessage(dataset_id, dataset_id, host, dtkey, Map.empty, f.length.toString, dataset_id, ""))
+                    // notify extractors that a file has been uploaded and added to a dataset
+                    current.plugin[RabbitmqPlugin].foreach { rabbitMQ =>
+                      rabbitMQ.fileCreated(f, Some(dataset), Utils.baseUrl(request))
+                      rabbitMQ.fileAddedToDataset(f, dataset, Utils.baseUrl(request))
                     }
 
                     //add file to RDF triple store if triple store is used

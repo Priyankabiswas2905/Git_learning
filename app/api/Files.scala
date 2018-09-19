@@ -95,15 +95,20 @@ class Files @Inject()(
   /**
    * Download file using http://en.wikipedia.org/wiki/Chunked_transfer_encoding
    */
-  def download(id: UUID) =
+  def download(id: UUID, tracking: Boolean) =
     PermissionAction(Permission.DownloadFiles, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
+      implicit val user = request.user
       //Check the license type before doing anything.
       files.get(id) match {
           case Some(file) => {    
               if (file.licenseData.isDownloadAllowed(request.user) || Permission.checkPermission(request.user, Permission.DownloadFiles, ResourceRef(ResourceRef.file, file.id))) {
 		        files.getBytes(id) match {            
 		          case Some((inputStream, filename, contentType, contentLength)) => {
-		
+
+                // Increment download count if tracking is enabled
+                if (tracking)
+                  files.incrementDownloads(id, user)
+
 		            request.headers.get(RANGE) match {
 		              case Some(value) => {
 		                val range: (Long, Long) = value.substring("bytes=".length).split("-") match {
@@ -130,6 +135,7 @@ class Files @Inject()(
 		              }
 		              case None => {
                     val userAgent = request.headers.get("user-agent").getOrElse("")
+
                     Ok.chunked(Enumerator.fromStream(inputStream))
 		                  .withHeaders(CONTENT_TYPE -> contentType)
                       .withHeaders(CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(filename, userAgent)))
@@ -216,7 +222,7 @@ class Files @Inject()(
             }
           }
           case None => {
-            val datasetsContainingFile = datasets.findByFileId(file.id).sortBy(_.name)
+            val datasetsContainingFile = datasets.findByFileIdDirectlyContain(file.id).sortBy(_.name)
             val foldersContainingFile = folders.findByFileId(file.id).sortBy(_.name)
 
             datasetsContainingFile.foreach{ dataset =>
@@ -258,7 +264,7 @@ class Files @Inject()(
         Logger.debug(s"Adding metadata to file $id")
         val doc = com.mongodb.util.JSON.parse(Json.stringify(request.body)).asInstanceOf[DBObject]
         files.get(id) match {
-          case Some(x) => {
+          case Some(file) => {
             val json = request.body
             //parse request for agent/creator info
             //creator can be UserAgent or ExtractorAgent
@@ -286,8 +292,7 @@ class Files @Inject()(
 
             //send RabbitMQ message
             current.plugin[RabbitmqPlugin].foreach { p =>
-              val dtkey = s"${p.exchange}.metadata.added"
-              p.extract(ExtractorMessage(metadata.attachedTo.id, UUID(""), controllers.Utils.baseEventUrl(request), dtkey, mdMap, "", UUID(""), ""))
+              p.metadataAddedToResource(ResourceRef(ResourceRef.file, file.id), mdMap, Utils.baseUrl(request))
             }
 
             files.index(id)
@@ -353,8 +358,7 @@ class Files @Inject()(
     
                   //send RabbitMQ message
                   current.plugin[RabbitmqPlugin].foreach { p =>
-                    val dtkey = s"${p.exchange}.metadata.added"
-                    p.extract(ExtractorMessage(metadata.attachedTo.id, UUID(""), controllers.Utils.baseEventUrl(request), dtkey, mdMap, "", UUID(""), ""))
+                    p.metadataAddedToResource(metadata.attachedTo, mdMap, Utils.baseUrl(request))
                   }
                   
                   files.index(id)
@@ -392,19 +396,16 @@ class Files @Inject()(
     }
   }
 
-  def removeMetadataJsonLD(id: UUID, extFilter: Option[String]) = PermissionAction(Permission.DeleteMetadata, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
+  def removeMetadataJsonLD(id: UUID, extractorId: Option[String]) = PermissionAction(Permission.DeleteMetadata, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
     files.get(id) match {
       case Some(file) => {
-        val num_removed = extFilter match {
-          case Some(f) => metadataService.removeMetadataByAttachToAndExtractor(ResourceRef(ResourceRef.file, id), f)
-          case None => metadataService.removeMetadataByAttachTo(ResourceRef(ResourceRef.file, id))
+        val num_removed = extractorId match {
+          case Some(f) => metadataService.removeMetadataByAttachToAndExtractor(ResourceRef(ResourceRef.file, id), f, Utils.baseUrl(request))
+          case None => metadataService.removeMetadataByAttachTo(ResourceRef(ResourceRef.file, id), Utils.baseUrl(request))
         }
         // send extractor message after attached to resource
         current.plugin[RabbitmqPlugin].foreach { p =>
-          val dtkey = s"${p.exchange}.metadata.removed"
-          p.extract(ExtractorMessage(UUID(""), UUID(""), "", dtkey, Map[String, Any](
-            "resourceType"->ResourceRef.file,
-            "resourceId"->id.toString), "", id, ""))
+          p.metadataRemovedFromResource(ResourceRef(ResourceRef.file, file.id), Utils.baseUrl(request))
         }
         Ok(toJson(Map("status" -> "success", "count" -> num_removed.toString)))
       }
@@ -452,10 +453,10 @@ class Files @Inject()(
   /**
    * Upload a file to a specific dataset
    */
-  def uploadToDataset(dataset_id: UUID, showPreviews: String="DatasetLevel", originalZipFile: String = "", flagsFromPrevious: String = "") = PermissionAction(Permission.AddResourceToDataset, Some(ResourceRef(ResourceRef.dataset, dataset_id)))(parse.multipartFormData) { implicit request =>
+  def uploadToDataset(dataset_id: UUID, showPreviews: String="DatasetLevel", originalZipFile: String = "", flagsFromPrevious: String = "", extract: Boolean = true) = PermissionAction(Permission.AddResourceToDataset, Some(ResourceRef(ResourceRef.dataset, dataset_id)))(parse.multipartFormData) { implicit request =>
     datasets.get(dataset_id) match {
       case Some(dataset) => {
-        val uploadedFiles = FileUtils.uploadFilesMultipart(request, Some(dataset), showPreviews = showPreviews, originalZipFile = originalZipFile, flagsFromPrevious = flagsFromPrevious)
+        val uploadedFiles = FileUtils.uploadFilesMultipart(request, Some(dataset), showPreviews = showPreviews, originalZipFile = originalZipFile, flagsFromPrevious = flagsFromPrevious, runExtractors=extract)
         uploadedFiles.length match {
           case 0 => BadRequest("No files uploaded")
           case 1 => Ok(Json.obj("id" -> uploadedFiles.head.id))
@@ -527,12 +528,12 @@ class Files @Inject()(
 
         val key = "unknown." + "file." + fileType.replace("__", ".")
 
-        val host = Utils.baseEventUrl(request)
+        val host = Utils.baseUrl(request)
         val extra = Map("filename" -> theFile.filename)
 
-        // TODO replace null with None
         current.plugin[RabbitmqPlugin].foreach {
-          _.extract(ExtractorMessage(id, id, host, key, extra, theFile.length.toString, null, flags))
+          // FIXME dataset not available?
+          _.fileCreated(theFile, None, Utils.baseUrl(request))
         }
 
         Ok(toJson(Map("id" -> id.stringify)))
@@ -719,7 +720,7 @@ class Files @Inject()(
           thumbnails.get(thumbnail_id) match {
             case Some(thumbnail) => {
               files.updateThumbnail(file_id, thumbnail_id)
-              val datasetList = datasets.findByFileId(file.id)
+              val datasetList = datasets.findByFileIdDirectlyContain(file.id)
               for (dataset <- datasetList) {
                 if (dataset.thumbnail_id.isEmpty) {
                   datasets.updateThumbnail(dataset.id, thumbnail_id)
@@ -1234,8 +1235,8 @@ class Files @Inject()(
     if (UUID.isValid(id.stringify)) {
       files.get(id) match {
         case Some(file) =>
-          // 1. get name of dataset directorly containing this file.
-          val datasetList = datasets.findByFileId(file.id)
+          // 1. get name of dataset directly containing this file.
+          val datasetList = datasets.findByFileIdDirectlyContain(file.id)
           val datasetNames = for(dataset <- datasetList) yield(dataset.name)
           //2. get paths from datasets to the parent folders containing this file.
           val foldersContainingFile = folders.findByFileId(file.id)
@@ -1438,10 +1439,8 @@ class Files @Inject()(
           events.addObjectEvent(request.user, file.id, file.filename, "delete_file")
           // notify rabbitmq
           current.plugin[RabbitmqPlugin].foreach { p =>
-            val clowderurl = Utils.baseEventUrl(request)
-            datasets.findByFileId(file.id).foreach{ds =>
-              val dtkey = s"${p.exchange}.dataset.file.removed"
-              p.extract(ExtractorMessage(file.id, file.id, clowderurl, dtkey, Map.empty, file.length.toString, ds.id, ""))
+            datasets.findByFileIdAllContain(file.id).foreach{ds =>
+              p.fileRemovedFromDataset(file, ds, Utils.baseUrl(request))
             }
           }
 
@@ -1451,7 +1450,7 @@ class Files @Inject()(
             _.removeFromIndexes(id)        
           }
           Logger.debug("Deleting file: " + file.filename)
-          files.removeFile(id)
+          files.removeFile(id, Utils.baseUrl(request))
           appConfig.incrementCount('files, -1)
           appConfig.incrementCount('bytes, -file.length)
 
@@ -1629,7 +1628,7 @@ class Files @Inject()(
     var userList: List[User] = List.empty
     files.get(id) match {
       case Some(file) => {
-        datasets.findByFileId(id).foreach(dataset => {
+        datasets.findByFileIdDirectlyContain(id).foreach(dataset => {
           dataset.spaces.foreach { spaceId =>
             spaces.get(spaceId) match {
               case Some(spc) => userList = spaces.getUsersInSpace(spaceId) ::: userList

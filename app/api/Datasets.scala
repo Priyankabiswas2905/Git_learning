@@ -78,7 +78,7 @@ class  Datasets @Inject()(
     */
   private def listDatasetsInSpace(file_id: UUID, title: Option[String], limit: Int, permission: Set[Permission], user: Option[User], superAdmin: Boolean, exact: Boolean) : List[Dataset] = {
     var datasetAll = List[Dataset]()
-    val datasetList = datasets.findByFileId(file_id)
+    val datasetList = datasets.findByFileIdDirectlyContain(file_id)
     datasetList match {
       case Nil => {
         val folderList = folders.findByFileId(file_id)
@@ -191,10 +191,10 @@ class  Datasets @Inject()(
       user match {
         case Some(identity) => {
           (request.body \ "space").asOpt[String] match {
-            case None | Some("default") => d = Dataset(name=name,description=description, created=new Date(), author=identity, licenseData = License.fromAppConfig())
+            case None | Some("default") => d = Dataset(name=name,description=description, created=new Date(), author=identity, licenseData = License.fromAppConfig(), stats = new Statistics())
             case Some(spaceId) =>
               spaces.get(UUID(spaceId)) match {
-                case Some(s) => d = Dataset(name=name,description=description, created=new Date(), author=identity, licenseData = License.fromAppConfig(), spaces = List(UUID(spaceId)))
+                case Some(s) => d = Dataset(name=name,description=description, created=new Date(), author=identity, licenseData = License.fromAppConfig(), spaces = List(UUID(spaceId)), stats = new Statistics())
                 case None => BadRequest(toJson("Bad space = " + spaceId))
               }
           }
@@ -266,7 +266,7 @@ class  Datasets @Inject()(
           case Some(identity) => {
             (request.body \ "space").asOpt[List[String]] match {
               case None | Some(List("default"))=> {
-                d = Dataset(name = name, description = description, created = new Date(), author = identity, licenseData = License.fromAppConfig(), status = access)
+                d = Dataset(name = name, description = description, created = new Date(), author = identity, licenseData = License.fromAppConfig(), stats = new Statistics(), status = access)
               }
 
               case Some(space) => {
@@ -279,7 +279,7 @@ class  Datasets @Inject()(
                     BadRequest(toJson("Bad space = " + aSpace))
                   }
                 }
-                d = Dataset(name = name, description = description, created = new Date(), author = identity, licenseData = License.fromAppConfig(), spaces = spaceList, status = access)
+                d = Dataset(name = name, description = description, created = new Date(), author = identity, licenseData = License.fromAppConfig(), spaces = spaceList, stats = new Statistics(), status = access)
               }
 
             }
@@ -600,8 +600,7 @@ class  Datasets @Inject()(
 
         //send RabbitMQ message
         current.plugin[RabbitmqPlugin].foreach { p =>
-          val dtkey = s"${p.exchange}.metadata.added"
-          p.extract(ExtractorMessage(UUID(""), UUID(""), controllers.Utils.baseEventUrl(request), dtkey, mdMap, "", metadata.attachedTo.id, ""))
+          p.metadataAddedToResource(metadata.attachedTo, mdMap, Utils.baseEventUrl(request))
         }
 
 
@@ -660,8 +659,7 @@ class  Datasets @Inject()(
     
                     //send RabbitMQ message
                     current.plugin[RabbitmqPlugin].foreach { p =>
-                      val dtkey = s"${p.exchange}.metadata.added"
-                      p.extract(ExtractorMessage(UUID(""), UUID(""), controllers.Utils.baseEventUrl(request), dtkey, mdMap, "", metadata.attachedTo.id, ""))
+                      p.metadataAddedToResource(metadata.attachedTo, mdMap, Utils.baseEventUrl(request))
                     }
 
                     datasets.index(id)
@@ -733,20 +731,17 @@ class  Datasets @Inject()(
     }
   }
 
-  def removeMetadataJsonLD(id: UUID, extFilter: Option[String]) = PermissionAction(Permission.DeleteMetadata, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
+  def removeMetadataJsonLD(id: UUID, extractorId: Option[String]) = PermissionAction(Permission.DeleteMetadata, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     datasets.get(id) match {
       case Some(dataset) => {
-        val num_removed = extFilter match {
-          case Some(f) => metadataService.removeMetadataByAttachToAndExtractor(ResourceRef(ResourceRef.dataset, id), f)
-          case None => metadataService.removeMetadataByAttachTo(ResourceRef(ResourceRef.dataset, id))
+        val num_removed = extractorId match {
+          case Some(f) => metadataService.removeMetadataByAttachToAndExtractor(ResourceRef(ResourceRef.dataset, id), f, Utils.baseEventUrl(request))
+          case None => metadataService.removeMetadataByAttachTo(ResourceRef(ResourceRef.dataset, id), Utils.baseEventUrl(request))
         }
 
         // send extractor message after attached to resource
         current.plugin[RabbitmqPlugin].foreach { p =>
-          val dtkey = s"${p.exchange}.metadata.removed"
-          p.extract(ExtractorMessage(UUID(""), UUID(""), "", dtkey, Map[String, Any](
-            "resourceType"->ResourceRef.dataset,
-            "resourceId"->id.toString), "", id, ""))
+          p.metadataRemovedFromResource(ResourceRef(ResourceRef.dataset, id), Utils.baseEventUrl(request))
         }
 
         Ok(toJson(Map("status" -> "success", "count" -> num_removed.toString)))
@@ -1739,7 +1734,7 @@ class  Datasets @Inject()(
           case _ => Logger.debug("userdfSPARQLStore not enabled")
         }
         events.addObjectEvent(request.user, dataset.id, dataset.name, "delete_dataset")
-        datasets.removeDataset(id)
+        datasets.removeDataset(id, Utils.baseUrl(request))
         appConfig.incrementCount('datasets, -1)
 
         current.plugin[ElasticsearchPlugin].foreach {
@@ -1797,7 +1792,7 @@ class  Datasets @Inject()(
         val trashDatasets = datasets.listUserTrash(request.user,0)
         for (ds <- trashDatasets){
           events.addObjectEvent(request.user, ds.id, ds.name, "delete_dataset")
-          datasets.removeDataset(ds.id)
+          datasets.removeDataset(ds.id, Utils.baseUrl(request))
           appConfig.incrementCount('datasets, -1)
           current.plugin[ElasticsearchPlugin].foreach {
             _.delete("data", "dataset", ds.id.stringify)
@@ -2320,23 +2315,28 @@ class  Datasets @Inject()(
     Some(new ByteArrayInputStream(s.getBytes("UTF-8")))
   }
 
-  def download(id: UUID, compression: Int) = PermissionAction(Permission.DownloadFiles, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
+  def download(id: UUID, compression: Int, tracking: Boolean) = PermissionAction(Permission.DownloadFiles, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     implicit val user = request.user
-        datasets.get(id) match {
-          case Some(dataset) => {
-            val bagit = play.api.Play.configuration.getBoolean("downloadDatasetBagit").getOrElse(true)
-            // Use custom enumerator to create the zip file on the fly
-            // Use a 1MB in memory byte array
-            Ok.chunked(enumeratorFromDataset(dataset,1024*1024, compression,bagit,user)).withHeaders(
-              CONTENT_TYPE -> "application/zip",
-              CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(dataset.name+ ".zip", request.headers.get("user-agent").getOrElse("")))
-            )
-          }
-          // If the dataset wasn't found by ID
-          case None => {
-            NotFound
-          }
-        }
+    datasets.get(id) match {
+      case Some(dataset) => {
+        val bagit = play.api.Play.configuration.getBoolean("downloadDatasetBagit").getOrElse(true)
+
+        // Increment download count if tracking is enabled
+        if (tracking)
+          datasets.incrementDownloads(id, user)
+
+        // Use custom enumerator to create the zip file on the fly
+        // Use a 1MB in memory byte array
+        Ok.chunked(enumeratorFromDataset(dataset,1024*1024, compression,bagit,user)).withHeaders(
+          CONTENT_TYPE -> "application/zip",
+          CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(dataset.name+ ".zip", request.headers.get("user-agent").getOrElse("")))
+        )
+      }
+      // If the dataset wasn't found by ID
+      case None => {
+        NotFound
+      }
+    }
   }
 
   def updateAccess(id:UUID, access:String) = PermissionAction(Permission.PublicDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
@@ -2384,8 +2384,7 @@ class  Datasets @Inject()(
             if (u.id == dataset.author.id) {
               spaces.get(spaceId) match {
                 case Some(space) => {
-                  val d = Dataset(name = dataset.name, description = dataset.description, created = new Date(), author = dataset.author, licenseData = dataset.licenseData, spaces = List(spaceId))
-
+                  val d = Dataset(name = dataset.name, description = dataset.description, created = new Date(), author = dataset.author, licenseData = dataset.licenseData, spaces = List(spaceId), stats = dataset.stats)
                   datasets.insert(d) match {
                     case Some(id) => {
                       copyDatasetMetadata(dataset.id,UUID(id))
@@ -2404,7 +2403,7 @@ class  Datasets @Inject()(
                             val newFile = models.File(loader_id = file.loader_id, filename = file.filename, author = file.author,
                               uploadDate = file.uploadDate, contentType = file.contentType, length = file.length,
                               loader = file.loader, showPreviews = file.showPreviews,
-                              description = file.description, licenseData = file.licenseData, status = file.status)
+                              description = file.description, licenseData = file.licenseData, stats = file.stats, status = file.status)
                             files.save(newFile)
                             FileUtils.copyFileThumbnail(file,newFile)
                             FileUtils.copyFileMetadata(file,newFile)
@@ -2458,7 +2457,7 @@ class  Datasets @Inject()(
           content, version)
         //add metadata to mongo
         metadataService.addMetadata(metadata)
-  }
+      }
     }
   }
 
@@ -2473,7 +2472,7 @@ class  Datasets @Inject()(
               val newFile = models.File(loader_id = file.loader_id, filename = file.filename, author = file.author,
                 uploadDate = file.uploadDate, contentType = file.contentType, length = file.length,
                 loader = file.loader, showPreviews = file.showPreviews, previews = file.previews, thumbnail_id = file.thumbnail_id,
-                description = file.description, licenseData = file.licenseData, status = file.status)
+                description = file.description, licenseData = file.licenseData, stats = file.stats, status = file.status)
               files.save(newFile)
               FileUtils.copyFileMetadata(file,newFile)
               FileUtils.copyFilePreviews(file,newFile)
