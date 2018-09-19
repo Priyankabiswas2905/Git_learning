@@ -584,7 +584,7 @@ class Files @Inject() (
 	            current.plugin[RabbitmqPlugin].foreach{
                 // FIXME dataset not available?
                 _.fileCreated(f, None, Utils.baseUrl(request))
-            
+              }
               current.plugin[ElasticsearchPlugin].foreach {
                 _.index(SearchUtils.getElasticsearchObject(f))
               }
@@ -1136,7 +1136,7 @@ class Files @Inject() (
                     datasets.addFile(dataset.id, files.get(f.id).get)
                     
                     // index in Elasticsearch
-                    current.plugin[ElasticsearchPlugin].foreach {
+                    current.plugin[ElasticsearchPlugin].foreach {es =>
                       // index dataset
                       datasets.index(dataset_id)
                       // index file

@@ -467,7 +467,9 @@ class Metadata @Inject() (
                         Logger.error("File resource type not recognized")
                     }
                   }
-
+                  case None => {
+                      Logger.error("Metadata missing attachedTo subdocument")
+                  }
                 }
                 Ok(JsObject(Seq("status" -> JsString("ok"))))
               }
@@ -490,24 +492,24 @@ class Metadata @Inject() (
                             datasets.index(resource.id)
                             //send RabbitMQ message
                             current.plugin[RabbitmqPlugin].foreach { p =>
-                              val dtkey = s"${p.exchange}.metadata.added"
-                              p.extract(ExtractorMessage(UUID(""), UUID(""), controllers.Utils.baseEventUrl(request),
-                                dtkey, mdMap, "", attachedTo.get.id, ""))
+                              p.metadataAddedToResource(resource, mdMap, Utils.baseUrl(request))
                             }
                           }
                           case ResourceRef.file => {
                             files.index(resource.id)
                             //send RabbitMQ message
                             current.plugin[RabbitmqPlugin].foreach { p =>
-                              val dtkey = s"${p.exchange}.metadata.added"
-                              p.extract(ExtractorMessage(attachedTo.get.id, UUID(""), controllers.Utils.baseEventUrl(request),
-                                dtkey, mdMap, "", UUID(""), ""))
+                              p.metadataAddedToResource(resource, mdMap, Utils.baseUrl(request))
                             }
                           }
-                          case _ => {}
+                          case _ => {
+                              Logger.error("File resource type not recognized")
+                          }
                         }
                       }
-                      case None => {}
+                      case None => {
+                          Logger.error("Metadata missing attachedTo subdocument")
+                      }
                     }
 
                     Ok(JsObject(Seq("status" -> JsString("ok"))) ++ newInfo)
@@ -558,8 +560,7 @@ class Metadata @Inject() (
                 "resourceId" -> attachedid)
 
               current.plugin[RabbitmqPlugin].foreach { p =>
-                val dtkey = s"${p.exchange}.metadata.updated"
-                p.extract(ExtractorMessage(UUID(""), UUID(""), request.host, dtkey, mdMap, "", attachedid, ""))
+                p.metadataUpdatedOnResource(resource, mdMap, Utils.baseUrl(request))
               }
 
               Logger.debug("re-indexing after metadata update")
@@ -653,7 +654,7 @@ class Metadata @Inject() (
           val resource = ResourceRef(Symbol(attachedtype), attachedUuid)
           val space = metadataService.getContextSpace(resource, None)
 
-          metadataService.removeMetadata(resource, term, itemid, deletedAt, deletor, space) match {
+          metadataService.removeMetadata(resource, term, itemid, deletedAt, deletor, space, Utils.baseUrl(request)) match {
             case content: JsObject => {
 
               val mdMap = Map(
@@ -662,8 +663,7 @@ class Metadata @Inject() (
                 "resourceId" -> attachedUuid)
 
               current.plugin[RabbitmqPlugin].foreach { p =>
-                val dtkey = s"${p.exchange}.metadata.removed"
-                p.extract(ExtractorMessage(UUID(""), UUID(""), request.host, dtkey, mdMap, "", attachedUuid, ""))
+                p.metadataRemovedFromResource(resource, Utils.baseUrl(request))
               }
 
               Logger.debug("re-indexing after metadata removal")

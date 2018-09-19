@@ -283,8 +283,8 @@ class CurationObjects @Inject() (
 
           //send RabbitMQ message
           current.plugin[RabbitmqPlugin].foreach { p =>
-		    p.metadataAddedToResource(ResourceRef(ResourceRef.dataset, dataset.id), mdMap, Utils.baseUrl(request))          }
-
+		        p.metadataAddedToResource(ResourceRef(ResourceRef.file, fileId), mdMap, requestHost)
+		  }
         }
 
         folder.folders.map(f => copyFolders(f, newCurationFolder.id, "folder", parentCurationObjectId, requestHost))

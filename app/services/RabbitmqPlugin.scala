@@ -537,6 +537,31 @@ class RabbitmqPlugin(application: Application) extends Plugin {
         extractWorkQueue(msg)
     }
   }
+  
+    // FIXME check if extractor is enabled in space or global
+  def metadataUpdatedOnResource(resourceRef: ResourceRef, extraInfo: Map[String, Any], host: String): Unit = {
+    val routingKey = s"$exchange.metadata.updated"
+    Logger.debug(s"Sending message $routingKey from $host with extraInfo $extraInfo")
+
+    // FIXME pass in actual metadata id
+    val emptyUUID = UUID("00000000-0000-0000-0000-000000000000")
+
+    resourceRef.resourceType match {
+      case ResourceRef.dataset =>
+        // FIXME pass in metadata id
+        val source = Entity(ResourceRef(ResourceRef.metadata, emptyUUID), None, JsObject(Seq.empty))
+        val target = Entity(resourceRef, None, JsObject(Seq.empty))
+        val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, routingKey, extraInfo, 0.toString, resourceRef.id,
+          "", apiKey, routingKey, source, "added", Some(target))
+        extractWorkQueue(msg)
+      case _ =>
+        val source = Entity(ResourceRef(ResourceRef.metadata, emptyUUID), None, JsObject(Seq.empty))
+        val target = Entity(resourceRef, None, JsObject(Seq.empty))
+        val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, routingKey, extraInfo, 0.toString, null,
+          "", apiKey, routingKey, source, "added", Some(target))
+        extractWorkQueue(msg)
+    }
+  }
 
   /**
     * File upladed for multimedia query. Not a common used feature.

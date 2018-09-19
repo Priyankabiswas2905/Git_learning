@@ -16,7 +16,6 @@
   showDownload: Boolean,
   accessData: models.DatasetAccess,
   canAddDatasetToCollection: Boolean,
-  stagingAreaDefined: Boolean,
   view: (Int, java.util.Date))(implicit flash: play.api.mvc.Flash, user: Option[models.User], request: RequestHeader)
 
 @import api.Permission
@@ -148,7 +147,7 @@
                 }
             </div>
             @if(Permission.checkPermission(Permission.EditDataset, ResourceRef(ResourceRef.dataset, dataset.id)) && !dataset.trash) {
-              <a id="add-creator" class="hiddencomplete @if(!stagingAreaDefined) { simple } " href="javascript:addCreator()" title="Click to add a Creator">
+              <a id="add-creator" class="hiddencomplete @if(!play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined) { simple } " href="javascript:addCreator()" title="Click to add a Creator">
                             <span class="glyphicon glyphicon-edit" aria-hidden="true"></span>
                         </a>
             }

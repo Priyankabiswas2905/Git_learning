@@ -81,8 +81,8 @@ trait MetadataService {
   /** Remove all metadata definitions related to a space**/
   def removeDefinitionsBySpace(spaceId: UUID)
 
-  /** Add vocabulary definitions, leaving it unchanged if the update argument is set to false, defaults to update **/
-  def addDefinition(definition: MetadataDefinition, update: Boolean = true)
+  /** Add vocabulary definitions **/
+  def addDefinition(definition: MetadataDefinition)
 
   /** Edit vocabulary definitions**/
   def editDefinition(id: UUID, json: JsValue)

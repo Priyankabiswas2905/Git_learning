@@ -342,7 +342,7 @@ class MongoDBMetadataService @Inject() (contextService: ContextLDService, datase
         }
         // send extractor message after de-attached from resource
     	current.plugin[RabbitmqPlugin].foreach { p =>
-      		p.metadataRemovedFromResource(resourceRef, host)
+      		p.metadataRemovedFromResource(attachedTo, host)
     	}
         //Return the deleted entry to the caller as part of success (to support event about delete)
         JsObject(Seq(term -> JsString(delVal)))

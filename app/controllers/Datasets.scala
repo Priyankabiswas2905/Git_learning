@@ -687,14 +687,12 @@ class Datasets @Inject() (
               canAddDatasetToCollection = true
             })
         }
-        val stagingAreaDefined = play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined
-        
                 // Increment view count for dataset
         val view_data = datasets.incrementViews(id, user)
         
         Ok(views.html.dataset(datasetWithFiles, commentsByDataset, filteredPreviewers.toList, m, metadataSummary, metadata.getDefinitions(metadataSummary.contextSpace),
           decodedCollectionsInside.toList, sensors, Some(decodedSpaces_canRemove), fileList,
-          filesTags, toPublish, curPubObjects, currentSpace, limit, showDownload, accessData, canAddDatasetToCollection, stagingAreaDefined, 
+          filesTags, toPublish, curPubObjects, currentSpace, limit, showDownload, accessData, canAddDatasetToCollection, 
           view_data))
       }
       case None => {
