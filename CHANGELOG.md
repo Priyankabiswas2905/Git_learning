@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Loading indicator should now show on Datasets page while files/folders are loading.
 - Additional columns added to reporting API endpoint including date, parent resources, file location, size and ownership.
 
+### Fixed
+- Preview tab names should now be titled with the previewer.id.
+  [CATS-939](https://opensource.ncsa.illinois.edu/jira/browse/CATS-939)
+
 ## 1.5.0 - 2018-10-23
 **_Warning:_ This update will reset all permissions assigned to roles. 
 Please review the defintion of roles in your instance before and after the upgrade to make sure that they match 
