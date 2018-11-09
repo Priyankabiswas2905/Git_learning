@@ -1,6 +1,7 @@
 package api
 
-import models.{ResourceRef, User}
+import api.Permission.getUserByIdentity
+import models.{ResourceRef, User, UserStatus}
 import play.api.Logger
 import play.api.mvc._
 import play.api.Play.configuration
@@ -101,11 +102,25 @@ object Permission extends Enumeration {
     ViewUser,
     EditUser = Value
 
-  var READONLY = Set[Permission](ViewCollection, ViewComments, ViewDataset, ViewFile, ViewGeoStream, ViewMetadata,
-    ViewSection, ViewSpace, ViewTags, ViewUser , ViewVocabulary, ViewVocabularyTerm)
+  var READONLY = Set[Permission](ViewCollection, ViewComments, ViewDataset, ViewFile, ViewSensor, ViewGeoStream,
+    ViewMetadata, ViewSection, ViewSpace, ViewTags, ViewUser , ViewVocabulary, ViewVocabularyTerm)
+
   if( play.Play.application().configuration().getBoolean("allowAnonymousDownload")) {
      READONLY += DownloadFiles
   }
+
+  val EDITOR_PERMISSIONS = READONLY ++ Set[Permission](CreateSpace, AddResourceToSpace, RemoveResourceFromSpace,
+    CreateDataset, EditDataset, AddResourceToDataset, RemoveResourceFromDataset, ExecuteOnDataset, PublicDataset,
+    CreateCollection, EditCollection, AddResourceToCollection, RemoveResourceFromCollection,
+    AddFile, EditFile, DownloadFiles, EditLicense, CreatePreview, MultimediaIndexDocument,
+    CreateSection, EditSection, DeleteSection,
+    AddMetadata, EditMetadata, DeleteMetadata,
+    AddTag, DeleteTag, AddComment, DeleteComment, EditComment,
+    CreateSensor, DeleteSensor, AddGeoStream, DeleteGeoStream, AddDatapoints,
+    CreateRelation, ViewRelation, DeleteRelation,
+    CreateVocabulary, DeleteVocabulary, EditVocabulary,
+    CreateVocabularyTerm, DeleteVocabularyTerm, EditVocabularyTerm
+  )
 
   lazy val files: FileService = DI.injector.getInstance(classOf[FileService])
   lazy val previews: PreviewService = DI.injector.getInstance(classOf[PreviewService])
@@ -124,7 +139,7 @@ object Permission extends Enumeration {
 
   /** Returns true if the user is listed as a server admin */
 	def checkServerAdmin(user: Option[User]): Boolean = {
-		user.exists(u => u.active && u.serverAdmin)
+		user.exists(u => u.status==UserStatus.Admin)
 	}
 
   /** Returns true if the user is the owner of the resource, this function is used in the code for checkPermission as well. */
@@ -207,7 +222,7 @@ object Permission extends Enumeration {
     // check specific resource
     resourceRef match {
       case ResourceRef(ResourceRef.file, id) => {
-        (folders.findByFileId(id).map(folder => datasets.get(folder.parentDatasetId)).flatten ++ datasets.findByFileId(id)) match {
+        (folders.findByFileId(id).map(folder => datasets.get(folder.parentDatasetId)).flatten ++ datasets.findByFileIdDirectlyContain(id)) match {
           case dataset :: _ => dataset.isPublic || (dataset.isDefault && dataset.spaces.find(sId => spaces.get(sId).exists(_.isPublic)).nonEmpty)
           case Nil => false
         }
@@ -299,7 +314,7 @@ object Permission extends Enumeration {
       }
       case ResourceRef(ResourceRef.file, id) => {
         for (clowderUser <- getUserByIdentity(user)) {
-          datasets.findByFileId(id).foreach { dataset =>
+          datasets.findByFileIdDirectlyContain(id).foreach { dataset =>
             if ((dataset.isPublic || (dataset.isDefault && dataset.spaces.find(sid => spaces.get(sid).exists(_.isPublic)).nonEmpty))
               && READONLY.contains(permission)) return true
             dataset.spaces.map{
@@ -328,13 +343,26 @@ object Permission extends Enumeration {
         datasets.get(id) match {
           case None => false
           case Some(dataset) => {
-            if ((dataset.isPublic || (dataset.isDefault && dataset.spaces.find(sid => spaces.get(sid).exists(_.isPublic)).nonEmpty))
-              && READONLY.contains(permission)) return true
-            for (clowderUser <- getUserByIdentity(user)) {
-              dataset.spaces.map {
-                spaceId => for (role <- users.getUserRoleInSpace(clowderUser.id, spaceId)) {
-                  if (role.permissions.contains(permission.toString))
-                    return true
+            if (dataset.trash){
+              if (permission.equals(Permission.DeleteDataset)){
+                for (clowderUser <- getUserByIdentity(user)) {
+                  dataset.spaces.map {
+                    spaceId => for (role <- users.getUserRoleInSpace(clowderUser.id, spaceId)) {
+                      if (role.permissions.contains(permission.toString))
+                        return true
+                    }
+                  }
+                }
+              }
+            } else {
+              if ((dataset.isPublic || (dataset.isDefault && dataset.spaces.find(sid => spaces.get(sid).exists(_.isPublic)).nonEmpty))
+                && READONLY.contains(permission)) return true
+              for (clowderUser <- getUserByIdentity(user)) {
+                dataset.spaces.map {
+                  spaceId => for (role <- users.getUserRoleInSpace(clowderUser.id, spaceId)) {
+                    if (role.permissions.contains(permission.toString))
+                      return true
+                  }
                 }
               }
             }
@@ -346,14 +374,27 @@ object Permission extends Enumeration {
         collections.get(id) match {
           case None => false
           case Some(collection) => {
-            if ((collection.spaces.find(sid => spaces.get(sid).exists(_.isPublic)).nonEmpty)
-              && READONLY.contains(permission)) return true
-
+            if (collection.trash){
+              if (permission.equals(Permission.DeleteCollection)){
+                for (clowderUser <- getUserByIdentity(user)) {
+                  collection.spaces.map {
+                    spaceId =>
+                      for (role <- users.getUserRoleInSpace(clowderUser.id, spaceId)) {
+                        if (role.permissions.contains(permission.toString))
+                          return true
+                      }
+                  }
+                }
+              }
+            } else {
+              if ((collection.spaces.find(sid => spaces.get(sid).exists(_.isPublic)).nonEmpty)
+                && READONLY.contains(permission)) return true
               for (clowderUser <- getUserByIdentity(user)) {
-              collection.spaces.map {
-                spaceId => for (role <- users.getUserRoleInSpace(clowderUser.id, spaceId)) {
-                  if (role.permissions.contains(permission.toString))
-                    return true
+                collection.spaces.map {
+                  spaceId => for (role <- users.getUserRoleInSpace(clowderUser.id, spaceId)) {
+                    if (role.permissions.contains(permission.toString))
+                      return true
+                  }
                 }
               }
             }

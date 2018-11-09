@@ -111,7 +111,7 @@
                             <li><a href="@routes.Datasets.list(showOnlyShared = play.Play.application().configuration().getBoolean("showOnlySharedInExplore"))"><span class="glyphicon glyphicon-briefcase"> </span> @Messages("datasets.title")</a></li>
                             <li><a href="@routes.Collections.list(showOnlyShared = play.Play.application().configuration().getBoolean("showOnlySharedInExplore"))"><span class="glyphicon glyphicon-th-large"> </span> @Messages("collections.title")</a></li>
                             @if(play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined){
-                                <li><a href="@routes.CurationObjects.getPublishedData()"><span class="glyphicon glyphicon-book"></span> Published Data</a></li>
+                                <li><a href="@routes.CurationObjects.getPublishedData("")"><span class="glyphicon glyphicon-book"></span> Published Data</a></li>
                             }
                             @if(user.isDefined){
                                 <li><a href="@routes.Users.getUsers()"><span class="glyphicon glyphicon-user"></span> Users</a></li>
@@ -171,6 +171,18 @@
                                 Clear All</a></li>
                         </ul>
                     </li>
+                    @if(play.Play.application().configuration().getBoolean("useTrash")){
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                                Trash <b class="caret"></b>
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a href="@routes.Datasets.list(owner=Some(user.get.id.stringify), showTrash = true)"><span class="glyphicon glyphicon-briefcase"></span> @Messages("datasets.title") in trash</a></li>
+                                <li><a href="@routes.Collections.list(owner=Some(user.get.id.stringify), showTrash = true)"><span class="glyphicon glyphicon-th-large"></span> @Messages("collections.title") in trash</a></li>
+                            </ul>
+                        </li>
+                    }
+
                 }
                     <li class="dropdown">
                         <a href="#" class="dropdown-toggle nav-icon" data-toggle="dropdown" title="Help">Help<b class="caret"></b></a>
@@ -220,6 +232,7 @@
                                         <li><a href="@routes.Admin.users">Users</a></li>
                                         <li><a href="@routes.Admin.listRoles">List Roles</a></li>
                                         <li><a href="@routes.Admin.createRole">Add Role</a></li>
+                                        <li><a href="@routes.Extractors.selectExtractors">Extractors</a></li>
                                         <li><a href="@routes.Extractors.listAllExtractions">Extractions</a></li>
                                         <li><a href="@routes.Admin.adminIndex">Indexes</a></li>
                                         <li><a href="@routes.Admin.viewDumpers">Dumps</a></li>
@@ -322,9 +335,11 @@
         request.done(function (response, textStatus, jqXHR) {
             updateSelectedCount(response.length);
         });
-        request.fail(function (jqXHR, textStatus, errorThrown){
+        request.fail(function (jqXHR, textStatus, errorThrown) {
             console.error("The following error occured: " + textStatus, errorThrown);
-            notify("Could not get selections: " + errorThrown, "error");
+            if (errorThrown != "Unauthorized") {
+                notify("Could not get selections: " + errorThrown, "error");
+            }
         });
     }
 

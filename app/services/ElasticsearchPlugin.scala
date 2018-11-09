@@ -27,6 +27,7 @@ import _root_.util.SearchUtils
 import org.elasticsearch.index.query.QueryBuilders
 
 import org.elasticsearch.ElasticsearchException
+import org.elasticsearch.indices.IndexAlreadyExistsException
 
 
 /**
@@ -113,7 +114,7 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
   }
 
   /** Prepare and execute Elasticsearch query, and return list of matching ResourceRefs */
-  def search(query: List[JsValue], grouping: String): List[ResourceRef] = {
+  def search(query: List[JsValue], grouping: String, from: Option[Int], size: Option[Int]): List[ResourceRef] = {
     /** Each item in query list has properties:
       *   "field_key":      full name of field to query, e.g. 'extractors.wordCount.lines'
       *   "operator":       type of query for this term, e.g. '=='
@@ -122,7 +123,7 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
       *   "field_leaf_key": name of immediate field only, e.g. 'lines'
       */
     val queryObj = prepareElasticJsonQuery(query, grouping)
-    val response: SearchResponse = _search(queryObj)
+    val response: SearchResponse = _search(queryObj, from=from, size=size)
 
     var results = MutableList[ResourceRef]()
     Option(response.getHits()) match {
@@ -169,17 +170,25 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
   }
 
   /*** Execute query */
-  def _search(queryObj: XContentBuilder, index: String = nameOfIndex, from: Int = 0, to: Int = 60): SearchResponse = {
+  def _search(queryObj: XContentBuilder, index: String = nameOfIndex, from: Option[Int] = Some(0), size: Option[Int] = Some(60)): SearchResponse = {
     connect()
     client match {
       case Some(x) => {
         Logger.info("Searching Elasticsearch: "+queryObj.string())
-        val response = x.prepareSearch(index)
+        var responsePrep = x.prepareSearch(index)
           .setSearchType(SearchType.DFS_QUERY_THEN_FETCH)
           .setQuery(queryObj)
-          .setFrom(from).setSize(to).setExplain(true)
-          .execute()
-          .actionGet()
+
+        from match {
+          case Some(f) => responsePrep = responsePrep.setFrom(f)
+          case None => {}
+        }
+        size match {
+          case Some(s) => responsePrep = responsePrep.setSize(s)
+          case None => {}
+        }
+
+        val response = responsePrep.setExplain(true).execute().actionGet()
         Logger.debug("Search hits: " + response.getHits().getTotalHits())
         response
       }
@@ -212,10 +221,16 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
     client match {
       case Some(x) => {
         Logger.debug("Index \""+index+"\" does not exist; creating now ---")
-        x.admin().indices().prepareCreate(index)
-          .setSettings(indexSettings)
-          .addMapping("clowder_object", getElasticsearchObjectMappings())
-          .execute().actionGet()
+        try {
+          x.admin().indices().prepareCreate(index)
+            .setSettings(indexSettings)
+            .addMapping("clowder_object", getElasticsearchObjectMappings())
+            .execute().actionGet()
+        } catch {
+          case e: IndexAlreadyExistsException => {
+            Logger.debug("Index already exists; skipping creation.")
+          }
+        }
       }
       case None =>
     }
@@ -228,7 +243,7 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
     client match {
       case Some(x) => {
         try {
-          val response = x.admin().indices().prepareDelete("_all").get()
+          val response = x.admin().indices().prepareDelete(nameOfIndex).get()
           if (!response.isAcknowledged())
             Logger.error("Did not delete all data from elasticsearch.")
         } catch {
@@ -352,6 +367,7 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
               // BASIC INFO
               .field("creator", eso.creator)
               .field("created", eso.created)
+              .field("created_as", eso.created_as)
               .field("resource_type", eso.resource.resourceType.name)
               .field("name", eso.name)
               .field("description", eso.description)
@@ -429,7 +445,7 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
       case Some(x) => {
         val searcher = x.prepareSearch(index)
           .setSearchType(SearchType.DFS_QUERY_THEN_FETCH)
-            .addAggregation(AggregationBuilders.terms("by_tag").field("tags.name"))
+            .addAggregation(AggregationBuilders.terms("by_tag").field("tags.name").size(10000))
             // Don't return actual documents; we only care about aggregation here
             .setSize(0)
         // Filter to tags on a particular type of resource if given

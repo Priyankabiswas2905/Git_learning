@@ -6,14 +6,16 @@ import play.api.i18n.Messages
 import securesocial.controllers.Registration._
 import securesocial.core._
 import securesocial.core.providers.UsernamePasswordProvider
-import services.{ UserService, SpaceService}
+import services.{SpaceService, UserService}
 import models.UUID
-import play.api.mvc.{Result, Action,AnyContent}
-import securesocial.core.providers.utils.{Mailer, GravatarHelper, RoutesHelper}
+import play.api.mvc.{Action, Result}
+import securesocial.core.providers.utils.{ Mailer, RoutesHelper}
 import securesocial.controllers.{ProviderController, Registration, TemplatesPlugin}
 import play.api.Logger
 import com.typesafe.plugin.use
 import securesocial.core.providers.Token
+import util.GravatarUtils
+
 /**
  * Registration class for overwritting securesocial.controllers.Registration when necessary
  */
@@ -52,7 +54,7 @@ class Registration @Inject()(spaces: SpaceService, users: UserService) extends S
                 info.lastName,
                 "%s %s".format(info.firstName, info.lastName),
                 Some(t.email),
-                GravatarHelper.avatarFor(t.email),
+                GravatarUtils.avatarFor(t.email),
                 AuthenticationMethod.UserPassword,
                 passwordInfo = Some(Registry.hashers.currentHasher.hash(info.password))
               )
@@ -85,7 +87,12 @@ class Registration @Inject()(spaces: SpaceService, users: UserService) extends S
               if ( UsernamePasswordProvider.signupSkipLogin ) {
                 ProviderController.completeAuthentication(user, eventSession).flashing(Success -> Messages(SignUpDone))
               } else {
-                Redirect(onHandleSignUpGoTo).flashing(Success -> Messages(SignUpDone)).withSession(eventSession)
+                // if registerThroughAdmins == true, then show the appropriate text
+                if (play.Play.application().configuration().getBoolean("registerThroughAdmins")) {
+                  Redirect(onHandleSignUpGoTo).flashing(Success -> Messages(ThankYouCheckEmail)).withSession(eventSession)
+                } else {
+                  Redirect(onHandleSignUpGoTo).flashing(Success -> Messages(SignUpDone)).withSession(eventSession)
+                }
               }
             }
           )

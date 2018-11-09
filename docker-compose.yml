@@ -1,71 +1,150 @@
-# clowder server
-clowder:
-  image: clowder/clowder:develop
-#  environment:
-#    CLOWDER_ADMIN: "joe@aol.com"
-#    TOOLMANAGER_URI: "http://192.168.99.100:8080"
-#    SMTP_HOST: smtp.ncsa.illinois.edu
-  ports:
-    - "9000:9000"
-  links:
-    - mongo
-    - rabbitmq
-    - elasticsearch
+version: "3.5"
 
-# extractors
-filedigest:
-  image: clowder/extractors-digest
-  links:
-    - rabbitmq
+services:
+  # clowder application
+  clowder:
+    image: clowder/clowder:latest
+    ports:
+      - 9000:9000
+    networks:
+      - clowder
+    volumes:
+      - clowder-custom:/home/clowder/custom
+      - clowder-data:/home/clowder/data
+    restart: unless-stopped
+    deploy:
+      mode: replicated
+      restart_policy:
+        condition: any
+    depends_on:
+      - mongo
+      - rabbitmq
+      - elasticsearch
 
-audiopreview:
-  image: clowder/extractors-audio-preview
-  links:
-    - rabbitmq
+  # mongo database used to store metadata/data
+  mongo:
+    image: mongo:3.4
+    networks:
+      - clowder
+    ports:
+      - 27017
+    volumes:
+      - mongo:/data/db
+    restart: unless-stopped
+    deploy:
+      mode: replicated
+      restart_policy:
+        condition: any
 
-imagepreview:
-  image: clowder/extractors-image-preview
-  links:
-    - rabbitmq
+  # rabbitmq to connect to extractors
+  rabbitmq:
+    image: rabbitmq:management-alpine
+    networks:
+      - clowder
+    ports:
+      - 5672
+      - 15672
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    restart: unless-stopped
+    deploy:
+      mode: replicated
+      restart_policy:
+        condition: any
 
-imagemetadata:
-  image: clowder/extractors-image-metadata
-  links:
-    - rabbitmq
-
-pdfpreview:
-  image: clowder/extractors-pdf-preview
-  links:
-    - rabbitmq
-
-videopreview:
-  image: clowder/extractors-video-preview
-  links:
-    - rabbitmq
-
-# mongo database used to store metadata/data
-mongo:
-  image: mongo:latest
-  ports:
-    - "27017:27017"
-  # volumes:
-  #   - clowder/mongo:/data/db
-
-# rabbitmq to connect to extractors
-rabbitmq:
-  image: rabbitmq:management
-  ports:
-    - "5672:5672"
-    - "15672:15672"
-  # volumes:
-  #   - clowder/rabbitmq:/var/lib/rabbitmq
-
-# elasticsearch to allow indexing
-elasticsearch:
+  # elasticsearch to allow indexing
+  elasticsearch:
     image: elasticsearch:2
     command: elasticsearch -Des.cluster.name="clowder"
+    networks:
+      - clowder
     ports:
-        - "9200:9200"
-        - "9300:9300"
-    # volumes:
-    #     - ${PWD}/esdata:/usr/share/elasticsearch/data
+      - 9200
+      - 9300
+    volumes:
+      - elasticsearch:/usr/share/elasticsearch/data
+    restart: unless-stopped
+    deploy:
+      mode: replicated
+      restart_policy:
+        condition: any
+
+  # extractors
+  filedigest:
+    image: clowder/extractors-digest
+    networks:
+      - clowder
+    depends_on:
+      - rabbitmq
+      - clowder
+    restart: unless-stopped
+    deploy:
+      mode: replicated
+      restart_policy:
+        condition: any
+
+  audiopreview:
+    image: clowder/extractors-audio-preview
+    networks:
+      - clowder
+    depends_on:
+      - rabbitmq
+      - clowder
+    restart: unless-stopped
+    deploy:
+      mode: replicated
+      restart_policy:
+        condition: any
+
+  imagepreview:
+    image: clowder/extractors-image-preview
+    networks:
+      - clowder
+    depends_on:
+      - rabbitmq
+      - clowder
+    restart: unless-stopped
+    deploy:
+      mode: replicated
+      restart_policy:
+        condition: any
+
+  imagemetadata:
+    image: clowder/extractors-image-metadata
+    networks:
+      - clowder
+    depends_on:
+      - rabbitmq
+      - clowder
+    restart: unless-stopped
+    deploy:
+
+  pdfpreview:
+    image: clowder/extractors-pdf-preview
+    networks:
+      - clowder
+    depends_on:
+      - rabbitmq
+      - clowder
+    restart: unless-stopped
+    deploy:
+
+  videopreview:
+    image: clowder/extractors-video-preview
+    networks:
+      - clowder
+    depends_on:
+      - rabbitmq
+      - clowder
+    restart: unless-stopped
+    deploy:
+
+networks:
+    clowder:
+
+volumes:
+  clowder-data:
+  clowder-custom:
+  mongo:
+  rabbitmq:
+  elasticsearch:

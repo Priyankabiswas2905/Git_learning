@@ -2,7 +2,10 @@ Following is a list of contributors in alphabetical order:
 
 - Ashwini Vaidya
 - Avinash Kumar
+- Ben Galewsky
+- Bing Zhang
 - Brock Angelo
+- Chen Wang
 - Chris Navarro
 - Constantinos Sophocleous
 - Gene Roeder
@@ -13,9 +16,11 @@ Following is a list of contributors in alphabetical order:
 - Jong Lee
 - Kenton McHenry
 - Luigi Marini
+- Mario Felarca
 - Max Burnette
 - Michal Ondrejcek
-- Mario Felarca
+- Michelle Pitcel
+- Mike Lambert
 - Nicholas Tenczar
 - Nishant Nayudu
 - Rob Kooper
@@ -25,10 +30,9 @@ Following is a list of contributors in alphabetical order:
 - Theerasit Issaranon
 - Todd Nicholson
 - Varun Kethineedi
+- Ward Poelmans
 - Will Hennessy
 - Winston Jansz
 - Xiaocheng Yuan
 - Yan Zhao
 - Yibo Guo
-
-

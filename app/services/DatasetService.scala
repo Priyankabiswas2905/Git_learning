@@ -1,5 +1,7 @@
 package services
 
+import java.util.Date
+
 import api.Permission.Permission
 import models._
 import play.api.libs.json.JsValue
@@ -101,7 +103,7 @@ trait DatasetService {
   /**
    * Return a list of datasets the user has access to.
    */
-  def listAccess(limit: Integer, title: String, permisions: Set[Permission], user: Option[User], showAll: Boolean, showPublic: Boolean, showOnlyShared : Boolean): List[Dataset]
+  def listAccess(limit: Integer, title: String, permisions: Set[Permission], user: Option[User], showAll: Boolean, showPublic: Boolean, showOnlyShared : Boolean, exact: Boolean): List[Dataset]
 
   /**
    * Return a list of datasets the user has access to starting at a specific date.
@@ -111,7 +113,7 @@ trait DatasetService {
   /**
    * Return a list of datasets the user has access to starting at a specific date.
    */
-  def listAccess(date: String, nextPage: Boolean, limit: Integer, title: String, permisions: Set[Permission], user: Option[User], showAll: Boolean, showPublic: Boolean, showOnlyShared : Boolean): List[Dataset]
+  def listAccess(date: String, nextPage: Boolean, limit: Integer, title: String, permisions: Set[Permission], user: Option[User], showAll: Boolean, showPublic: Boolean, showOnlyShared : Boolean, exact: Boolean): List[Dataset]
 
   /**
     * Return a list of datasets in a space the user has access to.
@@ -144,14 +146,28 @@ trait DatasetService {
   def listUser(limit: Integer, user: Option[User], showAll: Boolean, owner: User): List[Dataset]
 
   /**
+    * Return a list of datasets the user has created in trash.
+    */
+  def listUserTrash(limit: Integer, user: Option[User], showAll: Boolean, owner: User): List[Dataset]
+
+  /**
    * Return a list of datasets the user has created starting at a specific date.
    */
   def listUser(date: String, nextPage: Boolean, limit: Integer, user: Option[User], showAll: Boolean, owner: User): List[Dataset]
 
   /**
+    * Return a list of datasets the user has created starting at a specific date.
+    */
+  def listUserTrash(date: String, nextPage: Boolean, limit: Integer, user: Option[User], showAll: Boolean, owner: User): List[Dataset]
+
+
+  /**
     * Return a list of all the datasets the user can view or has created.
     */
   def listUser( user: User): List[Dataset]
+
+  def listUserTrash(user : Option[User],limit : Integer ) : List[Dataset]
+
   /**
    * Get dataset.
    */
@@ -250,11 +266,13 @@ trait DatasetService {
 
   def searchAllMetadataFormulateQuery(requestedMetadataQuery: Any): List[Dataset]
 
-  def removeDataset(id: UUID)
+  def removeDataset(id: UUID, host: String)
 
   def findOneByFileId(file_id: UUID): Option[Dataset]
 
-  def findByFileId(file_id: UUID): List[Dataset]
+  def findByFileIdDirectlyContain(file_id: UUID): List[Dataset]
+
+  def findByFileIdAllContain(file_id: UUID): List[Dataset]
 
   def findNotContainingFile(file_id: UUID): List[Dataset]
 
@@ -362,5 +380,10 @@ trait DatasetService {
    */
   def moveCreator(id: UUID, creator: String, position: Integer)
 
-}
+  def incrementViews(id: UUID, user: Option[User]): (Int, Date)
 
+  def incrementDownloads(id: UUID, user: Option[User])
+
+  def getMetrics(user: Option[User]): Iterable[Dataset]
+
+}

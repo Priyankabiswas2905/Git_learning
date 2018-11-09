@@ -148,6 +148,18 @@ paths:
           type: string
           name: id
           in: path
+        - in: query
+          name: showPreviews
+          schema:
+            type: string
+        - in: query
+          name: originalZipFile
+          schema:
+            type: string
+        - in: query
+          name: extract
+          schema:
+            type: boolean
       tags:
         - files
         - datasets
@@ -156,7 +168,9 @@ paths:
         Uploads the file, then links it with the dataset. Returns file id as
         JSON object, or ids with filenames if multiple files are sent. ID can be
         used to work on the file using the API. Uploaded file can be an XML
-        metadata file to be added to the dataset.
+        metadata file to be added to the dataset. If the optional Boolean
+        parameter extract is set to false, it does not send the file for
+        extraction. By default, Boolean parameter extract is set to true.
 
   /files/{id}/unfollow:
     post:
@@ -388,7 +402,7 @@ paths:
       summary: Follow file
       description: Add user to file followers and add file to user followed files.
 
-  /files/{id}/metadata.{format}ld:
+  /files/{id}/metadata.jsonld:
     post:
       responses:
         200:
@@ -397,10 +411,6 @@ paths:
         - required: true
           type: string
           name: id
-          in: path
-        - required: true
-          type: string
-          name: format
           in: path
       tags:
         - files
@@ -417,10 +427,6 @@ paths:
           type: string
           name: id
           in: path
-        - required: true
-          type: string
-          name: format
-          in: path
       tags:
         - files
       summary: 'Remove JSON-LD metadata, filtered by extractor if necessary'
@@ -433,10 +439,6 @@ paths:
         - required: true
           type: string
           name: id
-          in: path
-        - required: true
-          type: string
-          name: format
           in: path
       tags:
         - files
@@ -544,7 +546,7 @@ paths:
         Takes one argument, a UUID of the file. Request body takes key-value
         pair for the description
 
-  /files/{id}/technicalmetadat.{format}:
+  /files/{id}/technicalmetadatajson:
     get:
       responses:
         200:
@@ -553,10 +555,6 @@ paths:
         - required: true
           type: string
           name: id
-          in: path
-        - required: true
-          type: string
-          name: format
           in: path
       tags:
         - files
@@ -586,7 +584,7 @@ paths:
         on success. In the requested file type, replace / with __ (two
         underscores).
 
-  /files/{id}.{format}metadat.{format}:
+  /files/{id}/xmlmetadatajson:
     get:
       responses:
         200:
@@ -595,10 +593,6 @@ paths:
         - required: true
           type: string
           name: id
-          in: path
-        - required: true
-          type: string
-          name: format
           in: path
       tags:
         - files
@@ -706,7 +700,7 @@ paths:
       summary: Get the user-generated metadata of the selected file in an RDF file
       description: A file is the raw bytes plus metadata.
 
-  /files/{id}/usermetadat.{format}:
+  /files/{id}/usermetadatajson:
     get:
       responses:
         200:
@@ -715,10 +709,6 @@ paths:
         - required: true
           type: string
           name: id
-          in: path
-        - required: true
-          type: string
-          name: format
           in: path
       tags:
         - files
@@ -1307,7 +1297,7 @@ paths:
         Return the currently existing previews of the selected dataset (full
         description, including paths to preview files, previewer names etc).
 
-  /datasets/{id}/metadata.{format}ld:
+  /datasets/{id}/metadata.jsonld:
     post:
       responses:
         200:
@@ -1316,10 +1306,6 @@ paths:
         - required: true
           type: string
           name: id
-          in: path
-        - required: true
-          type: string
-          name: format
           in: path
       tags:
         - datasets
@@ -1336,10 +1322,6 @@ paths:
           type: string
           name: id
           in: path
-        - required: true
-          type: string
-          name: format
-          in: path
       tags:
         - datasets
       summary: 'Remove JSON-LD metadata, filtered by extractor if necessary'
@@ -1352,10 +1334,6 @@ paths:
         - required: true
           type: string
           name: id
-          in: path
-        - required: true
-          type: string
-          name: format
           in: path
       tags:
         - datasets
@@ -1394,7 +1372,7 @@ paths:
       summary: Follow dataset.
       description: Add user to dataset followers and add dataset to user followed datasets.
 
-  /datasets/{id}/technicalmetadat.{format}:
+  /datasets/{id}/technicalmetadatajson:
     get:
       responses:
         200:
@@ -1403,10 +1381,6 @@ paths:
         - required: true
           type: string
           name: id
-          in: path
-        - required: true
-          type: string
-          name: format
           in: path
       tags:
         - datasets
@@ -1468,6 +1442,9 @@ paths:
           type: string
           name: id
           in: path
+        - type: number
+          name: max
+          in: query
       tags:
         - datasets
       summary: List files in dataset and within folders
@@ -2797,6 +2774,238 @@ paths:
         - logos
       summary: Download file
       description: 'Download a static file, or the alternate file'
+
+  ##############################################################################
+  # Proxy                                                                      #
+  # NOTE: because they are so generic, these endpoints are not well defined    #
+  ##############################################################################
+  /proxy/{endpoint}:
+    get:
+      responses:
+        401:
+          description: Not authorized
+        404:
+          description: Endpoint not configured
+      parameters:
+        - required: true
+          type: string
+          name: endpoint
+          in: path
+      summary: Proxy a GET request to an endpoint specified in the proxy's configuration.
+      description: Access to the endpoint will be restricted by Clowder authentication.
+    post:
+      responses:
+        401:
+          description: Not authorized
+        404:
+          description: Endpoint not configured
+      parameters:
+        - required: true
+          type: string
+          name: endpoint
+          in: path
+        - required: false
+          in: body
+          name: body
+          description: The body of the POST request to proxy.
+          schema:
+            type: object
+      summary: Proxy a POST request to an endpoint specified in the proxy's configuration.
+      description: Access to the endpoint will be restricted by Clowder authentication.
+    put:
+      responses:
+        401:
+          description: Not authorized
+        404:
+          description: Endpoint not configured
+      parameters:
+        - required: true
+          type: string
+          name: endpoint
+          in: path
+        - required: false
+          in: body
+          name: body
+          description: The body of the PUT request to proxy.
+          schema:
+            type: object
+      summary: Proxy a PUT request to an endpoint specified in the proxy's configuration.
+      description: Access to the endpoint will be restricted by Clowder authentication.
+    delete:
+      responses:
+        401:
+          description: Not authorized
+        404:
+          description: Endpoint not configured
+      parameters:
+        - required: true
+          type: string
+          name: endpoint
+          in: path
+      summary: Proxy a DELETE request to an endpoint specified in the proxy's configuration.
+      description: Access to the endpoint will be restricted by Clowder authentication.
+  /proxy/{endpoint}/{pathSuffix}:
+    get:
+      responses:
+        401:
+          description: Not authorized
+        404:
+          description: Endpoint not configured
+      parameters:
+        - required: true
+          type: string
+          name: endpoint
+          in: path
+        - required: false
+          type: string
+          name: pathSuffix
+          in: path
+      summary: Proxy a GET request to an endpoint specified in the proxy's configuration.
+      description: Access to the endpoint will be restricted by Clowder authentication.
+    post:
+      responses:
+        401:
+          description: Not authorized
+        404:
+          description: Endpoint not configured
+      parameters:
+        - required: true
+          type: string
+          name: endpoint
+          in: path
+        - required: false
+          type: string
+          name: pathSuffix
+          in: path
+        - required: false
+          in: body
+          name: body
+          description: The body of the POST request to proxy.
+          schema:
+            type: object
+      summary: Proxy a POST request to an endpoint specified in the proxy's configuration.
+      description: Access to the endpoint will be restricted by Clowder authentication.
+    put:
+      responses:
+        401:
+          description: Not authorized
+        404:
+          description: Endpoint not configured
+      parameters:
+        - required: true
+          type: string
+          name: endpoint
+          in: path
+        - required: false
+          type: string
+          name: pathSuffix
+          in: path
+        - required: false
+          in: body
+          name: body
+          description: The body of the PUT request to proxy.
+          schema:
+            type: object
+      summary: Proxy a PUT request to an endpoint specified in the proxy's configuration.
+      description: Access to the endpoint will be restricted by Clowder authentication.
+    delete:
+      responses:
+        401:
+          description: Not authorized
+        404:
+          description: Endpoint not configured
+      parameters:
+        - required: true
+          type: string
+          name: endpoint
+          in: path
+        - required: false
+          type: string
+          name: pathSuffix
+          in: path
+      summary: Proxy a DELETE request to an endpoint specified in the proxy's configuration.
+      description: Access to the endpoint will be restricted by Clowder authentication.
+
+  ##############################################################################
+  # Reporting                                                                  #
+  ##############################################################################
+  /reports/metrics:
+    get:
+      responses:
+        200:
+          description: A CSV with usage metrics
+          schema:
+            type: file
+          headers:
+            Content-type:
+              type: file
+              description: text/csv
+        401:
+          description: Not authorized
+      tags:
+        - reporting
+      summary: Download usage metrics report for files, datasets and collections as CSV.
+      description: |
+        Download usage metrics report for files, datasets and collections as a CSV file.
+        Must be a server admin to access the report.
+  /reports/metrics/files:
+    get:
+      responses:
+        200:
+          description: A CSV with usage metrics
+          schema:
+            type: file
+          headers:
+            Content-type:
+              type: file
+              description: text/csv
+        401:
+          description: Not authorized
+      tags:
+        - reporting
+      summary: Download usage metrics report for files as CSV.
+      description: |
+        Download usage metrics report for files as a CSV file.
+        Must be a server admin to access the report.
+  /reports/metrics/datasets:
+    get:
+      responses:
+        200:
+          description: A CSV with usage metrics
+          schema:
+            type: file
+          headers:
+            Content-type:
+              type: file
+              description: text/csv
+        401:
+          description: Not authorized
+      tags:
+        - reporting
+      summary: Download usage metrics report for datasets as CSV.
+      description: |
+        Download usage metrics report for datasets as a CSV file.
+        Must be a server admin to access the report.
+  /reports/metrics/collections:
+    get:
+      responses:
+        200:
+          description: A CSV with usage metrics
+          schema:
+            type: file
+          headers:
+            Content-type:
+              type: file
+              description: text/csv
+        401:
+          description: Not authorized
+      tags:
+        - reporting
+      summary: Download usage metrics report for collections as CSV.
+      description: |
+        Download usage metrics report for collections as a CSV file.
+        Must be a server admin to access the report.
+
 
 ################################################################################
 #                                 Definitions                                  #

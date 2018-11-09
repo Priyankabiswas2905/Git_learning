@@ -228,7 +228,7 @@ class Collections @Inject() (datasets: DatasetService, collections: CollectionSe
   /**
    * List collections.
    */
-  def list(when: String, date: String, limit: Int, space: Option[String], mode: String, owner: Option[String], showPublic: Boolean, showOnlyShared : Boolean) = UserAction(needActive=false) { implicit request =>
+  def list(when: String, date: String, limit: Int, space: Option[String], mode: String, owner: Option[String], showPublic: Boolean, showOnlyShared : Boolean, showTrash : Boolean) = UserAction(needActive=false) { implicit request =>
     implicit val user = request.user
     val nextPage = (when == "a")
     val person = owner.flatMap(o => users.get(UUID(o)))
@@ -250,13 +250,25 @@ class Collections @Inject() (datasets: DatasetService, collections: CollectionSe
             title = Some(Messages("owner.in.resource.title", p.fullName, Messages("collections.title"), spaceTitle, routes.Spaces.getSpace(collectionSpace.get.id), collectionSpace.get.name))
           }
           case _ => {
-            title = Some(Messages("owner.title", p.fullName, Messages("collections.title")))
+            if (showTrash){
+              title = Some(Messages("owner.title", p.fullName, Messages("collections.trashtitle")))
+            } else {
+              title = Some(Messages("owner.title", p.fullName, Messages("collections.title")))
+            }
           }
         }
         if (date != "") {
-          collections.listUser(date, nextPage, limit, request.user, request.user.fold(false)(_.superAdminMode), p)
+          if (showTrash){
+            collections.listUserTrash(date, nextPage, limit, request.user, request.user.fold(false)(_.superAdminMode), p)
+          } else {
+            collections.listUser(date, nextPage, limit, request.user, request.user.fold(false)(_.superAdminMode), p)
+          }
         } else {
-          collections.listUser(limit, request.user, request.user.fold(false)(_.superAdminMode), p)
+          if (showTrash){
+            collections.listUserTrash(limit, request.user, request.user.fold(false)(_.superAdminMode), p)
+          } else {
+            collections.listUser(limit, request.user, request.user.fold(false)(_.superAdminMode), p)
+          }
         }
       }
       case None => {
@@ -285,7 +297,13 @@ class Collections @Inject() (datasets: DatasetService, collections: CollectionSe
     val prev = if (collectionList.nonEmpty && date != "") {
       val first = Formatters.iso8601(collectionList.head.created)
       val c = person match {
-        case Some(p) => collections.listUser(first, nextPage=false, 1, request.user, request.user.fold(false)(_.superAdminMode), p)
+        case Some(p) =>{
+          if (showTrash){
+            collections.listUserTrash(first, nextPage=false, 1, request.user, request.user.fold(false)(_.superAdminMode), p)
+          } else {
+            collections.listUser(first, nextPage=false, 1, request.user, request.user.fold(false)(_.superAdminMode), p)
+          }
+        }
         case None => {
           space match {
             case Some(s) => collections.listSpace(first, nextPage = false, 1, s)
@@ -306,7 +324,13 @@ class Collections @Inject() (datasets: DatasetService, collections: CollectionSe
     val next = if (collectionList.nonEmpty) {
       val last = Formatters.iso8601(collectionList.last.created)
       val ds = person match {
-        case Some(p) => collections.listUser(last, nextPage=true, 1, request.user, request.user.fold(false)(_.superAdminMode), p)
+        case Some(p) => {
+          if (showTrash){
+            collections.listUserTrash(last, nextPage=true, 1, request.user, request.user.fold(false)(_.superAdminMode), p)
+          } else {
+            collections.listUser(last, nextPage=true, 1, request.user, request.user.fold(false)(_.superAdminMode), p)
+          }
+        }
         case None => {
           space match {
             case Some(s) => collections.listSpace(last, nextPage = true, 1, s)
@@ -364,7 +388,7 @@ class Collections @Inject() (datasets: DatasetService, collections: CollectionSe
       case Some(s) if !Permission.checkPermission(Permission.ViewSpace, ResourceRef(ResourceRef.space, UUID(s))) => {
         BadRequest(views.html.notAuthorized("You are not authorized to access the " + spaceTitle+ ".", s, "space"))
       }
-      case _ =>  Ok(views.html.collectionList(decodedCollections.toList, prev, next, limit, viewMode, space, spaceName, title, owner, ownerName, when, date))
+      case _ =>  Ok(views.html.collectionList(decodedCollections.toList, prev, next, limit, viewMode, space, spaceName, title, owner, ownerName, when, date, showTrash))
     }
   }
 
@@ -407,7 +431,7 @@ class Collections @Inject() (datasets: DatasetService, collections: CollectionSe
 
           var collection : Collection = null
           if (colSpace.isEmpty || colSpace(0) == "default" || colSpace(0) == "") {
-              collection = Collection(name = colName(0), description = colDesc(0), datasetCount = 0, created = new Date, author = identity, root_spaces = List.empty)
+              collection = Collection(name = colName(0), description = colDesc(0), datasetCount = 0, created = new Date, author = identity, root_spaces = List.empty, stats = new Statistics())
           }
           else {
             val stringSpaces = colSpace(0).split(",").toList
@@ -416,7 +440,7 @@ class Collections @Inject() (datasets: DatasetService, collections: CollectionSe
             if(parentCollectionIds.length == 0) {
               root_spaces = colSpaces
             }
-            collection = Collection(name = colName(0), description = colDesc(0), datasetCount = 0, created = new Date, author = identity, spaces = colSpaces, root_spaces = root_spaces)
+            collection = Collection(name = colName(0), description = colDesc(0), datasetCount = 0, created = new Date, author = identity, spaces = colSpaces, root_spaces = root_spaces, stats = new Statistics())
           }
 
           Logger.debug("Saving collection " + collection.name)
@@ -601,9 +625,13 @@ class Collections @Inject() (datasets: DatasetService, collections: CollectionSe
             case Some(u) => selections.get(u.email.get).map(ds => ds.id.toString)
             case None => List.empty
           }
+
+          // Increment view count for collection
+          val (view_count, view_date) = collections.incrementViews(id, user)
+
           Ok(views.html.collectionofdatasets(decodedDatasetsInside.toList, decodedChildCollections.toList,
             Some(decodedParentCollections.toList),dCollection, filteredPreviewers.toList,commentMap,Some(collectionSpaces_canRemove),
-            prevd,nextd, prevcc, nextcc, limit, canAddToParent, userSelections))
+            prevd,nextd, prevcc, nextcc, limit, canAddToParent, userSelections, view_count, view_date))
 
         }
         case None => {
