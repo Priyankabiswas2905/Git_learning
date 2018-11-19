@@ -836,5 +836,8 @@ GET         /extractors                                                         
 POST        /extractors                                                                     @controllers.Extractors.updateExtractors()
 
 
+# ----------------------------------------------------------------------
+# TREE API
+# ----------------------------------------------------------------------
 
-
+GET         /api/tree/getChildrenOfNode                                                     @api.TreeView.getChildrenOfNode(nodeId : Option[String], nodeType: String, mine : Boolean ?= true, shared : Boolean ?= false, public : Boolean ?= false)
