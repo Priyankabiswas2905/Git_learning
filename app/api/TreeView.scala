@@ -9,7 +9,6 @@ import services._
 import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
 
-@Singleton
 class TreeView @Inject()(
   events : EventService,
   vocabularies : VocabularyService,
