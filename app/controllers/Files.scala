@@ -69,34 +69,43 @@ class Files @Inject() (
     implicit val user = request.user
     files.get(id) match {
       case Some(file) => {
+        // get previews attached to the file in the database
         val previewsFromDB = previews.findByFileId(file.id)
-        val previewers = Previewers.findPreviewers
+        // get compatible previewers from disk
+        val previewers = Previewers.findFilePreviewers()
 
-        //NOTE Should the following code be unified somewhere since it is duplicated in Datasets and Files for both api and controllers
+        // TODO Extract to standalone method since it is duplicated in Datasets and Files for both api and controllers
         val previewsWithPreviewer = {
+          // for each preview in the database, check that is compatible and add it to the list
           val pvf = for (
-            p <- previewers; pv <- previewsFromDB
-            if (!p.collection)
-            if (!file.showPreviews.equals("None")) && (p.contentType.contains(pv.contentType))
+              previewer <- previewers;
+              previewData <- previewsFromDB
+              if (previewer.preview)
+              if (!file.showPreviews.equals("None")) && (previewer.contentType.contains(previewData.contentType))
           ) yield {
-            val tabtitle: String = pv.title.getOrElse("")
-            (pv.id.toString, p.id, p.path, p.main, api.routes.Previews.download(pv.id).toString, pv.contentType, pv.length, tabtitle)
+            val tabTitle = previewData.title.getOrElse("Preview")
+            (previewData.id.toString, previewer.id, previewer.path, previewer.main,
+              api.routes.Previews.download(previewData.id).toString, previewData.contentType, previewData.length,
+              tabTitle)
           }
+          // for each previewer on disk, check that it is compatible and add it to the list
           val ff = for (
-            p <- previewers
-            if (!p.collection)
-            if (!file.showPreviews.equals("None")) && (p.contentType.contains(file.contentType))
+            previewer <- previewers
+            if (previewer.file)
+            if (!file.showPreviews.equals("None")) && (previewer.contentType.contains(file.contentType))
           ) yield {
-            if (file.licenseData.isDownloadAllowed(user) || Permission.checkPermission(user, Permission.DownloadFiles, ResourceRef(ResourceRef.file, file.id))) {
-              (file.id.toString, p.id, p.path, p.main, routes.Files.file(file.id) + "/blob", file.contentType, file.length, "")
-            }
-            else {
-              (file.id.toString, p.id, p.path, p.main, "null", file.contentType, file.length, "")
+            val tabTitle = previewer.id
+            if (file.licenseData.isDownloadAllowed(user) ||
+              Permission.checkPermission(user, Permission.DownloadFiles, ResourceRef(ResourceRef.file, file.id))) {
+              (file.id.toString, previewer.id, previewer.path, previewer.main, routes.Files.file(file.id) + "/blob",
+                file.contentType, file.length, tabTitle)
+            } else {
+              (file.id.toString, previewer.id, previewer.path, previewer.main, "null", file.contentType, file.length, tabTitle)
             }
           }
+          // take the union of both lists
           val prevs = pvf ++ ff
           Map(file -> prevs)
-
         }
 
         // add sections to file
@@ -192,7 +201,9 @@ class Files @Inject() (
         val foldersContainingFile = folders.findByFileId(file.id).sortBy(_.name)
         val isRDFExportEnabled = current.plugin[RDFExportService].isDefined
 
-        val extractionsByFile = extractions.findByFileId(id)
+        val extractionsByFile = extractions.findById(new ResourceRef('file, id))
+        val extractionGroups = extractions.groupByType(extractionsByFile)
+
 
         var folderHierarchy = new ListBuffer[Folder]()
         if (foldersContainingFile.length > 0) {
@@ -227,7 +238,7 @@ class Files @Inject() (
             plugin.getOutputFormats(contentTypeEnding).map(outputFormats =>
               Ok(views.html.file(file, id.stringify, commentsByFile, previewsWithPreviewer, sectionsWithPreviews,
                 extractorsActive, decodedDatasetsContaining.toList, foldersContainingFile,
-                mds, isRDFExportEnabled, extractionsByFile, outputFormats, space, access, folderHierarchy.reverse.toList, decodedSpacesContaining.toList, allDecodedDatasets.toList, view_count, view_date)))
+                mds, isRDFExportEnabled, extractionGroups, outputFormats, space, access, folderHierarchy.reverse.toList, decodedSpacesContaining.toList, allDecodedDatasets.toList, view_count, view_date)))
           }
           case None =>
             Logger.debug("Polyglot plugin not found")
@@ -238,7 +249,7 @@ class Files @Inject() (
             //passing None as the last parameter (list of output formats)
             Future(Ok(views.html.file(file, id.stringify, commentsByFile, previewsWithPreviewer, sectionsWithPreviews,
               extractorsActive, decodedDatasetsContaining.toList, foldersContainingFile,
-              mds, isRDFExportEnabled, extractionsByFile, None, space, access, folderHierarchy.reverse.toList, decodedSpacesContaining.toList, allDecodedDatasets.toList, view_count, view_date)))
+              mds, isRDFExportEnabled, extractionGroups, None, space, access, folderHierarchy.reverse.toList, decodedSpacesContaining.toList, allDecodedDatasets.toList, view_count, view_date)))
         }
       }
 
