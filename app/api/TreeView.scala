@@ -116,7 +116,16 @@ class TreeView @Inject()(
     if (mine){
       var spaceList = spaces.listUser(0,Some(user),false,user)
       for (space <- spaceList) {
-        var currentJson = Json.obj("id" -> space.id, "text" -> space.name, "type" -> "space", "children" -> true, "icon" -> "glyphicon glyphicon-hdd", "data" -> "none")
+        val num_collections_in_space = spaces.getCollectionsInSpace(Some(space.id.stringify)).size
+        val num_datasets_in_space = spaces.getDatasetsInSpace(Some(space.id.stringify)).size
+        val hasChildren = {
+          if (num_collections_in_space + num_datasets_in_space > 0){
+            true
+          } else {
+            false
+          }
+        }
+        var currentJson = Json.obj("id" -> space.id, "text" -> space.name, "type" -> "space", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-hdd", "data" -> "none")
         children += currentJson
       }
       var orphanCollections = getOrphanCollectionsNotInSpace(user)
@@ -145,7 +154,16 @@ class TreeView @Inject()(
       if (public){
         var spaceList = spaces.listAccess(0, Set[Permission](Permission.ViewSpace),Some(user),false,true,false,true).filter(( s : ProjectSpace) => ((s.creator != user.id) && (s.isPublic)))
         for (space <- spaceList) {
-          var currentJson = Json.obj("id" -> space.id, "text" -> space.name, "type" -> "space", "children" -> true, "icon" -> "glyphicon glyphicon-hdd", "data" -> "none")
+          val num_collections_in_space = spaces.getCollectionsInSpace(Some(space.id.stringify)).size
+          val num_datasets_in_space = spaces.getDatasetsInSpace(Some(space.id.stringify)).size
+          val hasChildren = {
+            if (num_collections_in_space + num_datasets_in_space > 0){
+              true
+            } else {
+              false
+            }
+          }
+          var currentJson = Json.obj("id" -> space.id, "text" -> space.name, "type" -> "space", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-hdd", "data" -> "none")
           children += currentJson
         }
         //TODO get public orphan collections
@@ -162,7 +180,31 @@ class TreeView @Inject()(
       } else if (shared) {
         var spaceList = spaces.listAccess(0, Set[Permission](Permission.ViewSpace),Some(user),false,false,false,true).filter(( s : ProjectSpace) => (s.creator != user.id))
         for (space <- spaceList) {
-          var currentJson = Json.obj("id" -> space.id, "text" -> space.name, "type" -> "space", "children" -> true, "icon" -> "glyphicon glyphicon-hdd", "data" -> "none")
+          val num_collections_in_space = spaces.getCollectionsInSpace(Some(space.id.stringify)).size
+          val num_datasets_in_space = spaces.getDatasetsInSpace(Some(space.id.stringify)).size
+          val hasChildren = {
+            if (num_collections_in_space + num_datasets_in_space > 0){
+              true
+            } else {
+              false
+            }
+          }
+          var currentJson = Json.obj("id" -> space.id, "text" -> space.name, "type" -> "space", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-hdd", "data" -> "none")
+          children += currentJson
+        }
+      } else {
+        var spaceList = spaces.listAccess(0, Set[Permission](Permission.ViewSpace),Some(user),false,false,false,true)
+        for (space <- spaceList){
+          val num_collections_in_space = spaces.getCollectionsInSpace(Some(space.id.stringify)).size
+          val num_datasets_in_space = spaces.getDatasetsInSpace(Some(space.id.stringify)).size
+          val hasChildren = {
+            if (num_collections_in_space + num_datasets_in_space > 0){
+              true
+            } else {
+              false
+            }
+          }
+          var currentJson = Json.obj("id" -> space.id, "text" -> space.name, "type" -> "space", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-hdd", "data" -> "none")
           children += currentJson
         }
       }
