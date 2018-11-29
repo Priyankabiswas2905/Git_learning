@@ -123,6 +123,7 @@ class Tree @Inject()(
           children += currentJson
         }
       }
+      var orphanDatasetsOfSpace = getOrphanDatasetsInSpace(space, user)
       // only spaces, collections, datasets that are PUBLIC
     } else if (public){
 
