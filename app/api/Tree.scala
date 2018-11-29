@@ -55,7 +55,26 @@ class Tree @Inject()(
         var currentJson = Json.obj("id" -> space.id, "text" -> space.name, "type" -> "space", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-hdd", "data" -> "none")
         children += currentJson
       }
-
+      var orphanCollections = getOrphanCollectionsNotInAnySpace(user)
+      for (col <- orphanCollections){
+        var hasChildren = false
+        if (!col.child_collection_ids.isEmpty || col.datasetCount > 0){
+          hasChildren = true
+        }
+        var data = Json.obj("thumbnail_id"->col.thumbnail_id)
+        var currentJson = Json.obj("id"->col.id,"text"->col.name,"type"->"collection", "children"->hasChildren,"data"->data)
+        children += currentJson
+      }
+      var orphanDatasets = getOrphanDatasetsNotInAnySpace(user)
+      for (ds <- orphanDatasets){
+        var hasChildren = false
+        if (ds.files.size > 0) {
+          hasChildren = true
+        }
+        var data = Json.obj("thumbnail_id" -> ds.thumbnail_id)
+        var currentJson = Json.obj("id" -> ds.id, "text" -> ds.name, "type" -> "dataset", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-briefcase", "data" -> data)
+        children+=currentJson
+      }
       // only spaces, collections, datasets that are PUBLIC
     } else if (public){
       var spaceList = spaces.listAccess(0, Set[Permission](Permission.ViewSpace), Some(user),false,true,false,false)
@@ -92,7 +111,18 @@ class Tree @Inject()(
 
     // default view - everything a user can see
     if (default) {
-
+      var collectionsInSpace = collections.listSpace(0,space.id.stringify)
+      for (col <- collectionsInSpace){
+        var hasChildren = false
+        if (col.author.id == user.id){
+          if (!col.child_collection_ids.isEmpty || col.datasetCount > 0){
+            hasChildren = true
+          }
+          var data = Json.obj("thumbnail_id"->col.thumbnail_id)
+          var currentJson = Json.obj("id"->col.id,"text"->col.name,"type"->"collection", "children"->hasChildren,"data"->data)
+          children += currentJson
+        }
+      }
       // only spaces, collections, datasets that are PUBLIC
     } else if (public){
 
@@ -118,5 +148,48 @@ class Tree @Inject()(
     var children : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
     children.toList
   }
+
+  //orphan collections and datasets
+  def getOrphanCollectionsNotInAnySpace(user : User) : List[Collection] = {
+    var collectionsNotInSpace = collections.listUser(0,Some(user),false,user).filter((c: Collection) => (c.spaces.isEmpty && c.parent_collection_ids.isEmpty))
+    collectionsNotInSpace
+  }
+
+  def getOrphanDatasetsNotInAnySpace(user : User ) : List[Dataset] = {
+    var datasetsNotInSpace = datasets.listUser(0,Some(user),false,user).filter((d: Dataset) => (d.spaces.isEmpty && d.collections.isEmpty))
+    datasetsNotInSpace
+  }
+
+  def getOrphanDatasetsInSpace(space : ProjectSpace, user : User) : List[Dataset] = {
+    var orphanDatasets : ListBuffer[Dataset] = ListBuffer.empty[Dataset]
+    var datasetsInSpace = datasets.listSpace(0,space.id.stringify, Some(user))
+    for (dataset <- datasetsInSpace){
+      if (!collectionInSpaceContainsDataset(dataset,space)){
+        orphanDatasets += dataset
+      }
+    }
+    orphanDatasets.toList
+  }
+
+  def collectionInSpaceContainsDataset(dataset : Dataset, space : ProjectSpace) : Boolean = {
+    var collectionInSpaceContainsDataset = false;
+    var datasetCollectionIds = dataset.collections
+    if (datasetCollectionIds.isEmpty){
+      collectionInSpaceContainsDataset = false
+      return collectionInSpaceContainsDataset
+    }
+    for (col_id <- datasetCollectionIds){
+      collections.get(col_id) match {
+        case Some(col) => {
+          if (col.spaces.contains(space.id)){
+            collectionInSpaceContainsDataset = true
+            return collectionInSpaceContainsDataset
+          }
+        }
+      }
+    }
+    return collectionInSpaceContainsDataset
+  }
+
 
 }
