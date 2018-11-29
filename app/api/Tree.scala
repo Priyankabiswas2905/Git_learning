@@ -18,10 +18,22 @@ class Tree @Inject()(
   files: FileService,
   collections: CollectionService)  extends ApiController {
 
-  def getChildrenOfNode(nodeId : Option[String], nodeType : String, mine: Boolean, shared: Boolean, public : Boolean, default: Boolean): List[JsValue] = {
+  def getChildrenOfNode(nodeId : Option[String], nodeType : String, mine: Boolean, shared: Boolean, public : Boolean, default: Boolean) = PrivateServerAction { implicit request =>
     var children : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
 
-    children.toList
+    request.user match {
+      case Some(user) => {
+        if (nodeType == "root"){
+          val result = getChildrenOfRoot(user, mine, shared, public, default)
+          Ok(toJson(result))
+        } else {
+          Ok(toJson("unimplemented"))
+        }
+      }
+      case None => {
+        Ok(toJson("nouser"))
+      }
+    }
   }
 
   def getChildrenOfRoot(user: User, mine: Boolean, shared: Boolean, public: Boolean, default: Boolean): List[JsValue] = {
@@ -29,9 +41,37 @@ class Tree @Inject()(
 
     // default view - everything a user can see
     if (default) {
+      var spaceList = spaces.listAccess(0, Set[Permission](Permission.ViewSpace), Some(user),true,false,false,false)
+      for (space <- spaceList) {
+        val num_collections_in_space = spaces.getCollectionsInSpace(Some(space.id.stringify)).size
+        val num_datasets_in_space = spaces.getDatasetsInSpace(Some(space.id.stringify)).size
+        val hasChildren = {
+          if (num_collections_in_space + num_datasets_in_space > 0){
+            true
+          } else {
+            false
+          }
+        }
+        var currentJson = Json.obj("id" -> space.id, "text" -> space.name, "type" -> "space", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-hdd", "data" -> "none")
+        children += currentJson
+      }
 
       // only spaces, collections, datasets that are PUBLIC
     } else if (public){
+      var spaceList = spaces.listAccess(0, Set[Permission](Permission.ViewSpace), Some(user),false,true,false,false)
+      for (space <- spaceList) {
+        val num_collections_in_space = spaces.getCollectionsInSpace(Some(space.id.stringify)).size
+        val num_datasets_in_space = spaces.getDatasetsInSpace(Some(space.id.stringify)).size
+        val hasChildren = {
+          if (num_collections_in_space + num_datasets_in_space > 0){
+            true
+          } else {
+            false
+          }
+        }
+        var currentJson = Json.obj("id" -> space.id, "text" -> space.name, "type" -> "space", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-hdd", "data" -> "none")
+        children += currentJson
+      }
 
       // user is author, not shared with others
     } else if (mine && !shared){
