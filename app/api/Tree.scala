@@ -239,7 +239,7 @@ class Tree @Inject()(
 
       //user not author, shared with author
     } else if (!mine && shared){
-      
+
     }
     children.toList
   }
