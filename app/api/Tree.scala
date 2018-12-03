@@ -122,6 +122,16 @@ class Tree @Inject()(
         children += currentJson
       }
       // TODO public collections and datasets
+      var orphanDatasetsNotInSpaceAndPublic = getOrphanDatasetsNotInAnySpace(user).filter((d : Dataset) => (d.isPublic))
+      for (ds <- orphanDatasetsNotInSpaceAndPublic){
+        var hasChildren = false
+        if (ds.files.size > 0) {
+          hasChildren = true
+        }
+        var data = Json.obj("thumbnail_id" -> ds.thumbnail_id)
+        var currentJson = Json.obj("id" -> ds.id, "text" -> ds.name, "type" -> "dataset", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-briefcase", "data" -> data)
+        children+=currentJson
+      }
 
       // user is author, not shared with others
     } else if (mine && !shared){
