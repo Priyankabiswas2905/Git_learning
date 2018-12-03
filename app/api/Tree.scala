@@ -374,6 +374,25 @@ class Tree @Inject()(
 
   def getChildrenOfDataset(dataset: Dataset, user: User, mine: Boolean, shared: Boolean, public: Boolean): List[JsValue] = {
     var children : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
+    var files_inside = dataset.files
+    for (f <- files_inside){
+      files.get(f) match {
+        case Some(file) => {
+          file.thumbnail_id match {
+            case Some(thumbnail) =>{
+              var data = Json.obj("thumbnail_id"->file.thumbnail_id)
+              var currentJson = Json.obj("id"->file.id,"text"->file.filename,"type"->"file","icon" -> "glyphicon glyphicon-file","data"->data)
+              children += currentJson
+            }
+            case None => {
+              var data = Json.obj("thumbnail_id"->file.thumbnail_id)
+              var currentJson = Json.obj("id"->file.id,"text"->file.filename,"type"->"file","icon" -> "glyphicon glyphicon-file","data"->data)
+              children += currentJson
+            }
+          }
+        }
+      }
+    }
     children.toList
   }
 
