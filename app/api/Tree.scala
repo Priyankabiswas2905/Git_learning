@@ -121,7 +121,7 @@ class Tree @Inject()(
         var currentJson = Json.obj("id" -> space.id, "text" -> space.name, "type" -> "space", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-hdd", "data" -> "none")
         children += currentJson
       }
-      // TODO public collections and datasets
+
       var orphanDatasetsNotInSpaceAndPublic = getOrphanDatasetsNotInAnySpace(user).filter((d : Dataset) => (d.isPublic))
       for (ds <- orphanDatasetsNotInSpaceAndPublic){
         var hasChildren = false
@@ -135,6 +135,43 @@ class Tree @Inject()(
 
       // user is author, not shared with others
     } else if (mine && !shared){
+      var spaceList = spaces.listUser(0, Some(user), false, user)
+      for (space <- spaceList) {
+        if (space.userCount  == 1){
+          val num_collections_in_space = spaces.getCollectionsInSpace(Some(space.id.stringify)).size
+          val num_datasets_in_space = spaces.getDatasetsInSpace(Some(space.id.stringify)).size
+          val hasChildren = {
+            if (num_collections_in_space + num_datasets_in_space > 0){
+              true
+            } else {
+              false
+            }
+          }
+          var currentJson = Json.obj("id" -> space.id, "text" -> space.name, "type" -> "space", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-hdd", "data" -> "none")
+          children += currentJson
+        }
+      }
+
+      var orphanCollections = getOrphanCollectionsNotInAnySpace(user).filter((c: Collection) => (c.author == user))
+      for (col <- orphanCollections){
+        var hasChildren = false
+        if (!col.child_collection_ids.isEmpty || col.datasetCount > 0){
+          hasChildren = true
+        }
+        var data = Json.obj("thumbnail_id"->col.thumbnail_id)
+        var currentJson = Json.obj("id"->col.id,"text"->col.name,"type"->"collection", "children"->hasChildren,"data"->data)
+        children += currentJson
+      }
+      var orphanDatasets = getOrphanDatasetsNotInAnySpace(user).filter((d: Dataset) => (d.author == user))
+      for (ds <- orphanDatasets){
+        var hasChildren = false
+        if (ds.files.size > 0) {
+          hasChildren = true
+        }
+        var data = Json.obj("thumbnail_id" -> ds.thumbnail_id)
+        var currentJson = Json.obj("id" -> ds.id, "text" -> ds.name, "type" -> "dataset", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-briefcase", "data" -> data)
+        children+=currentJson
+      }
 
       //user is author, shared with others
     } else if (mine && shared){
