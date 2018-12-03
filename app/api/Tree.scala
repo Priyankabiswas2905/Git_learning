@@ -39,7 +39,7 @@ class Tree @Inject()(
               } else if (nodeType == "collection"){
                 collections.get(UUID(id)) match {
                   case Some(col) => {
-                    val result = getChildrenOfCollection(col, user, mine, shared, public)
+                    val result = getChildrenOfCollection(col, user, mine, shared, public, default)
                     Ok(toJson(result))
                   }
                   case None => BadRequest("No collection with id found")
@@ -232,20 +232,143 @@ class Tree @Inject()(
         var currentJson = Json.obj("id" -> ds.id, "text" -> ds.name, "type" -> "dataset", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-briefcase", "data" -> data)
         children+=currentJson
       }
-    } else if (mine && !shared){
 
-      //user is author, shared with others
-    } else if (mine && shared){
+      // user is author - shared or not shared does not matter since
+      // whether contents of space shared are determined by that space
+    } else if ((mine && !shared) || (mine & shared)){
+      var collectionsInSpace = collections.listSpace(0,space.id.stringify).filter((c: Collection) => (c.author == user))
+      for (col <- collectionsInSpace){
+        var hasChildren = false
+        if (!col.child_collection_ids.isEmpty || col.datasetCount > 0){
+          hasChildren = true
+        }
+        var data = Json.obj("thumbnail_id"->col.thumbnail_id)
+        var currentJson = Json.obj("id"->col.id,"text"->col.name,"type"->"collection", "children"->hasChildren,"data"->data)
+        children += currentJson
+      }
+      var orphanDatasetsOfSpace = getOrphanDatasetsInSpace(space, user).filter((d: Dataset) => (d.author == user))
+      for (ds <- orphanDatasetsOfSpace){
+        var hasChildren = false
+        if (ds.files.size > 0) {
+          hasChildren = true
+        }
+        var data = Json.obj("thumbnail_id" -> ds.thumbnail_id)
+        var currentJson = Json.obj("id" -> ds.id, "text" -> ds.name, "type" -> "dataset", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-briefcase", "data" -> data)
+        children+=currentJson
+      }
 
-      //user not author, shared with author
+
+      // in this case, filter out anything where user is author/owner
+      // if user can view, but is not author, then it fits this case
     } else if (!mine && shared){
-
+      var collectionsInSpace = collections.listSpace(0,space.id.stringify).filter((c: Collection)=> (c.author != user))
+      for (col <- collectionsInSpace){
+        var hasChildren = false
+        if (!col.child_collection_ids.isEmpty || col.datasetCount > 0){
+          hasChildren = true
+        }
+        var data = Json.obj("thumbnail_id"->col.thumbnail_id)
+        var currentJson = Json.obj("id"->col.id,"text"->col.name,"type"->"collection", "children"->hasChildren,"data"->data)
+        children += currentJson
+      }
+      var orphanDatasetsOfSpace = getOrphanDatasetsInSpace(space, user).filter((d: Dataset)=> (d.author != user))
+      for (ds <- orphanDatasetsOfSpace){
+        var hasChildren = false
+        if (ds.files.size > 0) {
+          hasChildren = true
+        }
+        var data = Json.obj("thumbnail_id" -> ds.thumbnail_id)
+        var currentJson = Json.obj("id" -> ds.id, "text" -> ds.name, "type" -> "dataset", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-briefcase", "data" -> data)
+        children+=currentJson
+      }
     }
     children.toList
   }
 
-  def getChildrenOfCollection(collection: Collection, user: User, mine: Boolean, shared: Boolean, public: Boolean): List[JsValue] = {
+  def getChildrenOfCollection(collection: Collection, user: User, mine: Boolean, shared: Boolean, public: Boolean, default: Boolean): List[JsValue] = {
     var children : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
+    if (default) {
+      val datasetsInCollection = datasets.listCollection(collection.id.stringify, Some(user))
+      for (ds <- datasetsInCollection) {
+        var hasChildren = false
+        if (ds.files.size > 0 && (ds.trash == false)) {
+          hasChildren = true
+        }
+        var data = Json.obj("thumbnail_id" -> ds.thumbnail_id)
+        var currentJson = Json.obj("id" -> ds.id, "text" -> ds.name, "type" -> "dataset", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-briefcase", "data" -> data)
+        children += currentJson
+      }
+      for (child_id <- collection.child_collection_ids){
+        collections.get(child_id) match {
+          case Some(child) => {
+            if (child.trash == false) {
+              val hasChildren = if (!child.child_collection_ids.isEmpty || child.datasetCount > 0){
+                true
+              } else {
+                false
+              }
+              var data = Json.obj("thumbnail_id"->child.thumbnail_id)
+              var currentJson = Json.obj("id"->child.id,"text"->child.name,"type"->"collection", "children"->hasChildren,"data"->data)
+              children += currentJson
+            }
+          }
+        }
+      }
+    } else if (mine) {
+      val datasetsInCollection = datasets.listCollection(collection.id.stringify, Some(user)).filter((d: Dataset) => (d.author == user))
+      for (ds <- datasetsInCollection) {
+        var hasChildren = false
+        if (ds.files.size > 0 && (ds.trash == false)) {
+          hasChildren = true
+        }
+        var data = Json.obj("thumbnail_id" -> ds.thumbnail_id)
+        var currentJson = Json.obj("id" -> ds.id, "text" -> ds.name, "type" -> "dataset", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-briefcase", "data" -> data)
+        children += currentJson
+      }
+      for (child_id <- collection.child_collection_ids){
+        collections.get(child_id) match {
+          case Some(child) => {
+            if ((child.author.id == user.id) && (child.trash == false)){
+              val hasChildren = if (!child.child_collection_ids.isEmpty || child.datasetCount > 0){
+                true
+              } else {
+                false
+              }
+              var data = Json.obj("thumbnail_id"->child.thumbnail_id)
+              var currentJson = Json.obj("id"->child.id,"text"->child.name,"type"->"collection", "children"->hasChildren,"data"->data)
+              children += currentJson
+            }
+          }
+        }
+      }
+    } else {
+      val datasetsInCollection = datasets.listCollection(collection.id.stringify, Some(user)).filter((d: Dataset) => (d.author != user))
+      for (ds <- datasetsInCollection) {
+        var hasChildren = false
+        if (ds.files.size > 0 && (ds.trash == false)) {
+          hasChildren = true
+        }
+        var data = Json.obj("thumbnail_id" -> ds.thumbnail_id)
+        var currentJson = Json.obj("id" -> ds.id, "text" -> ds.name, "type" -> "dataset", "children" -> hasChildren, "icon" -> "glyphicon glyphicon-briefcase", "data" -> data)
+        children += currentJson
+      }
+      for (child_id <- collection.child_collection_ids){
+        collections.get(child_id) match {
+          case Some(child) => {
+            if ((child.author.id != user.id) && (child.trash == false)){
+              val hasChildren = if (!child.child_collection_ids.isEmpty || child.datasetCount > 0){
+                true
+              } else {
+                false
+              }
+              var data = Json.obj("thumbnail_id"->child.thumbnail_id)
+              var currentJson = Json.obj("id"->child.id,"text"->child.name,"type"->"collection", "children"->hasChildren,"data"->data)
+              children += currentJson
+            }
+          }
+        }
+      }
+    }
     children.toList
   }
 
@@ -261,7 +384,7 @@ class Tree @Inject()(
   }
 
   def getOrphanDatasetsNotInAnySpace(user : User ) : List[Dataset] = {
-    var datasetsNotInSpace = datasets.listUser(0,Some(user),false,user).filter((d: Dataset) => (d.spaces.isEmpty && d.collections.isEmpty))
+    var datasetsNotInSpace = datasets.listAccess(0, Set[Permission](Permission.ViewDataset), Some(user), true, true, false).filter((d: Dataset) => (d.spaces.isEmpty && d.collections.isEmpty))
     datasetsNotInSpace
   }
 
