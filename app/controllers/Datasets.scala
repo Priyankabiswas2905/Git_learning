@@ -110,13 +110,13 @@ class Datasets @Inject() (
     implicit val user = request.user
     datasets.get(id) match {
       case Some(dataset) => {
-        var datasetSpaces: List[ProjectSpace] = List.empty[ProjectSpace]
+        var datasetSpaces: List[ProjectSpace]= List.empty[ProjectSpace]
 
         dataset.spaces.map(sp =>
           spaceService.get(sp) match {
-            case Some(s) => datasetSpaces = s :: datasetSpaces
-            case None =>
-          })
+          case Some(s) => datasetSpaces =  s :: datasetSpaces
+          case None =>
+        })
         Ok(views.html.datasets.createStep2(dataset, datasetSpaces))
       }
       case None => {
@@ -129,14 +129,14 @@ class Datasets @Inject() (
     implicit val user = request.user
     datasets.get(id) match {
       case Some(dataset) => {
-        var datasetSpaces: List[ProjectSpace] = List.empty[ProjectSpace]
+            var datasetSpaces: List[ProjectSpace]= List.empty[ProjectSpace]
 
-        dataset.spaces.map(sp =>
-          spaceService.get(sp) match {
-            case Some(s) => datasetSpaces = s :: datasetSpaces
-            case None =>
-          })
-        Ok(views.html.datasets.addFiles(dataset, None, datasetSpaces, List.empty))
+            dataset.spaces.map(sp =>
+              spaceService.get(sp) match {
+                case Some(s) => datasetSpaces =  s :: datasetSpaces
+                case None =>
+              })
+            Ok(views.html.datasets.addFiles(dataset, None, datasetSpaces, List.empty))
       }
       case None => {
         InternalServerError(s"$Messages('dataset.title')  $id not found")
@@ -202,7 +202,7 @@ class Datasets @Inject() (
 
         Logger.debug("User selections" + user)
         val userSelections: List[String] =
-          if (user.isDefined) selections.get(user.get.identityId.userId).map(_.id.stringify)
+          if(user.isDefined) selections.get(user.get.identityId.userId).map(_.id.stringify)
           else List.empty[String]
         Logger.debug("User selection " + userSelections)
 
@@ -523,7 +523,7 @@ class Datasets @Inject() (
   def dataset(id: UUID, currentSpace: Option[String], limit: Int) = PermissionAction(Permission.ViewDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
 
     implicit val user = request.user
-    Previewers.findPreviewers.foreach(p => Logger.debug("Previewer found " + p.id))
+    Previewers.findDatasetPreviewers().foreach(p => Logger.debug("Previewer found " + p.id))
     datasets.get(id) match {
       case Some(dataset) => {
 
@@ -591,8 +591,7 @@ class Datasets @Inject() (
           decodedCommentsByDataset += dComment
         }
 
-        filesInDataset.map {
-          file =>
+        filesInDataset.map { file =>
             file.tags.map {
               tag => filesTags += tag.name
             }
@@ -621,8 +620,7 @@ class Datasets @Inject() (
         var decodedSpaces_canRemove: Map[ProjectSpace, Boolean] = Map.empty
         var isInPublicSpace = false
         dataset.spaces.map {
-          sp =>
-            spaceService.get(sp) match {
+            sp => spaceService.get(sp) match {
               case Some(s) => {
                 decodedSpaces_canRemove += (Utils.decodeSpaceElements(s) -> true)
                 datasetSpaces = s :: datasetSpaces
@@ -685,15 +683,21 @@ class Datasets @Inject() (
           datasetSpaces.map(space =>
             if (Permission.checkPermission(Permission.AddResourceToCollection, ResourceRef(ResourceRef.space, space.id))) {
               canAddDatasetToCollection = true
-            })
+            }
+          )
         }
+        val stagingAreaDefined = play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined
+
+        val extractionsByDataset = extractions.findById(new ResourceRef('dataset, id))
+        val extractionGroups = extractions.groupByType(extractionsByDataset)
+
                 // Increment view count for dataset
         val view_data = datasets.incrementViews(id, user)
         
         Ok(views.html.dataset(datasetWithFiles, commentsByDataset, filteredPreviewers.toList, m, metadataSummary, metadata.getDefinitions(metadataSummary.contextSpace),
           decodedCollectionsInside.toList, sensors, Some(decodedSpaces_canRemove), fileList,
           filesTags, toPublish, curPubObjects, currentSpace, limit, showDownload, accessData, canAddDatasetToCollection, 
-          view_data))
+          stagingAreaDefined, view_data, extractionGroups))
       }
       case None => {
         Logger.error("Error getting dataset" + id)
@@ -815,7 +819,8 @@ class Datasets @Inject() (
               "size" -> toJson(f.length),
               "url" -> toJson(routes.Files.file(f.id).absoluteURL(Utils.https(request))),
               "deleteUrl" -> toJson(api.routes.Files.removeFile(f.id).absoluteURL(Utils.https(request))),
-              "deleteType" -> toJson("POST")))))
+              "deleteType" -> toJson("POST")
+            ))))
           }
           case None => {
             Map("files" ->
@@ -824,7 +829,11 @@ class Datasets @Inject() (
                   Map(
                     "name" -> toJson(Messages("dataset.title") + " ID Invalid."),
                     "size" -> toJson(0),
-                    "error" -> toJson(s"${Messages("dataset.title")} with the specified ID=${ds} was not found. Please try again.")))))
+                    "error" -> toJson(s"${Messages("dataset.title")} with the specified ID=${ds} was not found. Please try again.")
+                  )
+                )
+              )
+            )
           }
         }
       }
@@ -835,7 +844,11 @@ class Datasets @Inject() (
               Map(
                 "name" -> toJson("Missing " + Messages("dataset.title") + "  ID."),
                 "size" -> toJson(0),
-                "error" -> toJson("No " + Messages("dataset.title") + "id found. Please try again.")))))
+                "error" -> toJson("No "+ Messages("dataset.title")+"id found. Please try again.")
+              )
+            )
+          )
+        )
       }
     }
     Ok(toJson(retMap))

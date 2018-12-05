@@ -79,7 +79,16 @@ class Metadata @Inject() (
 
     var listOfTerms = ListBuffer.empty[String]
 
-    // Get Elasticsearch metadata fields if plugin available
+    // First, get regular vocabulary matches
+    val definitions = metadataService.getDefinitionsDistinctName(user)
+    for (md_def <- definitions) {
+      val currVal = (md_def.json \ "label").as[String]
+      if (currVal.toLowerCase startsWith query.toLowerCase) {
+        listOfTerms.append("metadata." + currVal)
+      }
+    }
+
+    // Next get Elasticsearch metadata fields if plugin available
     current.plugin[ElasticsearchPlugin] match {
       case Some(plugin) => {
         val mdTerms = plugin.getAutocompleteMetadataFields(query)
@@ -227,10 +236,8 @@ class Metadata @Inject() (
             }
           }
         }
-
       }
     }
-
   }
 
   def editDefinition(id: UUID, spaceId: Option[String]) = AuthenticatedAction(parse.json) {
@@ -287,16 +294,12 @@ class Metadata @Inject() (
                                 Unauthorized(" Not Authorized")
                               }
                             }
-
                           }
                         }
-
                       }
                     }
                   }
-
                 }
-
               }
             }
           } else {
@@ -314,6 +317,7 @@ class Metadata @Inject() (
       case Some(user) => {
         metadataService.getDefinition(id) match {
           case Some(md) => {
+
             md.spaceId match {
               case Some(spaceId) if Permission.checkPermission(Some(user), Permission.EditSpace, Some(ResourceRef(ResourceRef.space, spaceId))) => {
                 metadataService.deleteDefinition(id)
@@ -442,8 +446,8 @@ class Metadata @Inject() (
                 val metadata = models.Metadata(UUID.generate, attachedTo.get, contextID, contextURL, createdAt, creator,
                   content, version)
 
-                //add metadata to mongo
-                metadataService.addMetadata(metadata)
+                // add metadata to mongo
+                val metadataId = metadataService.addMetadata(metadata)
                 val mdMap = metadata.getExtractionSummary
 
                 attachedTo match {
@@ -453,14 +457,14 @@ class Metadata @Inject() (
                         datasets.index(resource.id)
                         //send RabbitMQ message
                         current.plugin[RabbitmqPlugin].foreach { p =>
-                          p.metadataAddedToResource(resource, mdMap, Utils.baseUrl(request))
+                          p.metadataAddedToResource(metadataId, resource, mdMap, Utils.baseUrl(request))
                         }
                       }
                       case ResourceRef.file => {
                         files.index(resource.id)
                         //send RabbitMQ message
                         current.plugin[RabbitmqPlugin].foreach { p =>
-                          p.metadataAddedToResource(resource, mdMap, Utils.baseUrl(request))
+                          p.metadataAddedToResource(metadataId, resource, mdMap, Utils.baseUrl(request))
                         }
                       }
                       case _ =>
@@ -471,7 +475,7 @@ class Metadata @Inject() (
                       Logger.error("Metadata missing attachedTo subdocument")
                   }
                 }
-                Ok(JsObject(Seq("status" -> JsString("ok"))))
+                Ok(views.html.metadatald.view(List(metadata), true)(request.user))
               }
               case u: JsUndefined => {
                 content_ld match {
@@ -481,7 +485,7 @@ class Metadata @Inject() (
                     val newInfo = metadataService.addMetadata(content_ld, context, attachedTo.get, createdAt, creator, space)
                     Logger.info("new stuff is: " + newInfo.toString())
                     val mdMap = Map(
-                      "metadata" -> content_ld,
+                      "metadata" -> newInfo,
                       "resourceType" -> attachedTo.get.resourceType.name,
                       "resourceId" -> attachedTo.get.id.toString)
 
@@ -492,14 +496,14 @@ class Metadata @Inject() (
                             datasets.index(resource.id)
                             //send RabbitMQ message
                             current.plugin[RabbitmqPlugin].foreach { p =>
-                              p.metadataAddedToResource(resource, mdMap, Utils.baseUrl(request))
+                              p.metadataLDAddedToResource(resource, space, mdMap, Utils.baseUrl(request))
                             }
                           }
                           case ResourceRef.file => {
                             files.index(resource.id)
                             //send RabbitMQ message
                             current.plugin[RabbitmqPlugin].foreach { p =>
-                              p.metadataAddedToResource(resource, mdMap, Utils.baseUrl(request))
+                              p.metadataLDAddedToResource(resource, space, mdMap, Utils.baseUrl(request))
                             }
                           }
                           case _ => {
@@ -560,7 +564,7 @@ class Metadata @Inject() (
                 "resourceId" -> attachedid)
 
               current.plugin[RabbitmqPlugin].foreach { p =>
-                p.metadataUpdatedOnResource(resource, mdMap, Utils.baseUrl(request))
+                p.metadataLDUpdatedOnResource(resource, space, mdMap, Utils.baseUrl(request))
               }
 
               Logger.debug("re-indexing after metadata update")
@@ -604,7 +608,7 @@ class Metadata @Inject() (
               val mdMap = m.getExtractionSummary
 
               current.plugin[RabbitmqPlugin].foreach { p =>
-                p.metadataRemovedFromResource(m.attachedTo, Utils.baseUrl(request))
+                p.metadataRemovedFromResource(id, m.attachedTo, Utils.baseUrl(request))
               }
 
               Logger.debug("re-indexing after metadata removal")
@@ -655,42 +659,34 @@ class Metadata @Inject() (
           val space = metadataService.getContextSpace(resource, None)
 
           metadataService.removeMetadata(resource, term, itemid, deletedAt, deletor, space, Utils.baseUrl(request)) match {
-            case content: JsObject => {
 
-              val mdMap = Map(
-                "metadata" -> content,
-                "resourceType" -> attachedtype,
-                "resourceId" -> attachedUuid)
+          val mdMap = Map(
+            "term" -> term,
+            "itemid" -> itemid)
 
-              current.plugin[RabbitmqPlugin].foreach { p =>
-                p.metadataRemovedFromResource(resource, Utils.baseUrl(request))
-              }
-
-              Logger.debug("re-indexing after metadata removal")
-              current.plugin[ElasticsearchPlugin].foreach { p =>
-                // Delete existing index entry and re-index
-                Symbol(attachedtype) match {
-                  case ResourceRef.file => {
-                    p.delete("data", "file", attachedUuid.stringify)
-                    files.index(attachedUuid)
-                  }
-                  case ResourceRef.dataset => {
-                    p.delete("data", "dataset", attachedUuid.stringify)
-                    datasets.index(attachedUuid)
-                  }
-                  case _ => {
-                    Logger.error("unknown attached resource type for metadata - not reindexing")
-                  }
-                }
-              }
-
-              Ok(JsObject(Seq("status" -> JsString("ok"))))
-            }
-            case u: JsUndefined => {
-              BadRequest("Entry to delete not found.")
-            }
+          current.plugin[RabbitmqPlugin].foreach { p =>
+            p.metadataLDRemovedFromResource(resource, space, mdMap, Utils.baseUrl(request))
           }
-        }
+
+          Logger.debug("re-indexing after metadata removal")
+          current.plugin[ElasticsearchPlugin].foreach { p =>
+            // Delete existing index entry and re-index
+            Symbol(attachedtype) match {
+              case ResourceRef.file => {
+                p.delete("data", "file", attachedUuid.stringify)
+                files.index(attachedUuid)
+              }
+              case ResourceRef.dataset => {
+                p.delete("data", "dataset", attachedUuid.stringify)
+                datasets.index(attachedUuid)
+              }
+              case _ => {
+                Logger.error("unknown attached resource type for metadata - not reindexing")
+              }
+            }
+          }  
+          Ok(JsObject(Seq("status" -> JsString("ok"))))
+        }  
       }
       case None => BadRequest("Not authorized.")
     }

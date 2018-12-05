@@ -41,10 +41,10 @@ trait MetadataService {
   def updateMetadata(content_ld: JsValue, context: JsValue, attachedTo: ResourceRef, itemId: String, updatedAt: Date, updator: Agent, spaceId: Option[UUID]): JsValue
 
   /** Remove metadata by attachTo*/
-  def removeMetadataByAttachTo(resourceRef: ResourceRef, host: String): Long
+  def removeMetadataByAttachTo(resourceRef: ResourceRef, host: String): List[UUID]
 
   /** Remove metadata by attachTo from a specific extractor */
-  def removeMetadataByAttachToAndExtractor(resourceRef: ResourceRef, extractorName: String, host: String): Long
+  def removeMetadataByAttachToAndExtractor(resourceRef: ResourceRef, extractorName: String, host: String): List[UUID]
 
   /** Get the space (or None) holding the metadata definitions used for this resource */
   def getContextSpace(resourceRef: ResourceRef, space: Option[UUID]): Option[UUID]

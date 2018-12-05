@@ -307,6 +307,9 @@ DELETE    /api/datasets/:id/metadata.jsonld                                   @a
 POST      /api/files/:id/metadata.jsonld                                      @api.Files.addMetadataJsonLD(id: UUID)
 GET       /api/files/:id/metadata.jsonld                                      @api.Files.getMetadataJsonLD(id: UUID, extractor: Option[String] ?= None)
 DELETE    /api/files/:id/metadata.jsonld                                      @api.Files.removeMetadataJsonLD(id: UUID, extractor: Option[String] ?= None)
+POST           /api/files/metadata.jsonld                                               @api.Files.addBatchMetadataJsonLD()
+GET            /api/files/metadata.jsonld                                               @api.Files.getBatchMetadataJsonLD()
+
 
 POST      /api/metadata.jsonld                                                @api.Metadata.addUserMetadata()
 DELETE    /api/metadata.jsonld/:attachedtype/:attachedid/:term/:itemid        @api.Metadata.removeMetadata(attachedtype:String, attachedid:String, term: String, itemid: String)
@@ -689,6 +692,16 @@ GET       /api/relations/search                                               @a
 GET       /api/relations/:id                                                  @api.Relations.get(id: UUID)
 POST      /api/relations                                                      @api.Relations.add()
 DELETE    /api/relations/:id                                                  @api.Relations.delete(id: UUID)
+
+# ----------------------------------------------------------------------
+# REPORTING API
+# ----------------------------------------------------------------------
+GET            /api/reports/metrics                                                     @api.Reporting.allMetrics()
+GET            /api/reports/metrics/files                                               @api.Reporting.fileMetrics()
+GET            /api/reports/metrics/datasets                                            @api.Reporting.datasetMetrics()
+GET            /api/reports/metrics/collections                                         @api.Reporting.collectionMetrics()
+GET            /api/reports/metrics/spaces                                              @api.Reporting.spaceMetrics()
+GET            /api/reports/metrics/users                                               @api.Reporting.userMetrics()
 
 # ----------------------------------------------------------------------
 # MISC./OTHER ENDPOINTS

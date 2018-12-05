@@ -29,18 +29,18 @@ import play.api.libs.json.Reads._
  * Methods for interacting with the Curation Objects (now referred to as Publication Requests) in the staging area.
  */
 class CurationObjects @Inject() (
-    curations: CurationService,
-    datasets: DatasetService,
-    collections: CollectionService,
-    spaces: SpaceService,
-    files: FileService,
-    folders: FolderService,
-    comments: CommentService,
-    sections: SectionService,
-    events: EventService,
-    userService: UserService,
-    metadatas: MetadataService,
-    contextService: ContextLDService) extends SecuredController {
+  curations: CurationService,
+  datasets: DatasetService,
+  collections: CollectionService,
+  spaces: SpaceService,
+  files: FileService,
+  folders: FolderService,
+  comments: CommentService,
+  sections: SectionService,
+  events: EventService,
+  userService: UserService,
+  metadatas: MetadataService,
+  contextService: ContextLDService) extends SecuredController {
 
   /**
    * String name of the Space such as 'Project space' etc., parsed from conf/messages
@@ -170,7 +170,6 @@ class CurationObjects @Inject() (
                     newFiles = cf.id :: newFiles
 
                     fileCFileMap(f.id) = cf.id
-
                   }
                 }
               }
@@ -205,11 +204,11 @@ class CurationObjects @Inject() (
 
                 //send RabbitMQ message
                 current.plugin[RabbitmqPlugin].foreach { p =>
-                  p.metadataAddedToResource(ResourceRef(ResourceRef.dataset, dataset.id), mdMap, Utils.baseUrl(request))
+                  p.metadataLDAddedToResource(ResourceRef(ResourceRef.dataset, dataset.id), spaceId, mdMap, Utils.baseUrl(request))
                 }
 
               }
-              dataset.folders.map(f => copyFolders(f, newCuration.id, "dataset", newCuration.id, controllers.Utils.baseEventUrl(request)))
+              dataset.folders.map(f => copyFolders(f, newCuration.id, "dataset", newCuration.id, spaceId, controllers.Utils.baseEventUrl(request)))
               metadatas.copyMetadataSummary(ResourceRef(ResourceRef.dataset, datasetId), ResourceRef(ResourceRef.curationObject, newCuration.id))
               val summary = metadatas.getMetadataSummary(ResourceRef(ResourceRef.curationObject, newCuration.id), Some(spaceId))
               val mdMap = Map("metadata" -> summary.entries,
@@ -218,7 +217,7 @@ class CurationObjects @Inject() (
 
               //send RabbitMQ message
               current.plugin[RabbitmqPlugin].foreach { p =>
-               p.metadataAddedToResource(ResourceRef(ResourceRef.dataset, dataset.id), mdMap, Utils.baseUrl(request))
+               p.metadataLDAddedToResource(ResourceRef(ResourceRef.dataset, dataset.id), space, mdMap, Utils.baseUrl(request))
               }
               Redirect(routes.CurationObjects.getCurationObject(newCuration.id))
             } else {
@@ -232,7 +231,7 @@ class CurationObjects @Inject() (
     }
   }
 
-  private def copyFolders(id: UUID, parentId: UUID, parentType: String, parentCurationObjectId: UUID, requestHost: String): Unit = {
+  private def copyFolders(id: UUID, parentId: UUID, parentType: String, parentCurationObjectId: UUID, spaceId: UUID, requestHost: String): Unit = {
     folders.get(id) match {
       case Some(folder) => {
         var newFiles: List[UUID] = List.empty
@@ -283,7 +282,7 @@ class CurationObjects @Inject() (
 
           //send RabbitMQ message
           current.plugin[RabbitmqPlugin].foreach { p =>
-		        p.metadataAddedToResource(ResourceRef(ResourceRef.file, fileId), mdMap, requestHost)
+		        p.metadataLDAddedToResource(ResourceRef(ResourceRef.file, fileId), spaceId, mdMap, requestHost)
 		  }
         }
 
@@ -937,6 +936,5 @@ class CurationObjects @Inject() (
 
   }
 
-
-  }
+}
 

@@ -16,7 +16,9 @@
   showDownload: Boolean,
   accessData: models.DatasetAccess,
   canAddDatasetToCollection: Boolean,
-  view: (Int, java.util.Date))(implicit flash: play.api.mvc.Flash, user: Option[models.User], request: RequestHeader)
+  view: (Int, java.util.Date),
+  extractionsStatus: Map[String, ExtractionGroup]
+)(implicit flash: play.api.mvc.Flash, user: Option[models.User], request: RequestHeader)
 
 @import api.Permission
 @import play.api.Play.current
@@ -24,6 +26,7 @@
 @import play.api.libs.json.JsValue
 
 @main(dataset.name) {
+    <link rel="stylesheet" href="@routes.Assets.at("stylesheets/glyphicon-animations.css")">
     <script src="@routes.Assets.at("javascripts/htmlEncodeDecode.js")" language="javascript"></script>
     <script type="text/javascript">
         var spaceId = "@currentSpace";
@@ -269,12 +272,18 @@
 	    	<div class="tabbable" id="bottomDatasetTabbable"> <!-- Only required for left/right tabs -->
                 <ul class="nav nav-tabs margin-bottom-20" >
                     <li role="presentation" class="active"><a href="#tab-files" role="tab" data-toggle="tab">Files </a></li>
-                    <li role="presentation"><a href="#tab-metadata" role="tab" data-toggle="tab">Metadata</a></li>
+                    <li role="presentation"><a href="#tab-metadata" role="tab" data-toggle="tab">Metadata </a></li>
+                    <li role="presentation"><a href="#tab-extractions" role="tab" data-toggle="tab">Extractions </a></li>
                     <li role="presentation"><a href="#tab-visua" role="tab" data-toggle="tab">Visualizations</a></li>
                     <li role="presentation"><a href="#tab-comments" role="tab" data-toggle="tab">Comments (@comments.size)</a></li>
                 </ul>
                 <div class="tab-content">
-                    <div role="tabpanel" class="tab-pane fade in active" id="tab-files"></div>
+                    <div role="tabpanel" class="tab-pane fade in active" id="tab-files">
+                        <div id="loading-spinner" class="center-glyphicon valign-link">
+                            <span class="glyphicon glyphicon-refresh glyphicon-animation-spin glyphicon-5x"></span>
+                            <span class="sr-only">Loading...</span>
+                        </div>
+                    </div>
                     <div role="tabpanel" class="tab-pane fade" id="tab-comments">
                             <!-- If the user can add comments, the form will be present, otherwise the form is not available at all. -->
                         @if(Permission.checkPermission(Permission.AddComment, ResourceRef(ResourceRef.dataset, dataset.id)) && !dataset.trash) {
@@ -301,8 +310,19 @@
                             </div>
                         </div>
                     </div>
+                    <div role="tabpanel" class="tab-pane fade" id="tab-extractions">
+                        <div class="row">
+                            <div class="col-md-12" id="extractions-content">
+                            @extractions.extractionsList(extractionsStatus)
+                            </div>
+                        </div>
+                    </div>
                     <div role="tabpanel" class="tab-pane fade" id="tab-visua">
                         @datasets.previews(dataset, previewers)
+                    </div>
+                    <div class="row bottom-padding">
+                        <div class="col-md-12">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -334,7 +354,6 @@
 
     @* FIXME Commented out since it creates some issues with dataset previewers *@
     @*<script src="@routes.Assets.at("javascripts/tabsInURL.js")" type="text/javascript"></script>*@
-
     <script src="@routes.Assets.at("javascripts/errorRedirect.js")" type="text/javascript"></script>
     <script src="@routes.Assets.at("javascripts/updateLicenseInfo.js")" language="javascript"></script>
     <script src="@routes.Assets.at("javascripts/datasetListProcess.js")" type="text/javascript"></script>
@@ -674,10 +693,12 @@
             type: 'POST',
             contentType: "application/json"
          });
+         $('#loading-spinner').show();
 
          request.done(function(response, textStatus, jsXHR){
           $('#tab-files').html("");
           $('#tab-files').html(response);
+          $('#loading-spinner').hide();
           if(folderId != null) {
             parentType = 'folder';
             parentId = folderId;
@@ -689,6 +710,7 @@
           }
          });
          request.fail(function (jqXHR, textStatus, errorThrown){
+             $('#loading-spinner').hide();
             console.error("The following error occurred: " + textStatus, errorThrown);
             var errMsg = "You must be logged in to see files and folders.";
             if (!checkErrorAndRedirect(jqXHR, errMsg)) {

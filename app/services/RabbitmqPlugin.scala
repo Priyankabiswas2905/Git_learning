@@ -76,6 +76,8 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   val files: FileService = DI.injector.getInstance(classOf[FileService])
   val spacesService: SpaceService = DI.injector.getInstance(classOf[SpaceService])
   val extractorsService: ExtractorService = DI.injector.getInstance(classOf[ExtractorService])
+  val datasetService: DatasetService = DI.injector.getInstance(classOf[DatasetService])
+  val metadataService: MetadataService = DI.injector.getInstance(classOf[MetadataService])
 
   var extractQueue: Option[ActorRef] = None
   var channel: Option[Channel] = None
@@ -257,34 +259,6 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   }
 
   /**
-    * Find all extractors enabled for the spaces the dataset belongs to that match a specific mime type.
-    * @param dataset The dataset used to find which space to query for registered extractors.
-    * @param mimeType The mime type of the file we are interested in submitting.
-    * @return A list of extractors IDs.
-    */
-  private def getSpaceExtractorsByMimeType(dataset: Dataset, mimeType: String): List[String] = {
-    // FIXME support wildcard mimetypes, for example text/*
-    dataset.spaces.flatMap(s =>
-      spacesService.getAllExtractors(s).flatMap(exId =>
-        extractorsService.getExtractorInfo(exId)).filter(exInfo =>
-        containsOperation(exInfo.process.file, mimeType))).map(_.name)
-  }
-
-  /**
-    * Find all extractors enabled for the space the dataset belongs and the matched operation.
-    * @param dataset  The dataset used to find which space to query for registered extractors.
-    * @param operation The dataset operation requested.
-    * @return A list of extractors IDs.
-    */
-  private def getSpaceExtractorsByOperation(dataset: Dataset, operation: String): List[String] = {
-    // FIXME support wildcard mimetypes, for example text/*
-    dataset.spaces.flatMap(s =>
-      spacesService.getAllExtractors(s).flatMap(exId =>
-        extractorsService.getExtractorInfo(exId)).filter(exInfo =>
-        containsOperation(exInfo.process.dataset, operation))).map(_.name)
-  }
-
-  /**
     * Check if given operation matches any existing records cached in ExtractorInfo.
     * Note, dataset operation is in the format of "x.y",
     *       mimetype of files is in the format of "x/y"
@@ -314,12 +288,35 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   private def getGlobalExtractorsByOperation(operation: String): List[String] = {
     extractorsService.getEnabledExtractors().flatMap(exId =>
       extractorsService.getExtractorInfo(exId)).filter(exInfo =>
-      containsOperation(exInfo.process.dataset, operation) || containsOperation(exInfo.process.file, operation)).map(_.name)
+        containsOperation(exInfo.process.dataset, operation) ||
+        containsOperation(exInfo.process.file, operation) ||
+        containsOperation(exInfo.process.metadata, operation)
+      ).map(_.name)
+  }
+
+  /**
+    * Find all extractors enabled for the space the dataset belongs and the matched operation.
+    * @param dataset  The dataset used to find which space to query for registered extractors.
+    * @param operation The dataset operation requested.
+    * @return A list of extractors IDs.
+    */
+  private def getSpaceExtractorsByOperation(dataset: Dataset, operation: String): List[String] = {
+    dataset.spaces.flatMap(s =>
+      spacesService.getAllExtractors(s).flatMap(exId =>
+        extractorsService.getExtractorInfo(exId)).filter(exInfo =>
+      containsOperation(exInfo.process.dataset, operation) || containsOperation(exInfo.process.file, operation)).map(_.name))
   }
 
   /**
     * Query the list of bindings loaded at startup for which binding matches the routing key and extract the destination
-    * queues.
+    * queues. This is used for files bindings. For a mime type such as image/jpeg it will match the following routing keys:
+    * *.file.image.jpeg
+    * *.file.image.#
+    * *.file.#
+    *
+    * key4 is to match mime type for zip file's routing keys: e.g,
+    * *.file.multi.files-zipped.#
+    *
     * @param routingKey The binding routing key.
     * @return The list of queue matching the routing key.
     */
@@ -327,8 +324,11 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     // While the routing key includes the instance name the rabbitmq bindings has a *.
     // TODO this code could be improved by having less options in how routes and keys are represented
     val fragments = routingKey.split('.')
-    val bindingKey = "*."+fragments.slice(1,fragments.size).mkString(".")
-    bindings.filter(x => x.routing_key == bindingKey).map(_.destination)
+    val key1 = "*."+fragments.slice(1,fragments.size).mkString(".")
+    val key2 = "*."+fragments.slice(1,fragments.size - 1).mkString(".") + ".#"
+    val key3 = "*."+fragments(1)+".#"
+    val key4 = "*."+fragments.slice(1,fragments.size).mkString(".") + ".#"
+    bindings.filter(x => Set(key1, key2, key3, key4).contains(x.routing_key)).map(_.destination)
   }
 
   /**
@@ -341,23 +341,24 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     * @return a set of unique rabbitmq queues
     */
   private def getQueues(dataset: Dataset, routingKey: String, contentType: String): Set[String] = {
+    // drop the first fragment from the routing key and replace characters to create operation id
     val fragments = routingKey.split('.')
     val operation =
       if (fragments(1) == "dataset")
+        fragments(2) + "." + fragments(3)
+      else if (fragments(1) == "metadata")
         fragments(2) + "." + fragments(3)
       else if (fragments(1) == "file")
         fragments(2) + "/" + fragments(3)
       else ""
     // get extractors enabled at the global level
     val globalExtractors = getGlobalExtractorsByOperation(operation)
-    // get extractors in the spaces enabled for a specific mime type
-    val spaceExtractorsFile = getSpaceExtractorsByMimeType(dataset, contentType)
-    // get extractors in the spaces enabled for a action on a dataset
-    val spaceExtractorsDataset = getSpaceExtractorsByOperation(dataset, operation)
+    // get extractors enabled at the space level
+    val spaceExtractors = getSpaceExtractorsByOperation(dataset, operation)
     // get gueues based on RabbitMQ bindings (old method).
     val queuesFromBindings = getQueuesFromBindings(routingKey)
     // take the union of queues so that we publish to a specific queue only once
-    globalExtractors.toSet union spaceExtractorsFile.toSet union spaceExtractorsDataset.toSet union queuesFromBindings.toSet
+    globalExtractors.toSet union spaceExtractors.toSet union queuesFromBindings.toSet
   }
 
   /**
@@ -369,13 +370,14 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   def fileCreated(file: File, dataset: Option[Dataset], host: String): Unit = {
     val routingKey = exchange + "." + "file." + contentTypeToRoutingKey(file.contentType)
     val extraInfo = Map("filename" -> file.filename)
+    val sourceExtra = JsObject((Seq("filename" -> JsString(file.filename))))
     Logger.debug(s"Sending message $routingKey from $host with extraInfo $extraInfo")
     dataset match {
       case Some(d) =>
         getQueues(d, routingKey, file.contentType).foreach{ queue =>
-          val source = Entity(ResourceRef(ResourceRef.file, file.id), None, JsObject(Seq.empty))
-          val msg = ExtractorMessage(file.id, file.id, host, queue, extraInfo, file.length.toString, null,
-            "", apiKey, routingKey, source, "created", None)
+          val source = Entity(ResourceRef(ResourceRef.file, file.id), Some(file.contentType), sourceExtra)
+          val msg = ExtractorMessage(file.id, file.id, host, queue, extraInfo, file.length.toString,
+            d.id, "", apiKey, routingKey, source, "created", None)
           extractWorkQueue(msg)
         }
       case None =>
@@ -393,7 +395,8 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     val routingKey = exchange + "." + "file." + contentTypeToRoutingKey(file.contentType)
     val extraInfo = Map("filename" -> file.filename)
     Logger.debug(s"Sending message $routingKey from $host with extraInfo $extraInfo")
-    val source = Entity(ResourceRef(ResourceRef.file, file.id), Some(file.contentType), JsObject(Seq.empty))
+    val sourceExtra = JsObject((Seq("filename" -> JsString(file.filename))))
+    val source = Entity(ResourceRef(ResourceRef.file, file.id), Some(file.contentType), sourceExtra)
     val msg = ExtractorMessage(file.id, file.id, host, routingKey, extraInfo, file.length.toString, null,
       "", apiKey, routingKey, source, "created", None)
     extractWorkQueue(msg)
@@ -410,8 +413,9 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     val routingKey = s"$exchange.dataset.file.added"
     Logger.debug(s"Sending message $routingKey from $host")
     val queues = getQueues(dataset, routingKey, file.contentType)
+    val sourceExtra = JsObject((Seq("filename" -> JsString(file.filename))))
     queues.foreach{ extractorId =>
-      val source = Entity(ResourceRef(ResourceRef.file, file.id), Some(file.contentType), JsObject(Seq.empty))
+      val source = Entity(ResourceRef(ResourceRef.file, file.id), Some(file.contentType), sourceExtra)
       val target = Entity(ResourceRef(ResourceRef.dataset, dataset.id), None, JsObject(Seq.empty))
       val msg = ExtractorMessage(file.id, file.id, host, extractorId, Map.empty, file.length.toString, dataset.id,
         "", apiKey, routingKey, source, "added", Some(target))
@@ -429,8 +433,9 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     val routingKey = s"$exchange.dataset.file.removed"
     Logger.debug(s"Sending message $routingKey from $host")
     val queues = getQueues(dataset, routingKey, file.contentType)
+    val sourceExtra = JsObject((Seq("filename" -> JsString(file.filename))))
     queues.foreach{ extractorId =>
-      val source = Entity(ResourceRef(ResourceRef.file, file.id), Some(file.contentType), JsObject(Seq.empty))
+      val source = Entity(ResourceRef(ResourceRef.file, file.id), Some(file.contentType), sourceExtra)
       val target = Entity(ResourceRef(ResourceRef.dataset, dataset.id), None, JsObject(Seq.empty))
       val msg = ExtractorMessage(file.id, file.id, host, extractorId, Map.empty, file.length.toString, dataset.id,
         "", apiKey, routingKey, source, "removed", Some(target))
@@ -451,7 +456,8 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   def submitFileManually(originalId: UUID, file: File, host: String, queue: String, extraInfo: Map[String, Any],
     datasetId: UUID, newFlags: String): Unit = {
     Logger.debug(s"Sending message to $queue from $host with extraInfo $extraInfo")
-    val source = Entity(ResourceRef(ResourceRef.file, originalId), Some(file.contentType), JsObject(Seq.empty))
+    val sourceExtra = JsObject((Seq("filename" -> JsString(file.filename))))
+    val source = Entity(ResourceRef(ResourceRef.file, originalId), Some(file.contentType), sourceExtra)
     val msg = ExtractorMessage(file.id, file.id, host, queue, extraInfo, file.length.toString, datasetId,
       "", apiKey, "extractors." + queue, source, "submitted", None)
     extractWorkQueue(msg)
@@ -480,28 +486,40 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     * @param extraInfo
     * @param host
     */
-  // FIXME check if extractor is enabled in space or global
-  def metadataAddedToResource(resourceRef: ResourceRef, extraInfo: Map[String, Any], host: String): Unit = {
-    val routingKey = s"$exchange.metadata.added"
+  def metadataAddedToResource(metadataId: UUID, resourceRef: ResourceRef, extraInfo: Map[String, Any], host: String): Unit = {
+    val routingKey = s"$exchange.metadata.added.${resourceRef.resourceType.name}"
     Logger.debug(s"Sending message $routingKey from $host with extraInfo $extraInfo")
 
-    // FIXME pass in actual metadata id
-    val emptyUUID = UUID("00000000-0000-0000-0000-000000000000")
-
     resourceRef.resourceType match {
+      // metadata added to dataset
       case ResourceRef.dataset =>
-        // FIXME pass in metadata id
-        val source = Entity(ResourceRef(ResourceRef.metadata, emptyUUID), None, JsObject(Seq.empty))
-        val target = Entity(resourceRef, None, JsObject(Seq.empty))
-        val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, routingKey, extraInfo, 0.toString, resourceRef.id,
-          "", apiKey, routingKey, source, "added", Some(target))
-        extractWorkQueue(msg)
+        datasetService.get(resourceRef.id) match {
+          case Some(dataset) =>
+            getQueues(dataset, routingKey, "").foreach { extractorId =>
+              val source = Entity(ResourceRef(ResourceRef.metadata, metadataId), None, JsObject(Seq.empty))
+              val target = Entity(resourceRef, None, JsObject(Seq.empty))
+              val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, extractorId, extraInfo, 0.toString, resourceRef.id,
+                "", apiKey, routingKey, source, "added", Some(target))
+              extractWorkQueue(msg)
+            }
+          case None =>
+            Logger.error(s"Resource ${resourceRef.id} of type ${resourceRef.resourceType} not found.")
+        }
+      // metadata added to file
+      case ResourceRef.file =>
+        val datasets = datasetService.findByFileIdAllContain(resourceRef.id)
+        val fileType = files.get(resourceRef.id) match { case Some(f)=> f.contentType case None => ""}
+        datasets.foreach { dataset =>
+          getQueues(dataset, routingKey, fileType).foreach { extractorId =>
+            val source = Entity(ResourceRef(ResourceRef.metadata, metadataId), None, JsObject(Seq.empty))
+            val target = Entity(resourceRef, None, JsObject(Seq.empty))
+            val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, extractorId, extraInfo, 0.toString, null,
+              "", apiKey, routingKey, source, "added", Some(target))
+            extractWorkQueue(msg)
+          }
+        }
       case _ =>
-        val source = Entity(ResourceRef(ResourceRef.metadata, emptyUUID), None, JsObject(Seq.empty))
-        val target = Entity(resourceRef, None, JsObject(Seq.empty))
-        val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, routingKey, extraInfo, 0.toString, null,
-          "", apiKey, routingKey, source, "added", Some(target))
-        extractWorkQueue(msg)
+        Logger.error(s"Unrecognized resource type ${resourceRef.resourceType} when sending out metadata added event.")
     }
   }
 
@@ -511,30 +529,43 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     * @param host
     */
   // FIXME check if extractor is enabled in space or global
-  def metadataRemovedFromResource(resourceRef: ResourceRef, host: String): Unit = {
-    val routingKey = s"$exchange.metadata.removed"
+  def metadataRemovedFromResource(metadataId: UUID, resourceRef: ResourceRef, host: String): Unit = {
+    val routingKey = s"$exchange.metadata.removed.${resourceRef.resourceType.name}"
     val extraInfo = Map[String, Any](
       "resourceType"->resourceRef.resourceType.name,
       "resourceId"->resourceRef.id.toString)
     Logger.debug(s"Sending message $routingKey from $host with extraInfo $extraInfo")
 
-    // FIXME pass in actual metadata id
-    val emptyUUID = UUID("00000000-0000-0000-0000-000000000000")
-
     resourceRef.resourceType match {
+      // metadata added to dataset
       case ResourceRef.dataset =>
-        // FIXME pass in metadata id
-        val source = Entity(ResourceRef(ResourceRef.metadata, emptyUUID), None, JsObject(Seq.empty))
-        val target = Entity(resourceRef, None, JsObject(Seq.empty))
-        val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, routingKey, extraInfo, 0.toString, resourceRef.id,
-          "", apiKey, routingKey, source, "removed", Some(target))
-        extractWorkQueue(msg)
+        datasetService.get(resourceRef.id) match {
+          case Some(dataset) =>
+            getQueues(dataset, routingKey, "").foreach { extractorId =>
+              val source = Entity(ResourceRef(ResourceRef.metadata, metadataId), None, JsObject(Seq.empty))
+              val target = Entity(resourceRef, None, JsObject(Seq.empty))
+              val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, extractorId, extraInfo, 0.toString, resourceRef.id,
+                "", apiKey, routingKey, source, "removed", Some(target))
+              extractWorkQueue(msg)
+            }
+          case None =>
+            Logger.error(s"Resource ${resourceRef.id} of type ${resourceRef.resourceType} not found.")
+        }
+      // metadata added to file
+      case ResourceRef.file =>
+        val datasets = datasetService.findByFileIdAllContain(resourceRef.id)
+        val fileType = files.get(resourceRef.id) match { case Some(f)=> f.contentType case None => ""}
+        datasets.foreach { dataset =>
+          getQueues(dataset, routingKey, fileType).foreach { extractorId =>
+            val source = Entity(ResourceRef(ResourceRef.metadata, metadataId), None, JsObject(Seq.empty))
+            val target = Entity(resourceRef, None, JsObject(Seq.empty))
+            val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, extractorId, extraInfo, 0.toString, null,
+              "", apiKey, routingKey, source, "removed", Some(target))
+            extractWorkQueue(msg)
+          }
+        }
       case _ =>
-        val source = Entity(ResourceRef(ResourceRef.metadata, emptyUUID), None, JsObject(Seq.empty))
-        val target = Entity(resourceRef, None, JsObject(Seq.empty))
-        val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, routingKey, extraInfo, 0.toString, null,
-          "", apiKey, routingKey, source, "removed", Some(target))
-        extractWorkQueue(msg)
+        Logger.error(s"Unrecognized resource type ${resourceRef.resourceType} when sending out metadata added event.")
     }
   }
   
@@ -559,6 +590,119 @@ class RabbitmqPlugin(application: Application) extends Plugin {
         val target = Entity(resourceRef, None, JsObject(Seq.empty))
         val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, routingKey, extraInfo, 0.toString, null,
           "", apiKey, routingKey, source, "added", Some(target))
+        extractWorkQueue(msg)
+    }
+  }
+
+  
+    /**
+    * Metadata added to a resource (file or dataset).
+    * @param resourceRef
+    * @param extraInfo
+    * @param host
+    */
+  def metadataLDAddedToResource(resourceRef: ResourceRef, spaceId: Option[UUID], extraInfo: Map[String, Any], host: String): Unit = {
+    val routingKey = s"$exchange.metadata.added.${resourceRef.resourceType.name}"
+    Logger.debug(s"Sending message $routingKey from $host with extraInfo $extraInfo")
+    val summary = metadataService.getMetadataSummary(resourceRef, spaceId)
+    resourceRef.resourceType match {
+      // metadata added to dataset
+      case ResourceRef.dataset =>
+        datasetService.get(resourceRef.id) match {
+          case Some(dataset) =>
+            getQueues(dataset, routingKey, "").foreach { extractorId =>
+              val source = Entity(ResourceRef(ResourceRef.metadatasummary,summary.id), None, JsObject(Seq.empty))
+              val target = Entity(resourceRef, None, JsObject(Seq.empty))
+              val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, extractorId, extraInfo, 0.toString, resourceRef.id,
+                "", apiKey, routingKey, source, "added", Some(target))
+              extractWorkQueue(msg)
+            }
+          case None =>
+            Logger.error(s"Resource ${resourceRef.id} of type ${resourceRef.resourceType} not found.")
+        }
+      // metadata added to file
+      case ResourceRef.file =>
+        val datasets = datasetService.findByFileIdAllContain(resourceRef.id)
+        val fileType = files.get(resourceRef.id) match { case Some(f)=> f.contentType case None => ""}
+        datasets.foreach { dataset =>
+          getQueues(dataset, routingKey, fileType).foreach { extractorId =>
+            val source = Entity(ResourceRef(ResourceRef.metadatasummary, summary.id), None, JsObject(Seq.empty))
+            val target = Entity(resourceRef, None, JsObject(Seq.empty))
+            val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, extractorId, extraInfo, 0.toString, null,
+              "", apiKey, routingKey, source, "added", Some(target))
+            extractWorkQueue(msg)
+          }
+        }
+      case _ =>
+        Logger.error(s"Unrecognized resource type ${resourceRef.resourceType} when sending out metadata added event.")
+    }
+  }
+
+  /**
+    * Metadata removed from a resource (file or dataset).
+    * @param resourceRef
+    * @param host
+    */
+  // FIXME check if extractor is enabled in space or global
+  def metadataLDRemovedFromResource(resourceRef: ResourceRef, spaceId: Option[UUID], extraInfo: Map[String, Any], host: String): Unit = {
+    val routingKey = s"$exchange.metadata.removed.${resourceRef.resourceType.name}"
+
+    Logger.debug(s"Sending message $routingKey from $host with extraInfo $extraInfo")
+    val summary = metadataService.getMetadataSummary(resourceRef, spaceId)
+
+    resourceRef.resourceType match {
+      // metadata added to dataset
+      case ResourceRef.dataset =>
+        datasetService.get(resourceRef.id) match {
+          case Some(dataset) =>
+            getQueues(dataset, routingKey, "").foreach { extractorId =>
+              val source = Entity(ResourceRef(ResourceRef.metadatasummary, summary.id), None, JsObject(Seq.empty))
+              val target = Entity(resourceRef, None, JsObject(Seq.empty))
+              val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, extractorId, extraInfo, 0.toString, resourceRef.id,
+                "", apiKey, routingKey, source, "removed", Some(target))
+              extractWorkQueue(msg)
+            }
+          case None =>
+            Logger.error(s"Resource ${resourceRef.id} of type ${resourceRef.resourceType} not found.")
+        }
+      // metadata added to file
+      case ResourceRef.file =>
+        val datasets = datasetService.findByFileIdAllContain(resourceRef.id)
+        val fileType = files.get(resourceRef.id) match { case Some(f)=> f.contentType case None => ""}
+        datasets.foreach { dataset =>
+          getQueues(dataset, routingKey, fileType).foreach { extractorId =>
+            val source = Entity(ResourceRef(ResourceRef.metadatasummary, summary.id), None, JsObject(Seq.empty))
+            val target = Entity(resourceRef, None, JsObject(Seq.empty))
+            val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, extractorId, extraInfo, 0.toString, null,
+              "", apiKey, routingKey, source, "removed", Some(target))
+            extractWorkQueue(msg)
+          }
+        }
+      case _ =>
+        Logger.error(s"Unrecognized resource type ${resourceRef.resourceType} when sending out metadata added event.")
+    }
+  }
+  
+    // FIXME check if extractor is enabled in space or global
+  def metadataLDUpdatedOnResource(resourceRef: ResourceRef, spaceId: Option[UUID], extraInfo: Map[String, Any], host: String): Unit = {
+    val routingKey = s"$exchange.metadata.updated"
+    Logger.debug(s"Sending message $routingKey from $host with extraInfo $extraInfo")
+
+    val summary = metadataService.getMetadataSummary(resourceRef, spaceId)
+    
+    resourceRef.resourceType match {
+      case ResourceRef.dataset =>
+        // FIXME pass in metadata id
+        val source = Entity(ResourceRef(ResourceRef.metadatasummary, summary.id), None, JsObject(Seq.empty))
+        val target = Entity(resourceRef, None, JsObject(Seq.empty))
+        val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, routingKey, extraInfo, 0.toString, resourceRef.id,
+          "", apiKey, routingKey, source, "updated", Some(target))
+        extractWorkQueue(msg)
+      case _ =>
+        val source = Entity(ResourceRef(ResourceRef.metadatasummary, summary.id), None, JsObject(Seq.empty))
+        val target = Entity(resourceRef, None, JsObject(Seq.empty))
+        val msg = ExtractorMessage(resourceRef.id, resourceRef.id, host, routingKey, extraInfo, 0.toString, null,
+          "", apiKey, routingKey, source, "updated", Some(target))
         extractWorkQueue(msg)
     }
   }

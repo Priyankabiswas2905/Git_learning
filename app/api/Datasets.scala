@@ -600,7 +600,7 @@ class  Datasets @Inject()(
 
         //send RabbitMQ message
         current.plugin[RabbitmqPlugin].foreach { p =>
-          p.metadataAddedToResource(metadata.attachedTo, mdMap, Utils.baseEventUrl(request))
+          p.metadataAddedToResource(metadataId, metadata.attachedTo, mdMap, Utils.baseUrl(request))
         }
 
 
@@ -626,45 +626,45 @@ class  Datasets @Inject()(
                 Logger.error("RDFModel Errors: " + JsError.toFlatForm(e))
                 BadRequest(JsError.toFlatJson(e))
               }
-              case s: JsSuccess[RDFModel] => { 
-                model = s.get 
-                
+              case s: JsSuccess[RDFModel] => {
+                model = s.get
+
                 //parse request for agent/creator info
                 //creator can be UserAgent or ExtractorAgent
                 var creator: models.Agent = null
                 json.validate[Agent] match {
                   case s: JsSuccess[Agent] => {
                     creator = s.get
-    
+
                     // check if the context is a URL to external endpoint
                     val contextURL: Option[URL] = (json \ "@context").asOpt[String].map(new URL(_))
-    
+
                     // check if context is a JSON-LD document
                     val contextID: Option[UUID] = (json \ "@context").asOpt[JsObject]
                       .map(contextService.addContext(new JsString("context name"), _))
-    
+
                     // when the new metadata is added
                     val createdAt = new Date()
-    
+
                     //parse the rest of the request to create a new models.Metadata object
                     val attachedTo = ResourceRef(ResourceRef.dataset, id)
                     val content = (json \ "content")
                     val version = None
                     val metadata = models.Metadata(UUID.generate, attachedTo, contextID, contextURL, createdAt, creator,
                       content, version)
-    
+
                     //add metadata to mongo
-                    metadataService.addMetadata(metadata)
+                    val metadataId = metadataService.addMetadata(metadata)
                     val mdMap = metadata.getExtractionSummary
     
                     //send RabbitMQ message
                     current.plugin[RabbitmqPlugin].foreach { p =>
-                      p.metadataAddedToResource(metadata.attachedTo, mdMap, Utils.baseEventUrl(request))
+                      p.metadataAddedToResource(metadataId, metadata.attachedTo, mdMap, Utils.baseUrl(request))
                     }
 
                     datasets.index(id)
                     Ok(toJson("Metadata successfully added to db"))
-    
+
                   }
                   case e: JsError => {
                     Logger.error("Error getting creator");
@@ -731,23 +731,28 @@ class  Datasets @Inject()(
     }
   }
 
-  def removeMetadataJsonLD(id: UUID, extractorId: Option[String]) = PermissionAction(Permission.DeleteMetadata, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
+  def removeMetadataJsonLD(id: UUID, extractorId: Option[String]) =
+    PermissionAction(Permission.DeleteMetadata, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     datasets.get(id) match {
       case Some(dataset) => {
-        val num_removed = extractorId match {
-          case Some(f) => metadataService.removeMetadataByAttachToAndExtractor(ResourceRef(ResourceRef.dataset, id), f, Utils.baseEventUrl(request))
-          case None => metadataService.removeMetadataByAttachTo(ResourceRef(ResourceRef.dataset, id), Utils.baseEventUrl(request))
+        val metadataIds = extractorId match {
+          case Some(f) => metadataService.removeMetadataByAttachToAndExtractor(ResourceRef(ResourceRef.dataset, id), f,
+            Utils.baseUrl(request))
+          case None => metadataService.removeMetadataByAttachTo(ResourceRef(ResourceRef.dataset, id),
+            Utils.baseUrl(request))
         }
 
         // send extractor message after attached to resource
         current.plugin[RabbitmqPlugin].foreach { p =>
-          p.metadataRemovedFromResource(ResourceRef(ResourceRef.dataset, id), Utils.baseEventUrl(request))
+          metadataIds.foreach {mId =>
+            p.metadataRemovedFromResource(mId, ResourceRef(ResourceRef.dataset, id), Utils.baseUrl(request))
+          }
         }
 
-        Ok(toJson(Map("status" -> "success", "count" -> num_removed.toString)))
+        Ok(toJson(Map("status" -> "success", "count" -> metadataIds.size.toString)))
       }
       case None => {
-        Logger.error("Error getting dataset  " + id);
+        Logger.error("Error getting dataset  " + id)
         BadRequest(toJson("Error getting dataset  " + id))
       }
     }
@@ -1626,13 +1631,13 @@ class  Datasets @Inject()(
   }
 
   // TODO make a case class to represent very long tuple below
-  def jsonPreviewsFiles(filesList: List[(models.File, Array[(java.lang.String, String, String, String, java.lang.String, String, Long)])]): JsValue = {
+  def jsonPreviewsFiles(filesList: List[(models.File, List[(java.lang.String, String, String, String, java.lang.String, String, Long)])]): JsValue = {
     val list = for (filePrevs <- filesList) yield jsonPreviews(filePrevs._1, filePrevs._2)
     toJson(list)
   }
 
   // TODO make a case class to represent very long tuple below
-  def jsonPreviews(prvFile: models.File, prvs: Array[(java.lang.String, String, String, String, java.lang.String, String, Long)]): JsValue = {
+  def jsonPreviews(prvFile: models.File, prvs: List[(java.lang.String, String, String, String, java.lang.String, String, Long)]): JsValue = {
     val list = for (prv <- prvs) yield jsonPreview(prv._1, prv._2, prv._3, prv._4, prv._5, prv._6, prv._7)
     val listJson = toJson(list.toList)
     toJson(Map[String, JsValue]("file_id" -> JsString(prvFile.id.toString), "previews" -> listJson))
@@ -1656,7 +1661,7 @@ class  Datasets @Inject()(
       case Some(dataset) => {
         val datasetWithFiles = dataset.copy(files = dataset.files)
         val datasetFiles: List[models.File] = datasetWithFiles.files.flatMap(f => files.get(f))
-        val previewers = Previewers.findPreviewers
+        val previewers = Previewers.findDatasetPreviewers()
         //NOTE Should the following code be unified somewhere since it is duplicated in Datasets and Files for both api and controllers
         val previewslist = for (f <- datasetFiles; if (f.showPreviews.equals("DatasetLevel"))) yield {
           val pvf = for (p <- previewers; pv <- f.previews; if (p.contentType.contains(pv.contentType))) yield {
@@ -1678,7 +1683,7 @@ class  Datasets @Inject()(
             (f -> ff)
           }
         }
-        Ok(jsonPreviewsFiles(previewslist.asInstanceOf[List[(models.File, Array[(java.lang.String, String, String, String, java.lang.String, String, Long)])]]))
+        Ok(jsonPreviewsFiles(previewslist.asInstanceOf[List[(models.File, List[(java.lang.String, String, String, String, java.lang.String, String, Long)])]]))
       }
       case None => {
         Logger.error("Error getting dataset" + id); InternalServerError
@@ -2375,6 +2380,7 @@ class  Datasets @Inject()(
     }
     Ok(toJson("added new event"))
   }
+
   def copyDatasetToSpace(datasetId: UUID, spaceId: UUID) = PermissionAction(Permission.AddResourceToSpace, Some(ResourceRef(ResourceRef.space, spaceId))) { implicit request =>
     implicit val user = request.user
     user match {
