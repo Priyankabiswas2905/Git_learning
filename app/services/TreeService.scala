@@ -1,12 +1,7 @@
 package services
 
-import java.io.InputStream
-import java.util.Date
-
 import models._
-import com.mongodb.casbah.Imports._
-import models.FileStatus.FileStatus
-import play.api.libs.json.{JsArray, JsObject, JsValue}
+import play.api.libs.json.{JsValue}
 
 /**
   * Service for creating a file tree view for Spaces, Collections, Datasets.
