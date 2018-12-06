@@ -4,7 +4,7 @@ import api.Permission
 import api.Permission.Permission
 import javax.inject.{Inject, Singleton}
 import models._
-import play.api.libs.json.JsValue
+import play.api.libs.json.{JsValue, Json}
 import services._
 
 import scala.collection.mutable.ListBuffer
@@ -106,5 +106,19 @@ class MongoDBTreeService @Inject() (
     visibleCollection.toList
   }
 
+  private def collectionJson(collection: Collection) : JsValue = {
+    Json.obj("id" -> collection.id.toString, "name" -> collection.name, "description" -> collection.description,
+      "created" -> collection.created.toString, "thumbnail" -> collection.thumbnail_id, "authorId" -> collection.author.id)
+  }
+
+  private def datasetJson(dataset: Dataset) : JsValue = {
+    Json.obj("id" -> dataset.id.toString, "name" -> dataset.name, "description" -> dataset.description,
+      "created" -> dataset.created.toString, "thumbnail" -> dataset.thumbnail_id, "authorId" -> dataset.author.id, "spaces" -> dataset.spaces)
+
+  }
+
+  private def spaceJson(space: ProjectSpace) : JsValue = {
+    Json.obj("id"-> space.id.toString, "name"->space.name)
+  }
 
 }
