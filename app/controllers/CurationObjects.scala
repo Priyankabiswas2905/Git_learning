@@ -204,7 +204,7 @@ class CurationObjects @Inject() (
 
                 //send RabbitMQ message
                 current.plugin[RabbitmqPlugin].foreach { p =>
-                  p.metadataLDAddedToResource(ResourceRef(ResourceRef.dataset, dataset.id), spaceId, mdMap, Utils.baseUrl(request))
+                  p.metadataLDAddedToResource(ResourceRef(ResourceRef.dataset, dataset.id), Some(spaceId), mdMap, Utils.baseUrl(request))
                 }
 
               }
@@ -217,7 +217,7 @@ class CurationObjects @Inject() (
 
               //send RabbitMQ message
               current.plugin[RabbitmqPlugin].foreach { p =>
-               p.metadataLDAddedToResource(ResourceRef(ResourceRef.dataset, dataset.id), space, mdMap, Utils.baseUrl(request))
+               p.metadataLDAddedToResource(ResourceRef(ResourceRef.dataset, dataset.id), Some(spaceId), mdMap, Utils.baseUrl(request))
               }
               Redirect(routes.CurationObjects.getCurationObject(newCuration.id))
             } else {
@@ -282,11 +282,11 @@ class CurationObjects @Inject() (
 
           //send RabbitMQ message
           current.plugin[RabbitmqPlugin].foreach { p =>
-		        p.metadataLDAddedToResource(ResourceRef(ResourceRef.file, fileId), spaceId, mdMap, requestHost)
+		        p.metadataLDAddedToResource(ResourceRef(ResourceRef.file, fileId), Some(spaceId), mdMap, requestHost)
 		  }
         }
 
-        folder.folders.map(f => copyFolders(f, newCurationFolder.id, "folder", parentCurationObjectId, requestHost))
+        folder.folders.map(f => copyFolders(f, newCurationFolder.id, "folder", parentCurationObjectId, spaceId, requestHost))
       }
       case None => {
         Logger.error("Folder Not found in Publication Request")

@@ -595,7 +595,7 @@ class  Datasets @Inject()(
           json, version)
 
         //add metadata to mongo
-        metadataService.addMetadata(metadata)
+        val metadataId = metadataService.addMetadata(metadata)
         val mdMap = metadata.getExtractionSummary
 
         //send RabbitMQ message

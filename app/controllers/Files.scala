@@ -98,6 +98,7 @@ class Files @Inject() (
             } else {
               (file.id.toString, previewer.id, previewer.path, previewer.main, "null", file.contentType, file.length, tabTitle)
               }
+          }
           // take the union of both lists
           val prevs = pvf ++ ff
           Map(file -> prevs)

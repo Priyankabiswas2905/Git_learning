@@ -475,7 +475,7 @@ class Metadata @Inject() (
                       Logger.error("Metadata missing attachedTo subdocument")
                   }
                 }
-                Ok(views.html.metadatald.view(List(metadata), true)(request.user))
+                Ok(views.html.metadatald.view(Some(List(metadata)), null, null, true)(request.user))
               }
               case u: JsUndefined => {
                 content_ld match {
@@ -659,10 +659,12 @@ class Metadata @Inject() (
           val space = metadataService.getContextSpace(resource, None)
 
           metadataService.removeMetadata(resource, term, itemid, deletedAt, deletor, space, Utils.baseUrl(request)) match {
+            case content: JsObject => {
 
           val mdMap = Map(
-            "term" -> term,
-            "itemid" -> itemid)
+                "metadata" -> content,
+                "resourceType" -> attachedtype,
+                "resourceId" -> attachedUuid)
 
           current.plugin[RabbitmqPlugin].foreach { p =>
             p.metadataLDRemovedFromResource(resource, space, mdMap, Utils.baseUrl(request))
@@ -687,6 +689,11 @@ class Metadata @Inject() (
           }  
           Ok(JsObject(Seq("status" -> JsString("ok"))))
         }  
+            case u: JsUndefined => {
+              BadRequest("Entry to delete not found.")
+            }
+          }
+        }
       }
       case None => BadRequest("Not authorized.")
     }

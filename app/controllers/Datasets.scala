@@ -524,6 +524,10 @@ class Datasets @Inject() (
 
     implicit val user = request.user
     Previewers.findDatasetPreviewers().foreach(p => Logger.debug("Previewer found " + p.id))
+    
+    // Increment view count for dataset (before getting and copying it)
+    datasets.incrementViews(id, user)
+        
     datasets.get(id) match {
       case Some(dataset) => {
 
@@ -686,18 +690,16 @@ class Datasets @Inject() (
             }
           )
         }
-        val stagingAreaDefined = play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined
 
         val extractionsByDataset = extractions.findById(new ResourceRef('dataset, id))
         val extractionGroups = extractions.groupByType(extractionsByDataset)
 
-                // Increment view count for dataset
-        val view_data = datasets.incrementViews(id, user)
+
         
         Ok(views.html.dataset(datasetWithFiles, commentsByDataset, filteredPreviewers.toList, m, metadataSummary, metadata.getDefinitions(metadataSummary.contextSpace),
           decodedCollectionsInside.toList, sensors, Some(decodedSpaces_canRemove), fileList,
           filesTags, toPublish, curPubObjects, currentSpace, limit, showDownload, accessData, canAddDatasetToCollection, 
-          stagingAreaDefined, view_data, extractionGroups))
+          extractionGroups))
       }
       case None => {
         Logger.error("Error getting dataset" + id)

@@ -16,7 +16,6 @@
   showDownload: Boolean,
   accessData: models.DatasetAccess,
   canAddDatasetToCollection: Boolean,
-  view: (Int, java.util.Date),
   extractionsStatus: Map[String, ExtractionGroup]
 )(implicit flash: play.api.mvc.Flash, user: Option[models.User], request: RequestHeader)
 
@@ -333,8 +332,8 @@
             <div class="row ds-section-sm file-info">
                 <h4>Statistics</h4>
                 <table class="table table-condensed">
-                    <tr><td><b>Views:</b></td><td> @view._1</td></tr>
-                    <tr><td><b>Last viewed:</b></td><td> @view._2.format("MMM dd, yyyy HH:mm:ss")</td></tr>
+                    <tr><td><b>Views:</b></td><td> @dataset.stats.views</td></tr>
+                    <tr><td><b>Last viewed:</b></td><td> @if(dataset.stats.last_viewed.isDefined){@dataset.stats.last_viewed.get.format("MMM dd, yyyy HH:mm:ss")}else{Never}</td></tr>
                     <tr><td><b>Downloads:</b></td><td> @dataset.stats.downloads</td></tr>
                     <tr><td><b>Last downloaded:</b></td><td> @if(dataset.stats.last_downloaded.isDefined){@dataset.stats.last_downloaded.get.format("MMM dd, yyyy HH:mm:ss")}else{Never}</td></tr>
                 </table>
