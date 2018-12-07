@@ -9,7 +9,7 @@ import services._
 import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
 
-class Tree @Inject()(
+class OldTree @Inject()(
   events : EventService,
   vocabularies : VocabularyService,
   vocabularyTermService : VocabularyTermService,
