@@ -12,6 +12,8 @@ import scala.collection.mutable.ListBuffer
 @Singleton
 class MongoDBTreeService @Inject() (
   datasets: DatasetService,
+  fileService: FileService,
+  folderService: FolderService,
   collections: CollectionService,
   userService: UserService,
   spaceService: SpaceService,
@@ -102,6 +104,26 @@ class MongoDBTreeService @Inject() (
 
   def getChildrenOfDataset(dataset: Option[Dataset], mine: Boolean, user : User): List[JsValue] = {
     var children : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
+    var ds_file_ids = dataset.get.files
+    for (f <- ds_file_ids){
+      fileService.get(f) match {
+        case Some(file) => {
+          var fileJson = fileJson(file)
+          children += fileJson
+        }
+        case None =>
+      }
+    }
+    var ds_folder_ids = dataset.get.folders
+    for (ds_folder_id <- ds_folder_ids){
+      folderService.get(ds_folder_id) match {
+        case Some(folder) => {
+          var folderJson = folderJson(folder)
+          children += folderJson
+        }
+        case None =>
+      }
+    }
     children.toList
   }
 
@@ -159,6 +181,15 @@ class MongoDBTreeService @Inject() (
       hasChildren = true
     }
     Json.obj("id"-> space.id.toString, "name"->space.name ,"hasChildren"->hasChildren)
+  }
+
+  private def fileJson(file: File) : JsValue = {
+    Json.obj("id"->file.id, "name"->file.filename, "type"->"file")
+  }
+
+  private def folderJson(folder: Folder) : JsValue = {
+    Json.obj("id"->folder.id, "name"->folder.name, "type"->"folder")
+
   }
 
   private def datasetHasCollectionInSpace(dataset : Dataset, space : ProjectSpace) : Boolean = {
