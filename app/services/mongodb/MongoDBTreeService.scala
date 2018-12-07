@@ -61,16 +61,42 @@ class MongoDBTreeService @Inject() (
 
   def getChildrenOfSpace(space: Option[ProjectSpace], mine: Boolean, user : User): List[JsValue] = {
     var children : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
-    if (mine){
 
+    var collectionsInSpace = spaceService.getCollectionsInSpace(Some(space.get.id.stringify),None)
+    var datasetsInSpace = spaceService.getDatasetsInSpace(Some(space.get.id.stringify),None)
+    // filters datasets that have a collection in the space
+    datasetsInSpace = datasetsInSpace.filter((d: Dataset) => (!datasetHasCollectionInSpace(d,space.get)))
+    if (mine){
+      collectionsInSpace = collectionsInSpace.filter((c: Collection) => (c.author.id == user.id))
+      datasetsInSpace = datasetsInSpace.filter((d: Dataset) => (d.author.id == user.id))
     } else {
 
+    }
+    for (d <- datasetsInSpace){
+      var datasetJson = datasetJson(d)
+      children += datasetJson
+    }
+    for (c <- collectionsInSpace){
+      var collectionJson = collectionJson(c)
+      children += collectionJson
     }
     children.toList
   }
 
   def getChildrenOfCollection(collection: Option[Collection], mine: Boolean, user : User): List[JsValue] = {
     var children : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
+    var child_collections = collections.listChildCollections(collection.get.id)
+    var datasets_in_collection = datasets.listCollection(collection.get.id.stringify, Some(user))
+
+    for (child <- child_collections){
+      var childColJson = collectionJson(child)
+      children += childColJson
+    }
+    for (ds <- datasets_in_collection){
+      var dsJson = datasetJson(ds)
+      children += dsJson
+    }
+
     children.toList
   }
 
@@ -91,6 +117,7 @@ class MongoDBTreeService @Inject() (
   def getDatasets(mine : Boolean, user: User) : List[JsValue] = {
     var visibleDatasets : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
     var ds = datasets.listAccess(0,Set[Permission](Permission.ViewDataset),Some(user),true,true,false)
+    // ds = ds.filter((d: Dataset) => (d.trash == false))
     if (mine){
       ds = ds.filter((d: Dataset) => (d.author == user))
     }
@@ -99,16 +126,25 @@ class MongoDBTreeService @Inject() (
 
   def getCollections(mine: Boolean, user: User) : List[JsValue] = {
     var cols = collections.listAccess(0,Set[Permission](Permission.ViewCollection),Some(user),true,true,false)
+    // cols = cols.filter((c : Collection) => (c.trash == false))
     if (mine) {
       cols = cols.filter((c: Collection) => (c.author == user))
     }
     var visibleCollection : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
+    for (col <-cols){
+      visibleCollection += collectionJson(col)
+
+    }
     visibleCollection.toList
   }
 
   private def collectionJson(collection: Collection) : JsValue = {
+    var hasChildren = false
+    if (collection.child_collection_ids.size > 0 || collection.datasetCount > 0){
+      hasChildren = true
+    }
     Json.obj("id" -> collection.id.toString, "name" -> collection.name, "description" -> collection.description,
-      "created" -> collection.created.toString, "thumbnail" -> collection.thumbnail_id, "authorId" -> collection.author.id)
+      "created" -> collection.created.toString, "thumbnail" -> collection.thumbnail_id, "authorId" -> collection.author.id, "hasChildren"->hasChildren,"type"->"collection")
   }
 
   private def datasetJson(dataset: Dataset) : JsValue = {
@@ -118,7 +154,31 @@ class MongoDBTreeService @Inject() (
   }
 
   private def spaceJson(space: ProjectSpace) : JsValue = {
-    Json.obj("id"-> space.id.toString, "name"->space.name)
+    var hasChildren = false
+    if (space.datasetCount > 0 || space.collectionCount > 0){
+      hasChildren = true
+    }
+    Json.obj("id"-> space.id.toString, "name"->space.name ,"hasChildren"->hasChildren)
+  }
+
+  private def datasetHasCollectionInSpace(dataset : Dataset, space : ProjectSpace) : Boolean = {
+    var hasCollectionInSpace = false;
+    var datasetCollectionIds = dataset.collections
+    if (datasetCollectionIds.isEmpty){
+      hasCollectionInSpace = false
+      return hasCollectionInSpace
+    }
+    for (col_id <- datasetCollectionIds){
+      collections.get(col_id) match {
+        case Some(col) => {
+          if (col.spaces.contains(space.id)){
+            hasCollectionInSpace = true
+            return hasCollectionInSpace
+          }
+        }
+      }
+    }
+    return hasCollectionInSpace
   }
 
 }
