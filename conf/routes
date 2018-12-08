@@ -848,3 +848,4 @@ POST        /extractors                                                         
 
 GET         /api/tree/getChildrenOfNode                                                     @api.TreeView.getChildrenOfNode(nodeId : Option[String], nodeType: String, mine : Boolean ?= true, shared : Boolean ?= false, public : Boolean ?= false)
 GET         /api/tree/childrenOfNode                                                        @api.OldTree.getChildrenOfNode(nodeId : Option[String], nodeType: String, mine : Boolean ?= false, shared : Boolean ?= false, public : Boolean ?= false, default : Boolean ?= true)
+GET         /api/tree/node                                                                  @api.Tree.getChildrenOfNode(nodeType: String ?= "space", nodeId :Option[String] ?= None, mine : Boolean ?= true)

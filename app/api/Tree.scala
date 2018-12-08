@@ -1,11 +1,13 @@
 package api
 
-import javax.inject.Inject
+import javax.inject.{Inject, Singleton}
 import play.api.libs.json.Json.toJson
 import services._
 
-class Tree @Inject()(
-  treeService: TreeService) extends ApiController {
+@Singleton
+class Tree @Inject() (
+                     treeService: TreeService
+                     ) extends ApiController {
 
   def getChildrenOfNode(nodeType: String, nodeId: Option[String], mine: Boolean) = PrivateServerAction { implicit request =>
     request.user match {
