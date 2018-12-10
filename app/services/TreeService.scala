@@ -150,10 +150,14 @@ class TreeService @Inject()(
 
   def getDatasets(mine : Boolean, user: User) : List[JsValue] = {
     var visibleDatasets : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
-    var ds = datasets.listAccess(0,Set[Permission](Permission.ViewDataset),Some(user),true,true,false)
+    var ds = datasets.listAccess(999,Set[Permission](Permission.ViewDataset),Some(user),true,true,false)
     // ds = ds.filter((d: Dataset) => (d.trash == false))
     if (mine){
-      ds = ds.filter((d: Dataset) => (d.author == user))
+      ds = ds.filter((d: Dataset) => (d.author.id == user.id))
+    }
+    for (d <- ds){
+      var d_json = datasetJson(d)
+      visibleDatasets += d_json
     }
     visibleDatasets.toList
   }
@@ -162,7 +166,7 @@ class TreeService @Inject()(
     var cols = collections.listAccess(0,Set[Permission](Permission.ViewCollection),Some(user),true,true,false)
     // cols = cols.filter((c : Collection) => (c.trash == false))
     if (mine) {
-      cols = cols.filter((c: Collection) => (c.author == user))
+      cols = cols.filter((c: Collection) => (c.author.id == user.id))
     }
     var visibleCollection : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
     for (col <-cols){
@@ -192,7 +196,7 @@ class TreeService @Inject()(
     if (space.datasetCount > 0 || space.collectionCount > 0){
       hasChildren = true
     }
-    Json.obj("id"-> space.id.toString, "name"->space.name ,"hasChildren"->hasChildren)
+    Json.obj("id"-> space.id.toString, "name"->space.name ,"hasChildren"->hasChildren, "type"->"dataset")
   }
 
   private def fileJson(file: File) : JsValue = {
