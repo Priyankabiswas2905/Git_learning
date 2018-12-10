@@ -126,7 +126,8 @@ function setupField(id, elem, md_id, footerHtml, templateRoute) {
 		'field_id' : field_id,
 		'field_type' : field_type,
 		'entry_id' : md_id,
-		'field_value' : field_value
+		'field_value' : field_value,
+		'show_submit': true
 	});
 	$('#' + id + ' .selected_field').html(html + footerHtml);
 

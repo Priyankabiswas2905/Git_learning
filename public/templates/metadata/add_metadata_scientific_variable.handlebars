@@ -3,7 +3,7 @@
         <label for="field-value" class="col-sm-2 control-label" title="{{field_id}}">
             <strong>{{field_label}}</strong>
         </label>
-        <div class="col-sm-7">
+        <div class="col-sm-{{#if show_submit}}7{{else}}10{{/if}}">
             <input type="text" class="form-control" id="field-value" data-id="{{field_id}}"
                    data-label="{{field_label}}" placeholder="type here..." data-entry-id = "{{entry_id}}" value="{{field_value}}">
             <input type="checkbox" id="useSynonyms">
@@ -18,9 +18,11 @@
               </div>
             </div>
         </div>
+        {{#if show_submit}}
         <div class="col-sm-3">
             <button id="add-metadata-button" type="submit" class="btn btn-default"><span class="glyphicon glyphicon-saved"></span> Submit</button>
         </div>
+        {{/if}}
     </div>
     <div class="row">
         <div class="col-sm-offset-2 col-sm-7">
