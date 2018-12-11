@@ -6,8 +6,7 @@ import services._
 
 @Singleton
 class Tree @Inject() (
-                     treeService: TreeService
-                     ) extends ApiController {
+  treeService: TreeService) extends ApiController {
 
   def getChildrenOfNode(nodeType: String, nodeId: Option[String], mine: Boolean) = PrivateServerAction { implicit request =>
     request.user match {
