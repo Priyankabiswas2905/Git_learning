@@ -62,6 +62,18 @@ class TreeService @Inject()(
         }
         case None => children = getDatasets(mine, user)
       }
+    } else if (nodeType == "folder"){
+      nodeId match {
+        case Some(id) => {
+          folderService.get(UUID(id)) match {
+            case Some(folder) => {
+              children = getChildrenOfFolder(folder, mine, user)
+            }
+            case None => 
+          }
+        }
+        case None =>
+      }
     }
     children
   }
@@ -129,6 +141,34 @@ class TreeService @Inject()(
         case None =>
       }
     }
+    children.toList
+  }
+
+  def getChildrenOfFolder(folder: Folder, mine: Boolean, user: User) : List[JsValue] = {
+    var children : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
+
+    var subfolders_ids = folder.folders
+    for (subfolder_id <- subfolders_ids){
+      folderService.get(subfolder_id) match {
+        case Some(subfolder) => {
+          var sfjson = folderJson(subfolder)
+          children += sfjson
+        }
+        case None =>
+      }
+    }
+
+    var file_ids = folder.files
+    for (f <- file_ids){
+      fileService.get(f) match {
+        case Some(file) => {
+          var fjson : JsValue = fileJson(file)
+          children += fjson
+        }
+        case None =>
+      }
+    }
+
     children.toList
   }
 
