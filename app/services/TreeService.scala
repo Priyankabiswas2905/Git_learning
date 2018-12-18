@@ -69,7 +69,7 @@ class TreeService @Inject()(
             case Some(folder) => {
               children = getChildrenOfFolder(folder, mine, user)
             }
-            case None => 
+            case None =>
           }
         }
         case None =>
