@@ -255,13 +255,11 @@ class TreeService @Inject()(
     if (collection.child_collection_ids.size > 0 || collection.datasetCount > 0){
       hasChildren = true
     }
-    Json.obj("id" -> collection.id.toString, "name" -> collection.name, "description" -> collection.description,
-      "created" -> collection.created.toString, "thumbnail" -> collection.thumbnail_id, "authorId" -> collection.author.id, "hasChildren"->hasChildren,"type"->"collection")
+    Json.obj("id" -> collection.id.toString, "name" -> collection.name, "thumbnail" -> collection.thumbnail_id, "authorId" -> collection.author.id, "hasChildren"->hasChildren,"type"->"collection")
   }
 
   private def datasetJson(dataset: Dataset) : JsValue = {
-    Json.obj("id" -> dataset.id.toString, "name" -> dataset.name, "description" -> dataset.description,
-      "created" -> dataset.created.toString, "thumbnail" -> dataset.thumbnail_id, "authorId" -> dataset.author.id, "spaces" -> dataset.spaces)
+    Json.obj("id" -> dataset.id.toString, "name" -> dataset.name, "thumbnail" -> dataset.thumbnail_id, "authorId" -> dataset.author.id, "spaces" -> dataset.spaces, "type"->"dataset")
 
   }
 
