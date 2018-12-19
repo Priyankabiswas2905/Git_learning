@@ -6,6 +6,7 @@ import javax.inject.{Inject, Singleton}
 import models._
 import play.api.libs.json.{JsValue, Json}
 
+import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
 
 /**
@@ -74,6 +75,8 @@ class TreeService @Inject()(
         }
         case None =>
       }
+    } else if (nodeType == "root"){
+      children = getSpacesAndOrphanCollectionsDatasets(mine, user)
     }
     children
   }
@@ -117,6 +120,16 @@ class TreeService @Inject()(
     }
 
     children.toList
+  }
+
+  def getOrphanCollectionsNotInSpace(user : User) : List[Collection] = {
+    var collectionsNotInSpace = collections.listUser(0,Some(user),false,user).filter((c: Collection) => (c.spaces.isEmpty && c.parent_collection_ids.isEmpty))
+    collectionsNotInSpace
+  }
+
+  def getOrphanDatasetsNotInSpace(user : User ) : List[Dataset] = {
+    var datasetsNotInSpace = datasets.listUser(0,Some(user),false,user).filter((d: Dataset) => (d.spaces.isEmpty && d.collections.isEmpty))
+    datasetsNotInSpace
   }
 
   def getChildrenOfDataset(dataset: Option[Dataset], mine: Boolean, user : User): List[JsValue] = {
@@ -170,6 +183,30 @@ class TreeService @Inject()(
     }
 
     children.toList
+  }
+
+  def getSpacesAndOrphanCollectionsDatasets(mine: Boolean, user : User) : List[JsValue] = {
+    var root_level_nodes : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
+    var spaces = spaceService.listAccess(0,Set[Permission](Permission.ViewSpace),Some(user),true,true,false,false)
+    if (mine){
+      spaces = spaces.filter((s: ProjectSpace) => (s.creator == user.id))
+    }
+    for (s <- spaces){
+      var s_json = spaceJson(s)
+      root_level_nodes += s_json
+    }
+    var orphan_cols = getOrphanCollectionsNotInSpace(user)
+    for (c <- orphan_cols){
+      var c_json = collectionJson(c)
+      root_level_nodes += c_json
+    }
+
+    var orphan_ds = getOrphanDatasetsNotInSpace(user)
+    for (d <- orphan_ds){
+      var d_json = datasetJson(d)
+      root_level_nodes += d_json
+    }
+    root_level_nodes.toList
   }
 
   def getSpaces(mine : Boolean, user: User) : List[JsValue] = {
@@ -233,7 +270,7 @@ class TreeService @Inject()(
     if (space.datasetCount > 0 || space.collectionCount > 0){
       hasChildren = true
     }
-    Json.obj("id"-> space.id.toString, "name"->space.name ,"hasChildren"->hasChildren, "type"->"dataset")
+    Json.obj("id"-> space.id.toString, "name"->space.name ,"hasChildren"->hasChildren, "type"->"space")
   }
 
   private def fileJson(file: File) : JsValue = {
