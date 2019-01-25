@@ -186,9 +186,6 @@
 
     @defining(1) { counter: Int =>
         <script>
-                $(document).ready(function() {
-                    $("#metadata-cards").hide();
-                });
                 function activateTable() {
                     $("#metadataCardsBtn").addClass("btn-link").removeClass("btn-primary");
                     $("#metadata-cards").hide();
@@ -201,6 +198,9 @@
                     $("#metadata-cards").show();
                     $("#metadataCardsBtn").addClass("btn-primary").removeClass("btn-link");
                 }
+                $(document).ready(function() {
+                    activateCards();
+                });
         </script>
 
         <div class="row">
@@ -210,11 +210,11 @@
                 </div>
                 <div class="pull-right">
                     <div class="btn-group btn-group-sm" role="group" aria-label="...">
-                        <button id="metadataTableBtn" type="button" class="btn btn-primary" onclick="activateTable()">
-                            <span class="glyphicon glyphicon-th-large"></span>
-                        </button>
-                        <button id="metadataCardsBtn" type="button" class="btn btn-link" onclick="activateCards()">
+                        <button id="metadataCardsBtn" type="button" class="btn btn-primary" onclick="activateCards()">
                             <span class="glyphicon glyphicon-th-list"></span>
+                        </button>
+                        <button id="metadataTableBtn" type="button" class="btn btn-link" onclick="activateTable()">
+                            <span class="glyphicon glyphicon-th-large"></span>
                         </button>
                     </div>
                 </div>
@@ -230,7 +230,7 @@
                                 <th width="10%" style="width: 10%">Name</th>
                                 <th width="30%" style="width: 30%">Last Modified</th>
                                 <th width="50%" style="width: 50%">Values</th>
-                                <th width="10%" style="width: 10%">More</th>
+                                <th width="10%" style="width: 10%"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -245,6 +245,14 @@
                                                     @printContent(m.creator, m.content, m.contextId, m.contextURL, m.attachedTo.id, counter * i + 1, true)
                                                 </td>
                                                 <td>
+                                                    @if(toDelete && Permission.checkPermission(Permission.DeleteMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
+                                                        <a id="@m.id" title="Delete this metadata" class="btn btn-link delete-icon">
+                                                            <span class="panel-icon glyphicon glyphicon-trash"></span>
+                                                        </a>
+                                                    }
+
+                                                    @******************************
+                                                    This dropdown can be used to easily expand the functions offered by each row
                                                     <div class="dropdown">
                                                         <button class="btn btn-link btn-xs dropdown-toggle" type="button" id="dropdownMenu-@m.id" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
                                                             <span class="glyphicon glyphicon-option-horizontal"></span>
@@ -263,6 +271,7 @@
                                                             }
                                                         </ul>
                                                     </div>
+                                                    ******************************@
                                                 </td>
                                             </tr>
                                         }
@@ -341,18 +350,15 @@
         $(function () {
             $('.delete-icon').unbind().on('click', function(){
                 var delete_icon = $(this);
-
-                var request = jsRoutes.api.Metadata.removeMetadata(this.id).ajax({
+                var metadataId = this.id;
+                var request = jsRoutes.api.Metadata.removeMetadata(metadataId).ajax({
                     type: 'DELETE'
                 });
 
                 request.done(function (response, textStatus, jqXHR) {
-                    // FIXME: Delete still not working correctly across contexts
-                    var panel = $("#panel_" + this.id);
-                    panel.remove();
-                    var row = $("#row_" + this.id);
-                    row.remove();
-                    //delete_icon.closest(".panel").remove();
+                    // Remove both the panel and the table row for this entry
+                    $("#panel_" + metadataId).remove();
+                    $("#row_" + metadataId).remove();
                 });
 
                 request.fail(function (jqXHR, textStatus, errorThrown){
