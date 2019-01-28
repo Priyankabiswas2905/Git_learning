@@ -11,7 +11,10 @@
         formatter.format(date);
     }
 
-
+    @************************************************************************
+    * FIXME: tableValue is currently unused, but will allow us to customize *
+    * the Metadata Table View without messing up the Cards View             *
+    ************************************************************************@
     @printContent(agent: Agent, content: JsValue, contextId: Option[UUID], contextURL: Option[URL], resourceId: UUID, counter: Int, tableView: Boolean = false) = {
         @content match {
             case o: JsObject => {
@@ -228,8 +231,8 @@
                         <thead>
                             <tr>
                                 <th width="10%" style="width: 10%">Name</th>
+                                <th width="50%" style="width: 50%">Value</th>
                                 <th width="30%" style="width: 30%">Last Modified</th>
-                                <th width="50%" style="width: 50%">Values</th>
                                 <th width="10%" style="width: 10%"></th>
                             </tr>
                         </thead>
@@ -240,10 +243,10 @@
                                         @for((key, value) <- o.fields) {
                                             <tr id="row_@m.id">
                                                 <td><a href="#">@key</a></td>
-                                                <td>@printHeader(m.creator, m.createdAt)</td>
                                                 <td class="md-block tree" style="padding-left:0;">
                                                     @printContent(m.creator, m.content, m.contextId, m.contextURL, m.attachedTo.id, counter * i + 1, true)
                                                 </td>
+                                                <td>@printHeader(m.creator, m.createdAt)</td>
                                                 <td>
                                                     @if(toDelete && Permission.checkPermission(Permission.DeleteMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
                                                         <a id="@m.id" title="Delete this metadata" class="btn btn-link delete-icon">
