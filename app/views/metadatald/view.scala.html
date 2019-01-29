@@ -11,10 +11,9 @@
         formatter.format(date);
     }
 
-    @************************************************************************
-    * FIXME: tableValue is currently unused, but will allow us to customize *
-    * the Metadata Table View without messing up the Cards View             *
-    ************************************************************************@
+    @***********************************************************************************
+    * FIXME: this logic is duplicated in newTableRow.scala.html and newCard.scala.html *
+    ***********************************************************************************@
     @printContent(agent: Agent, content: JsValue, contextId: Option[UUID], contextURL: Option[URL], resourceId: UUID, counter: Int, tableView: Boolean = false) = {
         @content match {
             case o: JsObject => {
@@ -230,13 +229,13 @@
                     <table class="table table-hover table-condensed">
                         <thead>
                             <tr>
-                                <th width="10%" style="width: 10%">Name</th>
-                                <th width="50%" style="width: 50%">Value</th>
+                                <th width="20%" style="width: 20%">Name</th>
+                                <th width="40%" style="width: 40%">Value</th>
                                 <th width="30%" style="width: 30%">Last Modified</th>
                                 <th width="10%" style="width: 10%"></th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="metadata-table-body">
                             @for((m, i) <- metadata.zipWithIndex) {
                                 @m.content match {
                                     case o: JsObject => {
