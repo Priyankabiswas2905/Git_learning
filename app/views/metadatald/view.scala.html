@@ -48,94 +48,96 @@
         </div>
 
         <div class="row">
-            <div id="metadata-table" role="tabpanel" class="tab-pane fade in active">
-                <div class="table-responsive">
-                    <table class="table table-hover table-condensed">
-                        <thead>
-                            <tr>
-                                <th width="20%" style="width: 20%">Name</th>
-                                <th width="40%" style="width: 40%">Value</th>
-                                <th width="30%" style="width: 30%">Last Modified</th>
-                                <th width="10%" style="width: 10%"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="metadata-table-body">
-                            @for((m, i) <- metadata.zipWithIndex) {
-                                @m.content match {
-                                    case o: JsObject => {
-                                        @for((key, value) <- o.fields) {
-                                            <tr id="row_@m.id">
-                                                <td><a href="#">@key</a></td>
-                                                <td class="md-block tree" style="padding-left:0;">
-                                                    @printContent(m, "content", i, true)
-                                                </td>
-                                                <td>@printContent(m, "header", i, true)</td>
-                                                <td>
-                                                    @if(toDelete && Permission.checkPermission(Permission.DeleteMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
-                                                        <a id="@m.id" title="Delete this metadata" class="btn btn-link delete-icon">
-                                                            <span class="panel-icon glyphicon glyphicon-trash"></span>
-                                                        </a>
-                                                    }
+            <div class="col-md-12">
+                <div id="metadata-table" role="tabpanel" class="tab-pane fade in active">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-condensed">
+                            <thead>
+                                <tr>
+                                    <th width="20%" style="width: 20%">Name</th>
+                                    <th width="40%" style="width: 40%">Value</th>
+                                    <th width="30%" style="width: 30%">Last Modified</th>
+                                    <th width="10%" style="width: 10%"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="metadata-table-body">
+                                @for((m, i) <- metadata.zipWithIndex) {
+                                    @m.content match {
+                                        case o: JsObject => {
+                                            @for((key, value) <- o.fields) {
+                                                <tr id="row_@m.id">
+                                                    <td><a href="#">@key</a></td>
+                                                    <td class="md-block tree" style="padding-left:0;">
+                                                        @printContent(m, "content", i, true)
+                                                    </td>
+                                                    <td>@printContent(m, "header", i, true)</td>
+                                                    <td>
+                                                        @if(toDelete && Permission.checkPermission(Permission.DeleteMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
+                                                            <a id="@m.id" title="Delete this metadata" class="btn btn-link delete-icon">
+                                                                <span class="panel-icon glyphicon glyphicon-trash"></span>
+                                                            </a>
+                                                        }
 
-                                                    @******************************
-                                                    This dropdown can be used to easily expand the functions offered by each row
-                                                    <div class="dropdown">
-                                                        <button class="btn btn-link btn-xs dropdown-toggle" type="button" id="dropdownMenu-@m.id" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
-                                                            <span class="glyphicon glyphicon-option-horizontal"></span>
-                                                        </button>
-                                                        <ul class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenu-@m.id">
-                                                            @if(Permission.checkPermission(Permission.EditMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
-                                                                <li><a class="btn btn-link disabled" disabled="true">Edit</a></li>
-                                                            }
+                                                        @******************************
+                                                        This dropdown can be used to easily expand the functions offered by each row
+                                                        <div class="dropdown">
+                                                            <button class="btn btn-link btn-xs dropdown-toggle" type="button" id="dropdownMenu-@m.id" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                                                                <span class="glyphicon glyphicon-option-horizontal"></span>
+                                                            </button>
+                                                            <ul class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenu-@m.id">
+                                                                @if(Permission.checkPermission(Permission.EditMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
+                                                                    <li><a class="btn btn-link disabled" disabled="true">Edit</a></li>
+                                                                }
 
-                                                            @if(toDelete && Permission.checkPermission(Permission.DeleteMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
-                                                                <li>
-                                                                    <a id="@m.id" title="Delete this metadata" class="btn btn-link delete-icon">
-                                                                            <span class="panel-icon glyphicon glyphicon-trash"></span>
-                                                                    </a>
-                                                                </li>
-                                                            }
-                                                        </ul>
-                                                    </div>
-                                                    ******************************@
-                                                </td>
-                                            </tr>
+                                                                @if(toDelete && Permission.checkPermission(Permission.DeleteMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
+                                                                    <li>
+                                                                        <a id="@m.id" title="Delete this metadata" class="btn btn-link delete-icon">
+                                                                                <span class="panel-icon glyphicon glyphicon-trash"></span>
+                                                                        </a>
+                                                                    </li>
+                                                                }
+                                                            </ul>
+                                                        </div>
+                                                        ******************************@
+                                                    </td>
+                                                </tr>
+                                            }
                                         }
+                                        case _ => {@m.content}
                                     }
-                                    case _ => {@m.content}
                                 }
-                            }
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
-            <div id="metadata-cards" role="tabpanel" class="tab-pane fade in active">
-                @for((m, i) <- metadata.zipWithIndex) {
+                <div id="metadata-cards" role="tabpanel" class="tab-pane fade in active">
+                    @for((m, i) <- metadata.zipWithIndex) {
 
-                    <div class="panel panel-default" id="panel_@m.id">
-                        <div class="panel-heading" role="tab" id="heading_@m.id">
-                            <a data-toggle="collapse" href="#collapse_@m.id" class="collapse-icon">
-                                <span class="panel-icon glyphicon glyphicon-minus"></span>
-                            </a>
-                            <span>
-                            @printContent(m, "header", i)
-
-                            </span>
-                            @if(toDelete && Permission.checkPermission(Permission.DeleteMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
-                                <a id="@m.id" title="Delete this metadata" class="btn btn-link delete-icon">
-                                    <span class="panel-icon glyphicon glyphicon-trash"></span>
+                        <div class="panel panel-default" id="panel_@m.id">
+                            <div class="panel-heading" role="tab" id="heading_@m.id">
+                                <a data-toggle="collapse" href="#collapse_@m.id" class="collapse-icon">
+                                    <span class="panel-icon glyphicon glyphicon-minus"></span>
                                 </a>
-                            }
-                        </div>
-                        <div id="collapse_@m.id" class="panel-collapse collapse in" role="tabpanel" aria-labelledby="heading_@m.id">
-                            <div class="panel-body">
-                                <div class="tree">
-                                @printContent(m, "content", i)
+                                <span>
+                                @printContent(m, "header", i)
+
+                                </span>
+                                @if(toDelete && Permission.checkPermission(Permission.DeleteMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
+                                    <a id="@m.id" title="Delete this metadata" class="btn btn-link delete-icon">
+                                        <span class="panel-icon glyphicon glyphicon-trash"></span>
+                                    </a>
+                                }
+                            </div>
+                            <div id="collapse_@m.id" class="panel-collapse collapse in" role="tabpanel" aria-labelledby="heading_@m.id">
+                                <div class="panel-body">
+                                    <div class="tree">
+                                    @printContent(m, "content", i)
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                }
+                    }
+                </div>
             </div>
         </div>
 
