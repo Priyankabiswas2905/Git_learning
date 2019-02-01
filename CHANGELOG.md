@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 ### Added
+- New view for Files/Datasets offering a Table View of the attached Metadata.
 - Extraction history for dataset extractors is now displayed on dataset page.
   [CATS-796](https://opensource.ncsa.illinois.edu/jira/browse/CATS-796)
 - Script to verify / fix mongo uploads collection if file bytes are missing.
@@ -18,6 +19,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   [CATS-941](https://opensource.ncsa.illinois.edu/jira/browse/CATS-941)
 - Optional form to adding multiple metadata fields at once via UI under "Advanced."
   [CATS-940](https://opensource.ncsa.illinois.edu/jira/browse/CATS-940)
+- CONTAINS operator added to Advanced Search interface and wildcards (e.g. ".*") now supported in search box.
+  [CATS-962](https://opensource.ncsa.illinois.edu/jira/browse/CATS-962)
   
 ### Fixed
 - Enhancements to reporting date and string formatting. Space listing on spaces report and on New Collections page now correctly
@@ -29,6 +32,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   [CATS-952](https://opensource.ncsa.illinois.edu/jira/browse/CATS-952)
 - In SuperAdmin mode, the Spaces page will correctly show all spaces.
   [CATS-958](https://opensource.ncsa.illinois.edu/jira/browse/CATS-958)
+- In FileMetrics report, space and collection IDs are only added to the report once to avoid repeating.
   
 ### Changed 
 - Extraction events on File and Dataset pages are now grouped by extractor. The events view has been moved to a tab for both,

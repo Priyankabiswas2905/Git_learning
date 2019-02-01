@@ -204,7 +204,10 @@ line-height: 1.5;
                     if($('#'+'@contentDiv'+' .panel').length == 0) {
                         $('#' + "@contentDiv").empty();
                     }
-                    $('#'+"@contentDiv").prepend(response);
+
+                    // Pull both the new card and new table row from the response and render it in the DOM
+                    $('#metadata-cards').prepend(response['cards']);
+                    $('#metadata-table-body').prepend(response['table']);
                     notify("Metadata successfully added.", "success", false, 2000);
                 });
 

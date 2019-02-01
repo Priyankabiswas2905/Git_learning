@@ -1,0 +1,33 @@
+@(m: models.Metadata)(implicit user: Option[models.User])
+    @import java.net.URL
+    @import play.api.libs.json.JsString
+    @import play.api.libs.json.JsObject
+    @import play.api.libs.json.JsValue
+    @import play.api.libs.json.JsArray
+    @import api.Permission
+
+    @defining(1) { counter: Int =>
+        @for((m, i) <- List(m).zipWithIndex) {
+            @m.content match {
+                case o: JsObject => {
+                    @for((key, value) <- o.fields) {
+                        <tr id="row_@m.id">
+                            <td><a href="#">@key</a></td>
+                            <td class="md-block tree" style="padding-left:0;">
+                            @printContent(m, "content", i, true)
+                            </td>
+                            <td>@printContent(m, "header", i, true)</td>
+                            <td>
+                                @if(Permission.checkPermission(Permission.DeleteMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
+                                    <a id="@m.id" title="Delete this metadata" class="btn btn-link delete-icon">
+                                        <span class="panel-icon glyphicon glyphicon-trash"></span>
+                                    </a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            }
+        }
+    }
+
