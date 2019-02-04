@@ -6,11 +6,7 @@
     @import play.api.libs.json.JsArray
     @import api.Permission
 
-    @if(metadata.size == 0) {
-        <p class="text-center">No metadata available for this resource</p>
-    }
-
-    @defining(1) { counter: Int =>
+     @defining(1) { counter: Int =>
         <script>
                 function activateTable() {
                     $("#metadataCardsBtn").addClass("btn-link").removeClass("btn-primary");
@@ -18,18 +14,20 @@
                     $("#metadata-table").show();
                     $("#metadataTableBtn").addClass("btn-primary").removeClass("btn-link");
                 }
+
                 function activateCards() {
                     $("#metadataTableBtn").addClass("btn-link").removeClass("btn-primary");
                     $("#metadata-table").hide();
                     $("#metadata-cards").show();
                     $("#metadataCardsBtn").addClass("btn-primary").removeClass("btn-link");
                 }
-                $(document).ready(function() {
+
+                $(document).ready(function () {
                     activateCards();
                 });
         </script>
 
-        <div class="row">
+        <div class="row" id="cards-table-view-selector">
             <div class="col-sm-12">
                 <div class="pull-left">
                     <h4>Metadata</h4>
@@ -47,7 +45,7 @@
             </div>
         </div>
 
-        <div class="row">
+        <div class="row" id="cards-table-view">
             <div class="col-md-12">
                 <div id="metadata-table" role="tabpanel" class="tab-pane fade in active">
                     <div class="table-responsive">
@@ -67,8 +65,8 @@
                                             @for((key, value) <- o.fields) {
                                                 <tr id="row_@m.id">
                                                     <td><a href="#">@key</a></td>
-                                                    <td class="md-block tree" style="padding-left:0;">
-                                                        @printContent(m, "content", i, true)
+                                                    <td class="md-block tree" style="padding-left: 0;">
+                                                    @printContent(m, "content", i, true)
                                                     </td>
                                                     <td>@printContent(m, "header", i, true)</td>
                                                     <td>
@@ -77,33 +75,34 @@
                                                                 <span class="panel-icon glyphicon glyphicon-trash"></span>
                                                             </a>
                                                         }
-
                                                         @******************************
                                                         This dropdown can be used to easily expand the functions offered by each row
                                                         <div class="dropdown">
-                                                            <button class="btn btn-link btn-xs dropdown-toggle" type="button" id="dropdownMenu-@m.id" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
-                                                                <span class="glyphicon glyphicon-option-horizontal"></span>
-                                                            </button>
-                                                            <ul class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenu-@m.id">
-                                                                @if(Permission.checkPermission(Permission.EditMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
-                                                                    <li><a class="btn btn-link disabled" disabled="true">Edit</a></li>
-                                                                }
+                                                        <button class="btn btn-link btn-xs dropdown-toggle" type="button" id="dropdownMenu-@m.id" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                                                        <span class="glyphicon glyphicon-option-horizontal"></span>
+                                                        </button>
+                                                        <ul class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenu-@m.id">
+                                                        @if(Permission.checkPermission(Permission.EditMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
+                                                        <li><a class="btn btn-link disabled" disabled="true">Edit</a></li>
+                                                        }
 
-                                                                @if(toDelete && Permission.checkPermission(Permission.DeleteMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
-                                                                    <li>
-                                                                        <a id="@m.id" title="Delete this metadata" class="btn btn-link delete-icon">
-                                                                                <span class="panel-icon glyphicon glyphicon-trash"></span>
-                                                                        </a>
-                                                                    </li>
-                                                                }
-                                                            </ul>
+                                                        @if(toDelete && Permission.checkPermission(Permission.DeleteMetadata, ResourceRef(ResourceRef.metadata, m.id))) {
+                                                        <li>
+                                                        <a id="@m.id" title="Delete this metadata" class="btn btn-link delete-icon">
+                                                        <span class="panel-icon glyphicon glyphicon-trash"></span>
+                                                        </a>
+                                                        </li>
+                                                        }
+                                                        </ul>
                                                         </div>
                                                         ******************************@
                                                     </td>
                                                 </tr>
                                             }
                                         }
-                                        case _ => {@m.content}
+                                        case _ => {
+                                            @m.content
+                                        }
                                     }
                                 }
                             </tbody>
@@ -140,7 +139,10 @@
                 </div>
             </div>
         </div>
+    }
 
+    @if(metadata.size == 0) {
+        <p class="text-center" id="no-metadata-label">No metadata available for this resource</p>
     }
 
 

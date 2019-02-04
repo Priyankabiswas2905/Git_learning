@@ -246,6 +246,11 @@
                     // Remove both the panel and the table row for this entry
                     $("#panel_" + metadataId).remove();
                     $("#row_" + metadataId).remove();
+
+                    // No more panels left, display placeholder text instead
+                    if($('#metadata-content .panel').length == 0) {
+                        $('#no-metadata-label').text('No metadata available for this resource');
+                    }
                 });
 
                 request.fail(function (jqXHR, textStatus, errorThrown){

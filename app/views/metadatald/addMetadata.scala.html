@@ -202,7 +202,7 @@ line-height: 1.5;
                     $("#@id #addMetadataBasic #selected_field").empty();
                     $("#@id #addMetadataBasic #add-metadata-select").val('').trigger("chosen:updated");
                     if($('#'+'@contentDiv'+' .panel').length == 0) {
-                        $('#' + "@contentDiv").empty();
+                        $('#no-metadata-label').empty();
                     }
 
                     // Pull both the new card and new table row from the response and render it in the DOM
