@@ -445,6 +445,13 @@ class Extractions @Inject()(
     }
   }
 
+  def deleteExtractorInfo(name: String) = AuthenticatedAction { implicit request =>
+    extractors.deleteExtractorInfo(name) match {
+      case Some(x) => Ok(Json.toJson(x))
+      case None => NotFound("No ExtractorInfo found with name " + name)
+    }
+  }
+
   def addExtractorInfo() = AuthenticatedAction(parse.json) { implicit request =>
 
     // If repository is of type object, change it into an array.

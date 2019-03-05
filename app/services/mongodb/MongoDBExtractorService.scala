@@ -175,6 +175,12 @@ class MongoDBExtractorService extends ExtractorService {
     ExtractorInfoDAO.findOne(MongoDBObject("name" -> extractorName))
   }
 
+  def deleteExtractorInfo(extractorName: String): Option[ExtractorInfo] = {
+    val ret = ExtractorInfoDAO.findOne(MongoDBObject("name" -> extractorName))
+    ExtractorInfoDAO.remove(MongoDBObject("name" -> extractorName))
+    ret
+  }
+
   def updateExtractorInfo(e: ExtractorInfo): Option[ExtractorInfo] = {
     ExtractorInfoDAO.findOne(MongoDBObject("name" -> e.name)) match {
       case Some(old) => {

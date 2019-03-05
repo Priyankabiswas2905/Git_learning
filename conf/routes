@@ -403,6 +403,7 @@ GET            /api/files/:id/paths                                             
 GET            /api/extractors                                                          @api.Extractions.listExtractors()
 GET            /api/extractors/:name                                                    @api.Extractions.getExtractorInfo(name: String)
 POST           /api/extractors                                                          @api.Extractions.addExtractorInfo()
+DELETE         /api/extractors/:name                                                    @api.Extractions.deleteExtractorInfo(name: String)
 
 POST           /api/files/:file_id/extractions                                          @api.Extractions.submitFileToExtractor(file_id: UUID)
 POST           /api/datasets/:ds_id/extractions                                         @api.Extractions.submitDatasetToExtractor(ds_id: UUID)

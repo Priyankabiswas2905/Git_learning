@@ -39,5 +39,7 @@ trait ExtractorService {
 
   def getExtractorInfo(extractorName: String): Option[ExtractorInfo]
 
+  def deleteExtractorInfo(name: String): Option[ExtractorInfo]
+
   def updateExtractorInfo(e: ExtractorInfo): Option[ExtractorInfo]
 }
