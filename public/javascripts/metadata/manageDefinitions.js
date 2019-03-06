@@ -63,7 +63,9 @@ function editDefinition(id, json, element) {
     $("#type").val(json.type).change();
   }
   if (json.definitions_url) {
-    if (json.definitions_url.indexOf(window.location.origin) === -1) {
+    // Grab the origin + default path from the URL
+    var origin = window.location.href.split('/api')[0];
+    if (json.definitions_url.indexOf(origin) === -1) {
       $("#defined_by").val("url");
       $("#defined_by_list").hide();
       $("#definitions_list").val('');
@@ -106,8 +108,11 @@ function reset(element) {
 }
 
 function getVocabularyIdFromUrl(url) {
+    // Grab the origin + default path from the URL
+    var origin = window.location.href.split('/api')[0];
+
     // Strip out the hostname to make things easier
-    var suffix = url.replace(window.location.origin, '');
+    var suffix = url.replace(origin, '');
 
     // Suffix takes the form /api/standardvocab/:id/terms - we just want the ID
     return suffix.split('/')[3];
