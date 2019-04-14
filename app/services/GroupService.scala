@@ -11,4 +11,7 @@ import scala.util.Try
 trait GroupService {
 
   def insert(group: Group) : Option[String]
+
+  def get(id : UUID) : Option[Group]
+
 }

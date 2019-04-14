@@ -34,9 +34,14 @@ class MongoDBGroupService @Inject() (
 
     ) extends GroupService {
 
-    def insert(group: Group): Option[String] =  {
-      Group.insert(group).map(_.toString)
-    }
+  def insert(group: Group): Option[String] =  {
+    Group.insert(group).map(_.toString)
+  }
+
+  def get(id: UUID): Option[Group] = {
+    Group.findOneById(new ObjectId(id.stringify))
+  }
+
 }
 
 object Group extends ModelCompanion[Group, ObjectId] {
