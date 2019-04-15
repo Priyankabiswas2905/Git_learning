@@ -66,6 +66,12 @@ class MongoDBGroupService @Inject() (
       }
     }
   }
+
+  def addGroupToSpace(id: UUID, role: Role, spaceId: UUID){
+    Logger.debug("add user to space")
+    val spaceData = UserSpaceAndRole(spaceId, role)
+    val result = Group.dao.update(MongoDBObject("_id" -> new ObjectId(id.stringify)), $push("spaceandrole" -> UserSpaceAndRoleData.toDBObject(spaceData)));
+  }
 }
 
 object Group extends ModelCompanion[Group, ObjectId] {
