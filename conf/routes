@@ -864,6 +864,11 @@ DELETE      /api/proxy/:endpoint_key/*pathSuffix                                
 GET         /extractors                                                                     @controllers.Extractors.selectExtractors()
 POST        /extractors                                                                     @controllers.Extractors.updateExtractors()
 
+# ----------------------------------------------------------------------
+# GROUP API
+# ----------------------------------------------------------------------
 
-
+POST        /api/groups/createGroup                                                          @api.Groups.createGroup()
+GET         /api/groups/:id                                                                  @api.Groups.getGroup(id: UUID)
+POST        /api/groups/addUsers/:id                                                         @api.Groups.addUsersToGroup(id: UUID)
 

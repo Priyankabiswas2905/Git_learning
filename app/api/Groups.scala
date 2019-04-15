@@ -7,6 +7,8 @@ import play.api.Logger
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json.toJson
 
+import scala.collection.mutable.ListBuffer
+
 @Singleton
 class Groups @Inject() (
                         groups: GroupService,
@@ -69,9 +71,12 @@ class Groups @Inject() (
 
             // TODO implement check permissions
             if (user.id == group.creator || group.owners.contains(user.id)){
-              val usersToAdd = (request.body \ "members").asOpt[List[String]].getOrElse(List.empty[String])
-
-              Ok(toJson(usersToAdd))
+              val userIdsToAdd = (request.body \ "members").asOpt[List[String]].getOrElse(List.empty[String])
+              var usersToAdd : ListBuffer[User] = ListBuffer.empty[User]
+              for (id <- userIdsToAdd){
+                groups.addUser(group.id, UUID(id))
+              }
+              Ok(toJson(userIdsToAdd))
             }
             else {
               BadRequest("No permission to add users to this group")
@@ -115,7 +120,7 @@ class Groups @Inject() (
   }
 
   def jsonGroup(group: Group): JsValue = {
-    toJson(Map("id" -> group.id.toString, "groupName" -> group.groupName))
+    toJson(Map("id" -> group.id.toString, "groupName" -> group.groupName, "members"->group.members.toList.toString))
   }
 
 

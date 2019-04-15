@@ -50,7 +50,7 @@ class MongoDBGroupService @Inject() (
         userService.get(userId) match {
           case Some(user) => {
             if (! group.members.contains(user.id.stringify)){
-              Group.update(MongoDBObject("_id" -> new ObjectId(userId.stringify)), $addToSet("members" -> new ObjectId(userId.stringify)), false, false, WriteConcern.Safe)
+              Group.update(MongoDBObject("_id" -> new ObjectId(groupId.stringify)), $addToSet("members" -> new ObjectId(userId.stringify)), false, false, WriteConcern.Safe)
               Success
             } else {
               Failure
