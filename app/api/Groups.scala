@@ -42,7 +42,7 @@ class Groups @Inject() (
     }
   }
 
-  def getGroup(id: UUID) = PrivateServerAction (parse.json) { implicit request =>
+  def getGroup(id: UUID) = PrivateServerAction  { implicit request =>
     val user = request.user
     user match {
       case Some(identity) => {
@@ -58,10 +58,35 @@ class Groups @Inject() (
   }
 
   def addUsersToGroup(id: UUID) = PrivateServerAction (parse.json) { implicit request =>
+    val user = request.user
+    Logger.debug("Adding users to group")
 
+    user match {
+      case Some(user) => {
 
+        groups.get(id) match {
+          case Some(group) => {
 
-    Ok("unimplemented")
+            // TODO implement check permissions
+            if (user.id == group.creator || group.owners.contains(user.id)){
+              val usersToAdd = (request.body \ "members").asOpt[List[String]].getOrElse(List.empty[String])
+
+              Ok(toJson(usersToAdd))
+            }
+            else {
+              BadRequest("No permission to add users to this group")
+            }
+          }
+          case None => {
+            BadRequest("No group found")
+          }
+        }
+      }
+      case None => {
+        BadRequest("No user found")
+      }
+    }
+
 
   }
 
