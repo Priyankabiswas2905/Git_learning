@@ -4,9 +4,12 @@ import javax.inject.{Inject, Singleton}
 import services._
 import models._
 import play.api.Logger
+import play.api.libs.json.JsValue
+import play.api.libs.json.Json.toJson
 
 @Singleton
 class Groups @Inject() (
+                        groups: GroupService,
                         spaces: SpaceService,
                         users: UserService
 
@@ -23,7 +26,13 @@ class Groups @Inject() (
           case Some(gname) => {
 
             val group = Group(groupName = gname, creator=identity.id)
-            Ok("group was created")
+            groups.insert(group) match {
+              case Some(id) => {
+                Ok(toJson(Map("id" -> id)))
+              }
+              case None => BadRequest("Group was not inserted")
+
+            }
           }
           case None => BadRequest("Groups must have a name")
         }
@@ -34,12 +43,23 @@ class Groups @Inject() (
   }
 
   def getGroup(id: UUID) = PrivateServerAction (parse.json) { implicit request =>
-
-    Ok("unimplemented")
-
+    val user = request.user
+    user match {
+      case Some(identity) => {
+        groups.get(id) match {
+          case Some(group) => {
+            Ok(jsonGroup(group))
+          }
+          case None => BadRequest("No group found matching id : " + id)
+        }
+      }
+      case None => BadRequest("No user supplied")
+    }
   }
 
   def addUsersToGroup(id: UUID) = PrivateServerAction (parse.json) { implicit request =>
+
+
 
     Ok("unimplemented")
 
@@ -67,6 +87,10 @@ class Groups @Inject() (
 
     Ok("unimplemented")
 
+  }
+
+  def jsonGroup(group: Group): JsValue = {
+    toJson(Map("id" -> group.id.toString, "groupName" -> group.groupName))
   }
 
 

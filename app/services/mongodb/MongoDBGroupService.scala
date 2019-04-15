@@ -31,8 +31,10 @@ import play.api.Play._
 
 @Singleton
 class MongoDBGroupService @Inject() (
+  userService: UserService,
+  spaceService: SpaceService
 
-    ) extends GroupService {
+  ) extends GroupService {
 
   def insert(group: Group): Option[String] =  {
     Group.insert(group).map(_.toString)
@@ -42,6 +44,28 @@ class MongoDBGroupService @Inject() (
     Group.findOneById(new ObjectId(id.stringify))
   }
 
+  def addUser(groupId: UUID, userId: UUID) = Try {
+    Group.findOneById(new ObjectId(groupId.stringify)) match {
+      case Some(group) => {
+        userService.get(userId) match {
+          case Some(user) => {
+            if (! group.members.contains(user.id.stringify)){
+              Group.update(MongoDBObject("_id" -> new ObjectId(userId.stringify)), $addToSet("members" -> new ObjectId(userId.stringify)), false, false, WriteConcern.Safe)
+              Success
+            } else {
+              Failure
+            }
+          }
+          case None => {
+            Failure
+          }
+        }
+      }
+      case None => {
+        Failure
+      }
+    }
+  }
 }
 
 object Group extends ModelCompanion[Group, ObjectId] {

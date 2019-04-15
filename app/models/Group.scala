@@ -6,6 +6,7 @@ case class Group (
   groupName: String="",
   creator: UUID,
   owners: List[UUID] = List.empty[UUID],
+  members: List[UUID] = List.empty[UUID],
   spaceandrole: List[UserSpaceAndRole] = List.empty[UserSpaceAndRole]
 
 )

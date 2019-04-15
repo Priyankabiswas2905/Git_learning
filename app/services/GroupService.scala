@@ -14,4 +14,6 @@ trait GroupService {
 
   def get(id : UUID) : Option[Group]
 
+  def addUser(group: Group, user: User) : Try[Unit]
+
 }
