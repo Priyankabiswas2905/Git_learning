@@ -8,6 +8,7 @@ import play.api.libs.json._
 import play.api.libs.json.Json.toJson
 import _root_.util.Mail
 
+import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
 
 @Singleton
@@ -213,7 +214,7 @@ class Groups @Inject() (
                 groups.removeGroupFromSpace(id, spaceId)
               }
             }
-            Ok(toJson(Map("wasInSpace"->wasInSpace,"spaceId"->spaceId.toString,"status"->"removed")))
+            Ok("removed")
           }
           case None => BadRequest("No group with that id")
         }
@@ -222,33 +223,43 @@ class Groups @Inject() (
     }
   }
 
-  def listGroupsAll()= PrivateServerAction (parse.json) { implicit request =>
+  def listGroupsCreator()= PrivateServerAction { implicit request =>
     request.user match {
       case Some(user) => {
-        if (user.superAdminMode){
-          Ok(toJson("not implemented"))
-        } else {
-          Ok("not superadmin")
-        }
+        val list = for (group <- groups.listCreator(user.id))
+          yield group
+        Ok(toJson(list))
       }
-      case None => BadRequest("no user")
+      case None => BadRequest("No user supplied")
     }
-    Ok("unimplemented")
+  }
 
+  def listAll() = PrivateServerAction { implicit request =>
+    val list = for (group <- groups.listAllGroups())
+      yield group
+    Ok(toJson(list))
   }
 
   def listGroupsOwner() = PrivateServerAction {implicit request =>
     request.user match {
       case Some(user) => {
-
+        val list = for (group <- groups.listOwnerOrCreator(user.id))
+          yield group
+        Ok(toJson(list))
       }
-      case None => BadRequest("No user")
+      case None => BadRequest("No user supplied")
     }
-    Ok("unimplemented")
   }
 
   def listGroupsMember() = PrivateServerAction {implicit request =>
-    Ok("unimplemented")
+    request.user match {
+      case Some(user) => {
+        val list = for (group <- groups.listMember(user.id))
+          yield group
+        Ok(toJson(list))
+      }
+      case None => BadRequest("No user supplied")
+    }
   }
 
   def jsonGroup(group: Group): JsValue = {

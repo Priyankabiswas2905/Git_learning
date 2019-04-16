@@ -28,13 +28,13 @@ trait GroupService {
 
   def listGroupsInSpace(spaceId: UUID) : List[Group]
 
+  def listAllGroups() : List[Group]
+
   def listCreator(creatorId: UUID) : List[Group]
 
   def listOwnerOrCreator(userId: UUID) : List[Group]
 
   def listMember(userId: UUID) : List[Group]
-
-  def list() : List[Group]
 
 
 

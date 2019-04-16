@@ -44,7 +44,7 @@ class MongoDBGroupService @Inject() (
     Group.findOneById(new ObjectId(id.stringify))
   }
 
-  def list() : List[Group] = {
+  def listAllGroups() : List[Group] = {
     Group.findAll().toList
   }
 
