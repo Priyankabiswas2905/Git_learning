@@ -220,14 +220,35 @@ class Groups @Inject() (
       }
       case None => BadRequest("No user supplied")
     }
+  }
+
+  def listGroupsAll()= PrivateServerAction (parse.json) { implicit request =>
+    request.user match {
+      case Some(user) => {
+        if (user.superAdminMode){
+          Ok(toJson("not implemented"))
+        } else {
+          Ok("not superadmin")
+        }
+      }
+      case None => BadRequest("no user")
+    }
     Ok("unimplemented")
 
   }
 
-  def listGroups(creator: UUID)= PrivateServerAction (parse.json) { implicit request =>
+  def listGroupsOwner() = PrivateServerAction {implicit request =>
+    request.user match {
+      case Some(user) => {
 
+      }
+      case None => BadRequest("No user")
+    }
     Ok("unimplemented")
+  }
 
+  def listGroupsMember() = PrivateServerAction {implicit request =>
+    Ok("unimplemented")
   }
 
   def jsonGroup(group: Group): JsValue = {

@@ -44,6 +44,22 @@ class MongoDBGroupService @Inject() (
     Group.findOneById(new ObjectId(id.stringify))
   }
 
+  def list() : List[Group] = {
+    Group.findAll().toList
+  }
+
+  def listCreator(creatorId: UUID) : List[Group] = {
+    Group.findAll().toList.filter((g: Group) => (g.creator == creatorId))
+  }
+
+  def listOwnerOrCreator(userId: UUID) : List[Group] = {
+    Group.findAll().toList.filter((g: Group) => ((g.creator == userId)||(g.owners.contains(userId))))
+  }
+
+  def listMember(userId: UUID) : List[Group] = {
+    Group.findAll().toList.filter((g: Group) => (g.members.contains(userId) || g.owners.contains(userId) || g.creator == userId))
+  }
+
   def addUser(groupId: UUID, userId: UUID) = Try {
     Group.findOneById(new ObjectId(groupId.stringify)) match {
       case Some(group) => {
@@ -90,7 +106,7 @@ class MongoDBGroupService @Inject() (
       }
     }
   }
-  
+
 
   def listGroupsInSpace(spaceId: UUID) : List[Group] = {
     val retList: ListBuffer[Group] = ListBuffer.empty
