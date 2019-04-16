@@ -16,6 +16,9 @@ trait GroupService {
 
   def addUser(groupId: UUID, userId: UUID) : Try[Unit]
 
+  def removeUser(groupId: UUID, userId: UUID) : Try[Unit]
+
   def addGroupToSpace(id: UUID, role: Role, spaceId: UUID)
+
 
 }

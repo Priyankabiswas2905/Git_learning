@@ -871,4 +871,6 @@ POST        /extractors                                                         
 POST        /api/groups/createGroup                                                          @api.Groups.createGroup()
 GET         /api/groups/:id                                                                  @api.Groups.getGroup(id: UUID)
 POST        /api/groups/addUsers/:id                                                         @api.Groups.addUsersToGroup(id: UUID)
+POST        /api/groups/removeUsers/:id                                                      @api.Groups.removeUsersFromGroup(id: UUID)
+POST        /api/groups/leave/:id                                                            @api.Groups.leaveGroup(id: UUID)
 POST        /api/groups/:id/addToSpace/:spaceId                                              @api.Groups.addGroupToSpace(id: UUID, spaceId: UUID)

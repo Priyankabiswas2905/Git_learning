@@ -67,6 +67,31 @@ class MongoDBGroupService @Inject() (
     }
   }
 
+  def removeUser(groupId: UUID, userId: UUID) = Try {
+    Group.findOneById(new ObjectId(groupId.stringify)) match {
+      case Some(group) => {
+        userService.get(userId) match {
+          case Some(user) => {
+            if (group.members.contains(user.id)){
+              Group.update(MongoDBObject("_id" -> new ObjectId(groupId.stringify)), $pull("members" -> new ObjectId(userId.stringify)), false, false, WriteConcern.Safe)
+
+              Success
+            } else {
+              Failure
+            }
+          }
+          case None => {
+            Failure
+          }
+        }
+      }
+      case None => {
+        Failure
+      }
+    }
+  }
+
+
   def addGroupToSpace(id: UUID, role: Role, spaceId: UUID){
     Logger.debug("add user to space")
     val spaceData = UserSpaceAndRole(spaceId, role)

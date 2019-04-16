@@ -72,7 +72,6 @@ class Groups @Inject() (
             // TODO implement check permissions
             if (user.id == group.creator || group.owners.contains(user.id)){
               val userIdsToAdd = (request.body \ "members").asOpt[List[String]].getOrElse(List.empty[String])
-              var usersToAdd : ListBuffer[User] = ListBuffer.empty[User]
               for (id <- userIdsToAdd){
                 groups.addUser(group.id, UUID(id))
               }
@@ -96,13 +95,54 @@ class Groups @Inject() (
   }
 
   def removeUsersFromGroup(id : UUID) = PrivateServerAction (parse.json) { implicit request =>
+    request.user match {
+      case Some(user) => {
 
-    Ok("unimplemented")
+        groups.get(id) match {
+          case Some(group) => {
+
+            // TODO implement check permissions for group
+            if (user.id == group.creator || group.owners.contains(user.id)) {
+              val userIdsToRemove = (request.body \ "members").asOpt[List[String]].getOrElse(List.empty[String])
+              for (id <- userIdsToRemove){
+                groups.removeUser(group.id, UUID(id))
+              }
+              Ok(toJson(userIdsToRemove))
+            } else {
+              BadRequest("No permission to remove users from this group")
+            }
+
+          }
+          case None => BadRequest("No group with that id")
+        }
+      }
+      case None => BadRequest("No user supplied")
+    }
 
   }
 
-  def addGroupToSpace(id: UUID, spaceid: UUID) = PrivateServerAction (parse.json) { implicit request =>
+  def leaveGroup(id: UUID) = PrivateServerAction{ implicit request =>
+    request.user match {
+      case Some(user) => {
+        groups.get(id) match {
+          case Some(group) => {
+            if (group.members.contains(user.id)){
+              groups.removeUser(id, user.id)
+              Ok(toJson("removed self from group"))
+            } else {
+              BadRequest("Not in that group")
+            }
+          }
+          case None => BadRequest("No group found")
+        }
+      }
+      case None => BadRequest("No user supplied")
+    }
+    Ok(toJson("Not ready"))
+  }
 
+  def addGroupToSpace(id: UUID, spaceid: UUID) = PrivateServerAction (parse.json) { implicit request =>
+    
     Ok("unimplemented")
 
   }
