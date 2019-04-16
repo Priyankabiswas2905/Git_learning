@@ -868,15 +868,15 @@ POST        /extractors                                                         
 # GROUP API
 # ----------------------------------------------------------------------
 
-POST        /api/groups/createGroup                                                          @api.Groups.createGroup()
-GET         /api/groups/list                                                                 @api.Groups.listAll()
-GET         /api/groups/listCreator                                                          @api.Groups.listGroupsCreator()
-GET         /api/groups/listOwner                                                            @api.Groups.listGroupsOwner()
+POST        /api/groups/createGroup                                                         @api.Groups.createGroup()
+GET         /api/groups/list                                                                @api.Groups.listAll()
+GET         /api/groups/listCreator                                                         @api.Groups.listGroupsCreator()
+GET         /api/groups/listOwner                                                           @api.Groups.listGroupsOwner()
 GET         /api/groups/listMember                                                          @api.Groups.listGroupsMember()
-GET         /api/groups/:id                                                                  @api.Groups.getGroup(id: UUID)
+GET         /api/groups/:id                                                                 @api.Groups.getGroup(id: UUID)
 
-POST        /api/groups/addUsers/:id                                                         @api.Groups.addUsersToGroup(id: UUID)
-POST        /api/groups/removeUsers/:id                                                      @api.Groups.removeUsersFromGroup(id: UUID)
-POST        /api/groups/leave/:id                                                            @api.Groups.leaveGroup(id: UUID)
-POST        /api/groups/:id/addToSpace/:spaceId                                              @api.Groups.addGroupToSpace(id: UUID, spaceId: UUID)
-POST        /api/groups/:id/removeFromSpace/:spaceId                                         @api.Groups.removeGroupFromSpace(id: UUID, spaceId: UUID)
+POST        /api/groups/addUsers/:id                                                        @api.Groups.addUsersToGroup(id: UUID)
+POST        /api/groups/removeUsers/:id                                                     @api.Groups.removeUsersFromGroup(id: UUID)
+POST        /api/groups/leave/:id                                                           @api.Groups.leaveGroup(id: UUID)
+POST        /api/groups/:id/addToSpace/:spaceId                                             @api.Groups.addGroupToSpace(id: UUID, spaceId: UUID)    
+POST        /api/groups/:id/removeFromSpace/:spaceId                                        @api.Groups.removeGroupFromSpace(id: UUID, spaceId: UUID)
