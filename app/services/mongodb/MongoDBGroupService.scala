@@ -90,12 +90,62 @@ class MongoDBGroupService @Inject() (
       }
     }
   }
+  
 
+  def listGroupsInSpace(spaceId: UUID) : List[Group] = {
+    val retList: ListBuffer[Group] = ListBuffer.empty
+    for (aGroup <- Group.find(MongoDBObject())) {
+      for (aSpaceAndRole <- aGroup.spaceandrole) {
+        if (aSpaceAndRole.spaceId == spaceId) {
+          retList += aGroup
+        }
+      }
+    }
+    retList.toList
+  }
 
-  def addGroupToSpace(id: UUID, role: Role, spaceId: UUID){
-    Logger.debug("add user to space")
+  def getGroupRoleInSpace(groupId: UUID, spaceId: UUID): Option[Role] = {
+    var retRole: Option[Role] = None
+    var found = false
+
+    Group.findOneById(new ObjectId(groupId.stringify)) match {
+      case Some(group) => {
+        for (aSpaceAndRole <- group.spaceandrole){
+          if (!found){
+            if (aSpaceAndRole.spaceId == spaceId){
+              retRole = Some(aSpaceAndRole.role)
+              found = true
+            }
+          }
+        }
+      }
+      case None => Logger.debug("No user found for getRoleInSpace")
+    }
+
+    retRole
+  }
+
+  def changeGroupRoleInSpace(groupId: UUID, role: Role, spaceId: UUID): Unit = {
+    Group.dao.update(MongoDBObject("_id" -> new ObjectId(groupId.stringify), "spaceandrole.spaceId" -> new ObjectId(spaceId.stringify)),
+      $set({"spaceandrole.$.role" -> RoleDAO.toDBObject(role)}), false, true, WriteConcern.Safe)
+  }
+
+  def addGroupToSpace(groupId: UUID, role: Role, spaceId: UUID): Unit = {
+    Logger.debug("add group to space")
     val spaceData = UserSpaceAndRole(spaceId, role)
-    val result = Group.dao.update(MongoDBObject("_id" -> new ObjectId(id.stringify)), $push("spaceandrole" -> UserSpaceAndRoleData.toDBObject(spaceData)));
+    val result = Group.dao.update(MongoDBObject("_id" -> new ObjectId(groupId.stringify)), $push("spaceandrole" -> UserSpaceAndRoleData.toDBObject(spaceData)));
+  }
+
+  /**
+    * @see app.services.UserService
+    *
+    * Implementation of the UserService trait.
+    *
+    */
+  def removeGroupFromSpace(groupId: UUID, spaceId: UUID): Unit = {
+    Logger.debug("remove group from space")
+    Group.dao.update(MongoDBObject("_id" -> new ObjectId(groupId.stringify)),
+      $pull("spaceandrole" ->  MongoDBObject( "spaceId" -> new ObjectId(spaceId.stringify))), false, false, WriteConcern.Safe)
   }
 }
 
