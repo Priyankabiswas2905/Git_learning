@@ -223,6 +223,75 @@ class Groups @Inject() (
     }
   }
 
+  def addOwners(id: UUID) = PrivateServerAction (parse.json) {implicit request =>
+    request.user match {
+      case Some(user) => {
+        groups.get(id) match {
+          case Some(group) => {
+            if (user.id == group.creator || group.owners.contains(user.id)){
+              (request.body \"owners").asOpt[List[String]] match {
+                case Some(newowners) => {
+                  var ownerList: List[UUID] = List.empty
+                  newowners.map {
+                    aOwner => if (users.get(UUID(aOwner)).isDefined) {
+                      ownerList = UUID(aOwner) :: ownerList
+
+                    }
+                  }
+                  for (ownerId <- ownerList){
+                    groups.addOwner(group.id, ownerId)
+                  }
+                  Ok(toJson("added new owners"))
+                }
+                case None => BadRequest("No new owners to add")
+              }
+            } else {
+              BadRequest("No permission to add owners to this group")
+            }
+          }
+          case None => BadRequest("No group")
+        }
+      }
+      case None => BadRequest("No user")
+    }
+  }
+
+  def removeOwners(id: UUID) = PrivateServerAction (parse.json) {implicit request =>
+    request.user match {
+      case Some(user) => {
+        groups.get(id) match {
+          case Some(group) => {
+            if (user.id == group.creator || group.owners.contains(user.id)){
+              (request.body \"owners").asOpt[List[String]] match {
+                case Some(newowners) => {
+                  var ownerList: List[UUID] = List.empty
+                  newowners.map {
+                    aOwner => if (users.get(UUID(aOwner)).isDefined) {
+                      ownerList = UUID(aOwner) :: ownerList
+
+                    }
+                  }
+                  for (ownerId <- ownerList){
+                    if (group.owners.contains(ownerId)){
+                      groups.removeOwner(group.id, ownerId)
+                    }
+                  }
+                  Ok(toJson("removed  owners"))
+                }
+                case None => BadRequest("No new owners to add")
+              }
+            } else {
+              BadRequest("No permission to add owners to this group")
+            }
+          }
+          case None => BadRequest("No group")
+        }
+      }
+      case None => BadRequest("No user")
+    }
+  }
+
+
   def listGroupsCreator()= PrivateServerAction { implicit request =>
     request.user match {
       case Some(user) => {

@@ -18,6 +18,10 @@ trait GroupService {
 
   def removeUser(groupId: UUID, userId: UUID) : Try[Unit]
 
+  def addOwner(groupId: UUID, userId: UUID) : Try[Unit]
+
+  def removeOwner(groupId: UUID, userId: UUID) : Try[Unit]
+
   def addGroupToSpace(id: UUID, role: Role, spaceId: UUID)
 
   def getGroupRoleInSpace(groupId: UUID, spaceId: UUID): Option[Role]

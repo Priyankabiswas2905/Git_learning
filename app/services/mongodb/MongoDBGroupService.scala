@@ -107,6 +107,53 @@ class MongoDBGroupService @Inject() (
     }
   }
 
+  def addOwner(groupId: UUID, userId: UUID) = Try {
+    Group.findOneById(new ObjectId(groupId.stringify)) match {
+      case Some(group) => {
+        userService.get(userId) match {
+          case Some(user) => {
+            if (! group.owners.contains(user.id.stringify)){
+              Group.update(MongoDBObject("_id" -> new ObjectId(groupId.stringify)), $addToSet("owners" -> new ObjectId(userId.stringify)), false, false, WriteConcern.Safe)
+              Success
+            } else {
+              Failure
+            }
+          }
+          case None => {
+            Failure
+          }
+        }
+      }
+      case None => {
+        Failure
+      }
+    }
+  }
+
+  def removeOwner(groupId: UUID, userId: UUID) = Try {
+    Group.findOneById(new ObjectId(groupId.stringify)) match {
+      case Some(group) => {
+        userService.get(userId) match {
+          case Some(user) => {
+            if (group.members.contains(user.id)){
+              Group.update(MongoDBObject("_id" -> new ObjectId(groupId.stringify)), $pull("owners" -> new ObjectId(userId.stringify)), false, false, WriteConcern.Safe)
+
+              Success
+            } else {
+              Failure
+            }
+          }
+          case None => {
+            Failure
+          }
+        }
+      }
+      case None => {
+        Failure
+      }
+    }
+  }
+
 
   def listGroupsInSpace(spaceId: UUID) : List[Group] = {
     val retList: ListBuffer[Group] = ListBuffer.empty
