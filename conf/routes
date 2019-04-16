@@ -874,3 +874,4 @@ POST        /api/groups/addUsers/:id                                            
 POST        /api/groups/removeUsers/:id                                                      @api.Groups.removeUsersFromGroup(id: UUID)
 POST        /api/groups/leave/:id                                                            @api.Groups.leaveGroup(id: UUID)
 POST        /api/groups/:id/addToSpace/:spaceId                                              @api.Groups.addGroupToSpace(id: UUID, spaceId: UUID)
+POST        /api/groups/:id/removeFromSpace/:spaceId                                         @api.Groups.removeGroupFromSpace(id: UUID, spaceId: UUID)

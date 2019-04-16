@@ -200,8 +200,26 @@ class Groups @Inject() (
     }
   }
 
-  def removeGroupFromSpace(id: UUID, spaceid: UUID) = PrivateServerAction (parse.json) { implicit request =>
-
+  def removeGroupFromSpace(id: UUID, spaceId: UUID) = PrivateServerAction (parse.json) { implicit request =>
+    request.user match {
+      case Some(user) => {
+        groups.get(id) match {
+          case Some(group) => {
+            val currentGroupSpaceRoles = group.spaceandrole
+            var wasInSpace = false
+            for (eachSpaceRole <- currentGroupSpaceRoles) {
+              if (eachSpaceRole.spaceId == spaceId){
+                wasInSpace = true
+                groups.removeGroupFromSpace(id, spaceId)
+              }
+            }
+            Ok(toJson(Map("wasInSpace"->wasInSpace,"spaceId"->spaceId.toString,"status"->"removed")))
+          }
+          case None => BadRequest("No group with that id")
+        }
+      }
+      case None => BadRequest("No user supplied")
+    }
     Ok("unimplemented")
 
   }
