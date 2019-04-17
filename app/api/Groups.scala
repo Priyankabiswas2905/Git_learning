@@ -76,7 +76,7 @@ class Groups @Inject() (
                 case None => Logger.debug("No user found")
               }
             }
-            Ok(toJson(members.toList))
+            Ok(Json.toJson(members.map(userToJSON)))
           }
           case None => BadRequest("No group")
         }
@@ -191,13 +191,15 @@ class Groups @Inject() (
                       // we now have the roles the group has for the space
                       users.findRoleByName(newrole) match {
                         case Some(role) => {
-                          if (existingRolesForSpace.toList.contains(role)){
+                          val miniRole = new MiniRole(role.id,role.name,role.description)
+                          val basicRole = new Role(role.id,role.name,role.description)
+                          if (existingRolesForSpace.toList.contains(basicRole)){
                             Ok(toJson("already has that role in space"))
                           } else if (existingRolesForSpace.toList.size > 0 && !existingRolesForSpace.toList.contains(role)){
-                            groups.changeGroupRoleInSpace(id, role, spaceId)
+                            groups.changeGroupRoleInSpace(id, basicRole, spaceId)
                             Ok(toJson("changing role"))
                           } else {
-                            groups.addGroupToSpace(id, role, spaceId)
+                            groups.addGroupToSpace(id, basicRole, spaceId)
                             Ok(toJson("adding role"))
                           }
                         }
@@ -364,6 +366,49 @@ class Groups @Inject() (
 
   def jsonRole(role: Role) : JsValue = {
     Json.obj("id"->role.id,"name"->role.name,"description"->role.description)
+  }
+
+  def userToJSON(user: User): JsValue = {
+    var profile: Map[String, JsValue] = Map.empty
+    if(user.profile.isDefined) {
+      if(user.profile.get.biography.isDefined) {
+        profile  = profile + ("biography" -> Json.toJson(user.profile.get.biography))
+      }
+      if(user.profile.get.institution.isDefined) {
+        profile = profile + ( "institution" -> Json.toJson(user.profile.get.institution))
+      }
+      if(user.profile.get.orcidID.isDefined) {
+        profile = profile + ("orcidId" -> Json.toJson(user.profile.get.orcidID))
+      }
+      if(user.profile.get.position.isDefined) {
+        profile = profile + ("position" -> Json.toJson(user.profile.get.position))
+      }
+      if(user.profile.get.institution.isDefined) {
+        profile = profile + ("institution" -> Json.toJson(user.profile.get.institution))
+      }
+
+    }
+    Json.obj(
+
+      "@context" -> Json.toJson(
+        Map(
+          "firstName" -> Json.toJson("http://schema.org/Person/givenName"),
+          "lastName" -> Json.toJson("http://schema.org/Person/familyName"),
+          "email" -> Json.toJson("http://schema.org/Person/email"),
+          "affiliation" -> Json.toJson("http://schema.org/Person/affiliation")
+        )
+      ),
+      "id" -> user.id.stringify,
+      "firstName" -> user.firstName,
+      "lastName" -> user.lastName,
+      "fullName" -> user.fullName,
+      "email" -> user.email,
+      "avatar" -> user.getAvatarUrl(),
+      "profile" -> Json.toJson(profile),
+      "identityProvider" -> user.format(true)
+    )
+
+
   }
 
 
