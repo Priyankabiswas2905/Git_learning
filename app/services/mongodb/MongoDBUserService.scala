@@ -42,7 +42,8 @@ class MongoDBUserService @Inject() (
   events: EventService,
   folders: FolderService,
   metadata: MetadataService,
-  curations: CurationService) extends services.UserService {
+  curations: CurationService,
+  groups: GroupService) extends services.UserService {
   // ----------------------------------------------------------------------
   // Code to implement the common CRUD services
   // ----------------------------------------------------------------------
@@ -328,6 +329,17 @@ class MongoDBUserService @Inject() (
                           found = true
                       }
                   }
+              }
+              val userGroups = groups.listMember(userId)
+              for (userGroup <- userGroups){
+                for (groupSpaceAndRole <- userGroup.spaceandrole){
+                  if (!found){
+                    if (groupSpaceAndRole.spaceId == spaceId){
+                      retRole = Some(groupSpaceAndRole.role)
+                      found = true
+                    }
+                  }
+                }
               }
           }
           case None => Logger.debug("No user found for getRoleInSpace")
