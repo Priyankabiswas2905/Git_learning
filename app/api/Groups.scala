@@ -61,6 +61,32 @@ class Groups @Inject() (
     }
   }
 
+  def getMembersOfGroup(id: UUID) = PrivateServerAction {implicit request =>
+    request.user match {
+      case Some(user) => {
+        groups.get(id) match {
+          case Some(group) => {
+            val memberIds = group.members
+            var members : ListBuffer[User] = ListBuffer.empty[User]
+            for (memberId <- memberIds){
+              users.get(id) match {
+                case Some(member) => {
+                  members += member
+                }
+                case None => Logger.debug("No user found")
+              }
+            }
+            Ok(toJson(members.toList))
+          }
+          case None => BadRequest("No group")
+        }
+      }
+      case None => {
+        BadRequest("No user supplied")
+      }
+    }
+  }
+
   def addUsersToGroup(id: UUID) = PrivateServerAction (parse.json) { implicit request =>
     val user = request.user
     Logger.debug("Adding users to group")
@@ -332,7 +358,12 @@ class Groups @Inject() (
   }
 
   def jsonGroup(group: Group): JsValue = {
-    toJson(Map("id" -> group.id.toString, "groupName" -> group.groupName, "members"->group.members.toList.toString))
+    toJson(Map("id" -> group.id.toString, "groupName" -> group.groupName,
+      "members"->group.members.toList.toString, "owners"->group.owners.toList.toString))
+  }
+
+  def jsonRole(role: Role) : JsValue = {
+    Json.obj("id"->role.id,"name"->role.name,"description"->role.description)
   }
 
 

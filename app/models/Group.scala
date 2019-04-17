@@ -17,6 +17,7 @@ object Group {
       Json.obj(
         "id" -> group.id,
         "groupName" -> group.groupName,
+        "owners"->group.owners,
         "creator" -> group.creator,
           "members"->group.members)
     }
