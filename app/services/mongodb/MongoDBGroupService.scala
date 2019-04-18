@@ -167,25 +167,43 @@ class MongoDBGroupService @Inject() (
     retList.toList
   }
 
-  def getGroupRoleInSpace(groupId: UUID, spaceId: UUID): Option[Role] = {
-    var retRole: Option[Role] = None
-    var found = false
+  def getGroupRoleInSpace(groupId: UUID, spaceId: UUID): List[Role] = {
+
+    var retRoles: ListBuffer[Role] = ListBuffer.empty[Role]
 
     Group.findOneById(new ObjectId(groupId.stringify)) match {
       case Some(group) => {
         for (aSpaceAndRole <- group.spaceandrole){
-          if (!found){
-            if (aSpaceAndRole.spaceId == spaceId){
-              retRole = Some(aSpaceAndRole.role)
-              found = true
-            }
+          if (aSpaceAndRole.spaceId == spaceId){
+            retRoles += aSpaceAndRole.role
           }
         }
       }
       case None => Logger.debug("No user found for getRoleInSpace")
     }
 
-    retRole
+    retRoles.toList
+  }
+
+  def getUserGroupRolesInSpace(userId: UUID, spaceId: UUID): List[Role] = {
+
+    var retRoles: ListBuffer[Role] = ListBuffer.empty[Role]
+
+    userService.get(userId) match {
+      case Some(user) => {
+        val userGroups = Group.findAll().toList.filter((g: Group) => (g.members.contains(userId) || g.owners.contains(userId) || g.creator == userId))
+        for (group <- userGroups){
+          for (aSpaceRole <- group.spaceandrole){
+            if (aSpaceRole.spaceId == spaceId){
+              retRoles += aSpaceRole.role
+            }
+          }
+        }
+      }
+      case None => Logger.info("No user found")
+    }
+
+    retRoles.toList
   }
 
   def changeGroupRoleInSpace(groupId: UUID, role: Role, spaceId: UUID): Unit = {

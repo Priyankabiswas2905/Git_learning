@@ -24,7 +24,9 @@ trait GroupService {
 
   def addGroupToSpace(id: UUID, role: Role, spaceId: UUID)
 
-  def getGroupRoleInSpace(groupId: UUID, spaceId: UUID): Option[Role]
+  def getGroupRoleInSpace(groupId: UUID, spaceId: UUID): List[Role]
+
+  def getUserGroupRolesInSpace(userId: UUID, spaceId: UUID): List[Role]
 
   def removeGroupFromSpace(groupId: UUID, spaceId: UUID)
 
