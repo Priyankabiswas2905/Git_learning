@@ -346,8 +346,15 @@ class MongoDBUserService @Inject() (
         for (aSpaceAndRole <- aUser.spaceandrole) {
           if (!found) {
             if (aSpaceAndRole.spaceId == spaceId) {
-              allUserRoles += aSpaceAndRole.role
-              found = true
+
+              findRoleByName(aSpaceAndRole.role.name) match {
+                case Some(role) => {
+                  allUserRoles += role
+                  found = true
+                }
+                case None => Logger.info("No role exists with name")
+              }
+
             }
           }
         }
@@ -355,7 +362,7 @@ class MongoDBUserService @Inject() (
         allUserRoles ++= groupRolesOfUser
       }
       case None => {
-        case None => Logger.debug("No user found for getRoleInSpace")
+        Logger.debug("No user found for getRoleInSpace")
       }
 
     }
