@@ -216,6 +216,11 @@ trait UserService  {
    */
   def updateRole(role: Role)
 
+
+  def getUserSpaceAndRoleWithPermissions(user: User) : List[UserSpaceAndRole]
+
+  def getUserSpaceAndRoleWithPermissionsIncludingGroup(user: User) : List[UserSpaceAndRole]
+
   /**
    * Follow a file.
    */

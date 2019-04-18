@@ -513,6 +513,41 @@ class MongoDBUserService @Inject() (
     }
   }
 
+  def getUserSpaceAndRoleWithPermissions(user: User) : List[UserSpaceAndRole] = {
+    var userSpaceAndRole: ListBuffer[UserSpaceAndRole] = ListBuffer.empty[UserSpaceAndRole]
+
+    userSpaceAndRole.toList
+  }
+
+  def getUserSpaceAndRoleWithPermissionsIncludingGroup(user: User) : List[UserSpaceAndRole] = {
+    var userSpaceAndRoleWithPermissions : ListBuffer[UserSpaceAndRole] = ListBuffer.empty[UserSpaceAndRole]
+
+    for (spaceRole <- user.spaceandrole) {
+      findRoleByName(spaceRole.role.name) match {
+        case Some(role) => {
+          val spaceRoleWithPermissions = UserSpaceAndRole(spaceRole.spaceId, role)
+          userSpaceAndRoleWithPermissions += spaceRoleWithPermissions
+        }
+        case None =>
+      }
+    }
+
+    val groupsOfUser = groups.listMember(user.id)
+    for (group <- groupsOfUser){
+      for (gSpaceRole <- group.spaceandrole){
+        findRoleByName(gSpaceRole.role.name) match {
+          case Some(role) => {
+            val spaceRoleWithPermissions = UserSpaceAndRole(gSpaceRole.spaceId, role)
+            userSpaceAndRoleWithPermissions += spaceRoleWithPermissions
+          }
+          case None =>
+        }
+      }
+    }
+
+    userSpaceAndRoleWithPermissions.toList
+  }
+
   override def acceptTermsOfServices(id: UUID): Unit = {
     UserDAO.dao.update(MongoDBObject("_id" -> new ObjectId(id.stringify)),
       $set("termsOfServices" -> MongoDBObject("accepted" -> true, "acceptedDate" -> new Date, "acceptedVersion" -> AppConfiguration.getTermsOfServicesVersionString)))
