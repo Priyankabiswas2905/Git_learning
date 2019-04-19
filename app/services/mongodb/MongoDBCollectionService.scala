@@ -262,7 +262,7 @@ class MongoDBCollectionService @Inject() (
           }
           val permissionsString = permissions.map(_.toString)
           val okspaces = if (showOnlyShared){
-            u.spaceandrole.filter(_.role.permissions.intersect(permissionsString).nonEmpty).filter((p: UserSpaceAndRole)=>
+            userService.getUserSpaceAndRoleWithPermissions(u).filter(_.role.permissions.intersect(permissionsString).nonEmpty).filter((p: UserSpaceAndRole)=>
               (spaces.get(p.spaceId) match {
                 case Some(space) => {
                   if (space.userCount > 1){
@@ -275,7 +275,7 @@ class MongoDBCollectionService @Inject() (
               })
             )
           } else {
-            u.spaceandrole.filter(_.role.permissions.intersect(permissionsString).nonEmpty)
+            userService.getUserSpaceAndRoleWithPermissions(u).filter(_.role.permissions.intersect(permissionsString).nonEmpty)
           }
           if (okspaces.nonEmpty) {
             orlist += ("spaces" $in okspaces.map(x => new ObjectId(x.spaceId.stringify)))
@@ -317,7 +317,7 @@ class MongoDBCollectionService @Inject() (
                   val permissionsString = permissions.map(_.toString)
                   val orlistB = collection.mutable.ListBuffer.empty[MongoDBObject]
 
-                  val okspaces = u.spaceandrole.filter(_.role.permissions.intersect(permissionsString).nonEmpty)
+                  val okspaces = userService.getUserSpaceAndRoleWithPermissions(u).filter(_.role.permissions.intersect(permissionsString).nonEmpty)
                   if (okspaces.nonEmpty) {
                     if(enablePublic && showPublic) {
                       orlistB += ("spaces" $in okspaces.map(x => new ObjectId(x.spaceId.stringify)) ++ publicSpaces)
@@ -397,7 +397,7 @@ class MongoDBCollectionService @Inject() (
       orlist += ("spaces" $in publicSpaces)
       orlist += MongoDBObject("author._id" -> new ObjectId(user.id.stringify))
       val permissionsString = Set[Permission](Permission.ViewCollection).map(_.toString)
-      val okspaces = user.spaceandrole.filter(_.role.permissions.intersect(permissionsString).nonEmpty)
+      val okspaces = userService.getUserSpaceAndRoleWithPermissions(user).filter(_.role.permissions.intersect(permissionsString).nonEmpty)
       if (okspaces.nonEmpty) {
         orlist += ("spaces" $in okspaces.map(x => new ObjectId(x.spaceId.stringify)))
       }
