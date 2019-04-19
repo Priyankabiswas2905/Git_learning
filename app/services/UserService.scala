@@ -215,6 +215,11 @@ trait UserService  {
   def updateRole(role: Role)
 
   /**
+    * Get spaceAndRole with permissions
+    */
+  def getUserSpaceAndRoleWithPermissions(user: User) : List[UserSpaceAndRole]
+
+  /**
    * Follow a file.
    */
   def followResource(followerId: UUID, resourceRef: ResourceRef)

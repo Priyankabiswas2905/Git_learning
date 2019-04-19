@@ -282,7 +282,8 @@ class MongoDBUserService @Inject() (
    */
   def addUserToSpace(userId: UUID, role: Role, spaceId: UUID): Unit = {
       Logger.debug("add user to space")
-      val spaceData = UserSpaceAndRole(spaceId, role)
+      val userRole = new Role(role.id, role.name,role.description)
+      val spaceData = UserSpaceAndRole(spaceId, userRole)
       val result = UserDAO.dao.update(MongoDBObject("_id" -> new ObjectId(userId.stringify)), $push("spaceandrole" -> UserSpaceAndRoleData.toDBObject(spaceData)));
   }
 
@@ -324,8 +325,13 @@ class MongoDBUserService @Inject() (
               for (aSpaceAndRole <- aUser.spaceandrole) {
                   if (!found) {
                       if (aSpaceAndRole.spaceId == spaceId) {
-                          retRole = Some(aSpaceAndRole.role)
-                          found = true
+                        findRoleByName(aSpaceAndRole.role.name) match {
+                          case Some(role) => {
+                            retRole = Some(role)
+                            found = true
+                          }
+                          case None => Logger.debug("No role with that name")
+                        }
                       }
                   }
               }
@@ -464,8 +470,10 @@ class MongoDBUserService @Inject() (
                       case None => UUID("")
                     }
 
-                    if (roleid == role.id)
-                      changeUserRoleInSpace(userid, role, spaceid)
+                    if (roleid == role.id) {
+                      val newUserRole = new Role(role.id, role.name, role.description)
+                      changeUserRoleInSpace(userid, newUserRole, spaceid)
+                    }
                   }
                   case None => {}
                 }
@@ -478,6 +486,22 @@ class MongoDBUserService @Inject() (
       }
     }
   }
+
+  def getUserSpaceAndRoleWithPermissions(user: User) : List[UserSpaceAndRole] = {
+    var userSpaceAndRoleWithPermissions: ListBuffer[UserSpaceAndRole] = ListBuffer.empty[UserSpaceAndRole]
+
+    for (spaceRole <- user.spaceandrole) {
+      findRoleByName(spaceRole.role.name) match {
+        case Some(role) => {
+          val spaceRoleWithPermissions = UserSpaceAndRole(spaceRole.spaceId, role)
+          userSpaceAndRoleWithPermissions += spaceRoleWithPermissions
+        }
+        case None =>
+      }
+    }
+    userSpaceAndRoleWithPermissions.toList
+  }
+
 
   override def acceptTermsOfServices(id: UUID): Unit = {
     UserDAO.dao.update(MongoDBObject("_id" -> new ObjectId(id.stringify)),
