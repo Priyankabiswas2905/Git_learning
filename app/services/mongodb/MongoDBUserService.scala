@@ -23,6 +23,7 @@ import securesocial.core.providers.Token
 import services._
 import services.mongodb.MongoContext.context
 import _root_.util.Direction._
+import api.Permission.Permission
 import javax.inject.Inject
 
 /**
@@ -340,6 +341,31 @@ class MongoDBUserService @Inject() (
       }
 
       retRole
+  }
+
+  def getUserPermissionsInSpace(userId: UUID, spaceId: UUID) : List[String] = {
+    var userPermissionsForSpace : ListBuffer[String] = ListBuffer.empty[String]
+    var found = false
+
+    findById(userId) match {
+      case Some(aUser) => {
+        for (aSpaceAndRole <- aUser.spaceandrole) {
+          if (!found) {
+            if (aSpaceAndRole.spaceId == spaceId) {
+              findRoleByName(aSpaceAndRole.role.name) match {
+                case Some(role) => {
+                  userPermissionsForSpace ++= role.permissions.toList
+                }
+                case None => Logger.debug("No role with that name")
+              }
+            }
+          }
+        }
+      }
+      case None => Logger.debug("No user found for getRoleInSpace")
+    }
+    userPermissionsForSpace.toList
+
   }
 
   /**
