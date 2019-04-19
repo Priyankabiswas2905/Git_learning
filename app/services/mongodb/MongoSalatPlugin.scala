@@ -315,6 +315,8 @@ class MongoSalatPlugin(app: Application) extends Plugin {
   // ----------------------------------------------------------------------
   def updateDatabase() {
 
+    updateMongo("remove-permissions-userspacerole",removePermissionsFromUserSpaceAndRole)
+
     //add trash field dataset
     updateMongo("add-trash-dataset", addDateMovedToTrashDatasets)
 
@@ -1642,6 +1644,27 @@ class MongoSalatPlugin(app: Application) extends Plugin {
       }
       user.put("spaceandrole", userSpaceRoles)
       collection("social.users").save(user, WriteConcern.Safe)
+    }
+  }
+
+  private def removePermissionsFromUserSpaceAndRole() {
+    collection("social.users").foreach { user =>
+      val spaceandroles = user.getAsOrElse[MongoDBList]("spaceandrole", MongoDBList.empty)
+      val newRoles = MongoDBList.empty
+      spaceandroles.foreach { spaceandrole =>
+        val tempSpaceandRole = spaceandrole.asInstanceOf[BasicDBObject]
+        val tempRole = tempSpaceandRole.get("role").asInstanceOf[BasicDBObject]
+        tempRole.put("permissions",MongoDBList.empty)
+        newRoles += tempRole
+
+
+      }
+      user.put("spaceandrole", newRoles)
+      try {
+        collection("social.users").save(user, WriteConcern.Safe)
+      } catch {
+        case e: BSONException => Logger.error("Unable to update spaces for user with id:" + user.getAsOrElse("_id", new ObjectId()).toString())
+      }
     }
   }
 

@@ -271,7 +271,7 @@ class MongoDBDatasetService @Inject() (
 
     orlist += MongoDBObject("status" -> DatasetStatus.PUBLIC.toString)
     orlist += MongoDBObject("spaces" -> List.empty) ++ MongoDBObject("author._id" -> new ObjectId(user.id.stringify))
-    val okspaces = user.spaceandrole.filter(_.role.permissions.intersect(Set(Permission.ViewDataset.toString)).nonEmpty)
+    val okspaces = userService.getUserSpaceAndRoleWithPermissions(user).filter(_.role.permissions.intersect(Set(Permission.ViewDataset.toString)).nonEmpty)
     if (okspaces.nonEmpty) {
       orlist += ("spaces" $in okspaces.map(x => new ObjectId(x.spaceId.stringify)))
     }
@@ -380,7 +380,7 @@ class MongoDBDatasetService @Inject() (
           }
           val permissionsString = permissions.map(_.toString)
           val okspaces = if (showOnlyShared){
-            u.spaceandrole.filter(_.role.permissions.intersect(permissionsString).nonEmpty).filter((p: UserSpaceAndRole)=>
+            userService.getUserSpaceAndRoleWithPermissions(u).filter(_.role.permissions.intersect(permissionsString).nonEmpty).filter((p: UserSpaceAndRole)=>
               (spaces.get(p.spaceId) match {
                 case Some(space) => {
                   if (space.userCount > 1){
@@ -393,7 +393,7 @@ class MongoDBDatasetService @Inject() (
               })
             )
           } else {
-            u.spaceandrole.filter(_.role.permissions.intersect(permissionsString).nonEmpty)
+            userService.getUserSpaceAndRoleWithPermissions(u).filter(_.role.permissions.intersect(permissionsString).nonEmpty)
           }
           if (okspaces.nonEmpty) {
             orlist += ("spaces" $in okspaces.map(x => new ObjectId(x.spaceId.stringify)))

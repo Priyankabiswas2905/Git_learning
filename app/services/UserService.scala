@@ -1,5 +1,6 @@
 package services
 
+import api.Permission.Permission
 import models._
 import securesocial.core.{Identity, IdentityId}
 import util.Direction
@@ -174,6 +175,17 @@ trait UserService  {
    * 
    */
   def getUserRoleInSpace(userId: UUID, spaceId: UUID): Option[Role]
+
+  /**
+    * Retrieve the permissions that a user has for a specific space.
+    *
+    * @param userId The identifier of the user to retrieve
+    * @param spaceId The identifier of the space to get the role for
+    *
+    * @return The permissions that the user has associated with the space specified
+    *
+    */
+  def getUserPermissionsInSpace(userId: UUID, spaceId: UUID) : List[String]
   
   /**
    * List the users that are associated with a specific space.
@@ -213,6 +225,11 @@ trait UserService  {
    * Update role
    */
   def updateRole(role: Role)
+
+  /**
+    * Get spaceAndRole with permissions
+    */
+  def getUserSpaceAndRoleWithPermissions(user: User) : List[UserSpaceAndRole]
 
   /**
    * Follow a file.
