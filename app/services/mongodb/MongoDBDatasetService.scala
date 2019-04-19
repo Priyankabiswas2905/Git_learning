@@ -683,7 +683,7 @@ class MongoDBDatasetService @Inject() (
         case Some(u)  => {
           orlist += MongoDBObject("status" -> DatasetStatus.PUBLIC.toString )
           orlist += MongoDBObject("spaces" -> List.empty) ++ MongoDBObject("author._id" -> new ObjectId(u.id.stringify))
-          val okspaces = u.spaceandrole.filter(_.role.permissions.intersect(Set(Permission.ViewDataset.toString)).nonEmpty)
+          val okspaces = userService.getUserSpaceAndRoleWithPermissions(u).filter(_.role.permissions.intersect(Set(Permission.ViewDataset.toString)).nonEmpty)
           if(okspaces.nonEmpty){
             orlist += ("spaces" $in okspaces.map(x => new ObjectId(x.spaceId.stringify)))
           }
