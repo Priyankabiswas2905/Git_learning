@@ -1654,15 +1654,12 @@ class MongoSalatPlugin(app: Application) extends Plugin {
       userSpaceRoles.foreach{ userSpaceRole =>
         val tempUserSpaceRole = userSpaceRole.asInstanceOf[BasicDBObject]
         val tempRole = tempUserSpaceRole.get("role").asInstanceOf[BasicDBObject]
-        val roleInDb = collection("roles").findOne(MongoDBObject("name" -> tempRole.get("name")))
+        val roleInDb = collection("roles").findOne(MongoDBObject("name" -> tempRole.get("name"))).getOrElse(None)
 
-        val roleInDbAsObject = roleInDb.getOrElse(None)
+        if (roleInDb != None){
+          tempUserSpaceRole.put("role",roleInDb)
 
-        val name = roleInDb.get("name")
-        tempUserSpaceRole.put("role",roleInDbAsObject)
-        // change id
-        // change permissions
-
+        }
       }
       user.put("spaceandrole", userSpaceRoles)
       collection("social.users").save(user, WriteConcern.Safe)
