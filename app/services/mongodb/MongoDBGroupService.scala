@@ -195,14 +195,7 @@ class MongoDBGroupService @Inject() (
         for (group <- userGroups){
           for (aSpaceRole <- group.spaceandrole){
             if (aSpaceRole.spaceId == spaceId){
-              // TODO get role here from service, don't use user space and role
-              userService.findRoleByName(aSpaceRole.role.name) match {
-                case Some(role) => {
-                  retRoles += role
-
-                }
-                case None => Logger.info("Role does not exist")
-              }
+              retRoles += aSpaceRole.role
             }
           }
         }
