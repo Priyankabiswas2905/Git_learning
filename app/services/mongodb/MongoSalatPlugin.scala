@@ -315,6 +315,8 @@ class MongoSalatPlugin(app: Application) extends Plugin {
   // ----------------------------------------------------------------------
   def updateDatabase() {
 
+    updateMongo("update-all-roles", updateAllRolesInUserSpaceRole)
+
     //add trash field dataset
     updateMongo("add-trash-dataset", addDateMovedToTrashDatasets)
 
@@ -1639,6 +1641,28 @@ class MongoSalatPlugin(app: Application) extends Plugin {
         if(tempRole.get("name") == "Editor") {
           tempRole.put("permissions", Permission.EDITOR_PERMISSIONS.map(_.toString).toSet)
         }
+      }
+      user.put("spaceandrole", userSpaceRoles)
+      collection("social.users").save(user, WriteConcern.Safe)
+    }
+  }
+
+
+  private def updateAllRolesInUserSpaceRole(): Unit = {
+    collection("social.users").foreach{user =>
+      val userSpaceRoles = user.getAsOrElse[MongoDBList]("spaceandrole", MongoDBList.empty)
+      userSpaceRoles.foreach{ userSpaceRole =>
+        val tempUserSpaceRole = userSpaceRole.asInstanceOf[BasicDBObject]
+        val tempRole = tempUserSpaceRole.get("role").asInstanceOf[BasicDBObject]
+        val roleInDb = collection("roles").findOne(MongoDBObject("name" -> tempRole.get("name")))
+
+        val roleInDbAsObject = roleInDb.getOrElse(None)
+
+        val name = roleInDb.get("name")
+        tempUserSpaceRole.put("role",roleInDbAsObject)
+        // change id
+        // change permissions
+
       }
       user.put("spaceandrole", userSpaceRoles)
       collection("social.users").save(user, WriteConcern.Safe)
