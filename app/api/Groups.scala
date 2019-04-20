@@ -191,15 +191,13 @@ class Groups @Inject() (
                       // we now have the roles the group has for the space
                       users.findRoleByName(newrole) match {
                         case Some(role) => {
-                          val miniRole = new MiniRole(role.id,role.name,role.description)
-                          val basicRole = new Role(role.id,role.name,role.description)
-                          if (existingRolesForSpace.toList.contains(basicRole)){
+                          if (existingRolesForSpace.toList.contains(role)){
                             Ok(toJson("already has that role in space"))
                           } else if (existingRolesForSpace.toList.size > 0 && !existingRolesForSpace.toList.contains(role)){
-                            groups.changeGroupRoleInSpace(id, basicRole, spaceId)
+                            groups.changeGroupRoleInSpace(id, role, spaceId)
                             Ok(toJson("changing role"))
                           } else {
-                            groups.addGroupToSpace(id, basicRole, spaceId)
+                            groups.addGroupToSpace(id, role, spaceId)
                             Ok(toJson("adding role"))
                           }
                         }

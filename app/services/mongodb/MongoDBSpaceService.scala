@@ -173,11 +173,9 @@ class MongoDBSpaceService @Inject() (
           user match {
             case Some(u) => {
               if(showPublic) {
-                // author ++ $or(statusFilter, ("_id" $in u.spaceandrole.filter(_.role.permissions.intersect(permissions.map(_.toString)).nonEmpty).map(x => new ObjectId(x.spaceId.stringify))))
-                author ++ $or(statusFilter, ("_id" $in users.getUserSpaceAndRoleWithPermissionsIncludingGroup(u).filter(_.role.permissions.intersect(permissions.map(_.toString)).nonEmpty).map(x => new ObjectId(x.spaceId.stringify))))
-
+                author ++ $or(statusFilter, ("_id" $in u.spaceandrole.filter(_.role.permissions.intersect(permissions.map(_.toString)).nonEmpty).map(x => new ObjectId(x.spaceId.stringify))))
               } else {
-                author ++ $or(("_id" $in users.getUserSpaceAndRoleWithPermissionsIncludingGroup(u).filter(_.role.permissions.intersect(permissions.map(_.toString)).nonEmpty).map(x => new ObjectId(x.spaceId.stringify))))
+                author ++ $or(("_id" $in u.spaceandrole.filter(_.role.permissions.intersect(permissions.map(_.toString)).nonEmpty).map(x => new ObjectId(x.spaceId.stringify))))
               }
 
             }
@@ -205,7 +203,7 @@ class MongoDBSpaceService @Inject() (
               else if (u.superAdminMode) {
                 MongoDBObject()
               } else if (permissions.contains(Permission.ViewSpace) && play.Play.application().configuration().getBoolean("enablePublic") && showPublic && showOnlyShared) {
-                $or(author, statusFilter, ("_id" $in users.getUserSpaceAndRoleWithPermissionsIncludingGroup(u).filter(_.role.permissions.intersect(permissions.map(_.toString)).nonEmpty).filter((p: UserSpaceAndRole) =>
+                $or(author, statusFilter, ("_id" $in u.spaceandrole.filter(_.role.permissions.intersect(permissions.map(_.toString)).nonEmpty).filter((p: UserSpaceAndRole) =>
                   get(p.spaceId) match {
                     case Some(space) => {
                       if (space.userCount > 1) {
@@ -218,9 +216,9 @@ class MongoDBSpaceService @Inject() (
                   }
                 ).map(x => new ObjectId(x.spaceId.stringify))))
               } else if (permissions.contains(Permission.ViewSpace) && play.Play.application().configuration().getBoolean("enablePublic") && showPublic) {
-                $or(author, statusFilter,  ("_id" $in users.getUserSpaceAndRoleWithPermissionsIncludingGroup(u).filter(_.role.permissions.intersect(permissions.map(_.toString)).nonEmpty).map(x => new ObjectId(x.spaceId.stringify))))
+                $or(author, statusFilter,  ("_id" $in u.spaceandrole.filter(_.role.permissions.intersect(permissions.map(_.toString)).nonEmpty).map(x => new ObjectId(x.spaceId.stringify))))
               } else {
-                $or(author, ("_id" $in users.getUserSpaceAndRoleWithPermissionsIncludingGroup(u).filter(_.role.permissions.intersect(permissions.map(_.toString)).nonEmpty).map(x => new ObjectId(x.spaceId.stringify))))
+                $or(author, ("_id" $in u.spaceandrole.filter(_.role.permissions.intersect(permissions.map(_.toString)).nonEmpty).map(x => new ObjectId(x.spaceId.stringify))))
 
               }
             }

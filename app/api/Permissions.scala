@@ -407,22 +407,11 @@ object Permission extends Enumeration {
           case None => false
           case Some(space) => {
             if (space.isPublic && READONLY.contains(permission)) return true
-
-            var hasPermissionWithGroups : Option[Boolean] = Some(false)
-            getUserByIdentity(user) match {
-              case Some(clowderUser) => {
-                val allUserRoles = users.getAllUserRolesInSpaceIncludingGroups(clowderUser.id, space.id)
-                for (role <- allUserRoles){
-                  if (role.permissions.contains(permission.toString)){
-                    hasPermissionWithGroups = Some(true)
-                  }
-                }
-
-              }
-              case None =>
-            }
-
-            hasPermissionWithGroups.getOrElse(false)
+            val hasPermission: Option[Boolean] = for {clowderUser <- getUserByIdentity(user)
+                                                      role <- users.getUserRoleInSpace(clowderUser.id, space.id)
+                                                      if role.permissions.contains(permission.toString)
+            } yield true
+            hasPermission getOrElse(false)
           }
         }
       }
