@@ -480,39 +480,38 @@ class MongoDBUserService @Inject() (
     }
   }
 
-  def getUserSpaceAndRoleWithPermissions(user: User) : List[UserSpaceAndRole] = {
-    var userSpaceAndRole: ListBuffer[UserSpaceAndRole] = ListBuffer.empty[UserSpaceAndRole]
+  def getUserSpaceAndRoleIncludingGroups(user: User) : List[UserSpaceAndRole] = {
+    var userSpaceAndRoleIncludingGroups: ListBuffer[UserSpaceAndRole] = ListBuffer.empty[UserSpaceAndRole]
 
-    userSpaceAndRole.toList
+    userSpaceAndRoleIncludingGroups ++= user.spaceandrole
+
+    val groupsOfUser = groups.listMember(user.id)
+    for (group <- groupsOfUser){
+      userSpaceAndRoleIncludingGroups ++= group.spaceandrole
+    }
+
+    userSpaceAndRoleIncludingGroups.toList
   }
 
-  def getUserSpaceAndRoleWithPermissionsIncludingGroup(user: User) : List[UserSpaceAndRole] = {
-    var userSpaceAndRoleWithPermissions : ListBuffer[UserSpaceAndRole] = ListBuffer.empty[UserSpaceAndRole]
+  def getUserRolesInSpaceIncludingGroups(user: User, spaceId: UUID) : List[Role] = {
+    var userRolesInSpaceIncludingGroups : ListBuffer[Role] = ListBuffer.empty[Role]
 
-    for (spaceRole <- user.spaceandrole) {
-      findRoleByName(spaceRole.role.name) match {
-        case Some(role) => {
-          val spaceRoleWithPermissions = UserSpaceAndRole(spaceRole.spaceId, role)
-          userSpaceAndRoleWithPermissions += spaceRoleWithPermissions
-        }
-        case None =>
+    for (aSpaceRole <- user.spaceandrole){
+      if (aSpaceRole.spaceId == spaceId) {
+        userRolesInSpaceIncludingGroups += aSpaceRole.role
       }
     }
 
     val groupsOfUser = groups.listMember(user.id)
     for (group <- groupsOfUser){
       for (gSpaceRole <- group.spaceandrole){
-        findRoleByName(gSpaceRole.role.name) match {
-          case Some(role) => {
-            val spaceRoleWithPermissions = UserSpaceAndRole(gSpaceRole.spaceId, role)
-            userSpaceAndRoleWithPermissions += spaceRoleWithPermissions
-          }
-          case None =>
-        }
+       if (gSpaceRole.spaceId == spaceId){
+         userRolesInSpaceIncludingGroups += gSpaceRole.role
+       }
       }
     }
 
-    userSpaceAndRoleWithPermissions.toList
+    userRolesInSpaceIncludingGroups.toList
   }
 
   override def acceptTermsOfServices(id: UUID): Unit = {

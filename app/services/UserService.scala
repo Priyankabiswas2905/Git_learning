@@ -214,10 +214,9 @@ trait UserService  {
    */
   def updateRole(role: Role)
 
+  def getUserSpaceAndRoleIncludingGroups(user: User) : List[UserSpaceAndRole]
 
-  def getUserSpaceAndRoleWithPermissions(user: User) : List[UserSpaceAndRole]
-
-  def getUserSpaceAndRoleWithPermissionsIncludingGroup(user: User) : List[UserSpaceAndRole]
+  def getUserRolesInSpaceIncludingGroups(user: User, spaceId: UUID) : List[Role]
 
   /**
    * Follow a file.
