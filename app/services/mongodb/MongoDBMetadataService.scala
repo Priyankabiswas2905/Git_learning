@@ -13,7 +13,7 @@ import play.api.libs.json.JsValue
 import javax.inject.{Inject, Singleton}
 import com.mongodb.casbah.commons.TypeImports.ObjectId
 import com.mongodb.casbah.WriteConcern
-import services.{ContextLDService, CurationService, DatasetService, ElasticsearchPlugin, ExtractorMessage, FileService, FolderService, MetadataService, RabbitmqPlugin}
+import services._
 import api.{Permission, UserRequest}
 import controllers.Utils
 
@@ -22,7 +22,7 @@ import controllers.Utils
  */
 @Singleton
 class MongoDBMetadataService @Inject() (contextService: ContextLDService, datasets: DatasetService, files: FileService,
-  folders: FolderService, curations: CurationService) extends MetadataService {
+  folders: FolderService, curations: CurationService, users: UserService) extends MetadataService {
 
   /**
    * Add metadata to the metadata collection and attach to a section /file/dataset/collection
@@ -212,7 +212,7 @@ class MongoDBMetadataService @Inject() (contextService: ContextLDService, datase
       //TODO: Add public space check.
       user match {
         case Some(u) => {
-          val okspaces = u.spaceandrole.filter(_.role.permissions.intersect(Set(Permission.ViewMetadata.toString())).nonEmpty)
+          val okspaces = (u.spaceandrole ++ users.getUserSpaceAndRoleIncludingGroups(u)).filter(_.role.permissions.intersect(Set(Permission.ViewMetadata.toString())).nonEmpty)
           if(okspaces.nonEmpty) {
             orlist += ("spaceId" $in okspaces.map(x=> new ObjectId(x.spaceId.stringify)))
           }
