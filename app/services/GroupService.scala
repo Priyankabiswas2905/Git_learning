@@ -34,6 +34,8 @@ trait GroupService {
 
   def listGroupsInSpace(spaceId: UUID) : List[Group]
 
+  def getUserGroupSpaceAndRole(userId: UUID, groupId: UUID) : List[UserSpaceAndRole]
+
   def listAllGroups() : List[Group]
 
   def listCreator(creatorId: UUID) : List[Group]

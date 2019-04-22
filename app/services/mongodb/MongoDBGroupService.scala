@@ -167,6 +167,24 @@ class MongoDBGroupService @Inject() (
     retList.toList
   }
 
+  def getUserGroupSpaceAndRole(userId: UUID, groupId: UUID) : List[UserSpaceAndRole] = {
+    var groupspaceandrole : ListBuffer[UserSpaceAndRole] = ListBuffer.empty[UserSpaceAndRole]
+
+    userService.get(userId) match {
+      case Some(user) => {
+        Group.findOneById(new ObjectId(groupId.stringify)) match {
+          case Some(group) => {
+            groupspaceandrole ++= group.spaceandrole
+          }
+          case None => Logger.info("No group found with id")
+
+        }
+      }
+      case None => Logger.info("No user found with id")
+    }
+    groupspaceandrole.toList
+  }
+
   def getGroupRoleInSpace(groupId: UUID, spaceId: UUID): List[Role] = {
 
     var retRoles: ListBuffer[Role] = ListBuffer.empty[Role]
