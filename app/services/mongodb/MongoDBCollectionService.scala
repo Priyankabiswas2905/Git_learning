@@ -262,7 +262,7 @@ class MongoDBCollectionService @Inject() (
           }
           val permissionsString = permissions.map(_.toString)
           val okspaces = if (showOnlyShared){
-            u.spaceandrole.filter(_.role.permissions.intersect(permissionsString).nonEmpty).filter((p: UserSpaceAndRole)=>
+            (u.spaceandrole ++ userService.getUserSpaceAndRoleIncludingGroups(u)).filter(_.role.permissions.intersect(permissionsString).nonEmpty).filter((p: UserSpaceAndRole)=>
               (spaces.get(p.spaceId) match {
                 case Some(space) => {
                   if (space.userCount > 1){
@@ -275,7 +275,7 @@ class MongoDBCollectionService @Inject() (
               })
             )
           } else {
-            u.spaceandrole.filter(_.role.permissions.intersect(permissionsString).nonEmpty)
+            (u.spaceandrole ++ userService.getUserSpaceAndRoleIncludingGroups(u)).filter(_.role.permissions.intersect(permissionsString).nonEmpty)
           }
           if (okspaces.nonEmpty) {
             orlist += ("spaces" $in okspaces.map(x => new ObjectId(x.spaceId.stringify)))
@@ -317,7 +317,7 @@ class MongoDBCollectionService @Inject() (
                   val permissionsString = permissions.map(_.toString)
                   val orlistB = collection.mutable.ListBuffer.empty[MongoDBObject]
 
-                  val okspaces = u.spaceandrole.filter(_.role.permissions.intersect(permissionsString).nonEmpty)
+                  val okspaces = (u.spaceandrole ++ userService.getUserSpaceAndRoleIncludingGroups(u)).filter(_.role.permissions.intersect(permissionsString).nonEmpty)
                   if (okspaces.nonEmpty) {
                     if(enablePublic && showPublic) {
                       orlistB += ("spaces" $in okspaces.map(x => new ObjectId(x.spaceId.stringify)) ++ publicSpaces)
