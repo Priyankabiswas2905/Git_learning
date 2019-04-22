@@ -337,31 +337,6 @@ class MongoDBUserService @Inject() (
       retRole
   }
 
-  def getAllUserRolesInSpaceIncludingGroups(userId: UUID, spaceId: UUID) : List[Role] = {
-    var allUserRoles: ListBuffer[Role] = ListBuffer.empty[Role]
-
-    findById(userId) match {
-      case Some(aUser) => {
-        var found = false
-        for (aSpaceAndRole <- aUser.spaceandrole) {
-          if (!found) {
-            if (aSpaceAndRole.spaceId == spaceId) {
-              allUserRoles += aSpaceAndRole.role
-            }
-          }
-        }
-        val groupRolesOfUser = groups.getUserGroupRolesInSpace(userId, spaceId)
-        allUserRoles ++= groupRolesOfUser
-      }
-      case None => {
-        Logger.debug("No user found for getRoleInSpace")
-      }
-
-    }
-
-    allUserRoles.toList
-  }
-
   /**
    * @see app.services.UserService
    *

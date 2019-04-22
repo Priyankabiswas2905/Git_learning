@@ -175,8 +175,6 @@ trait UserService  {
    */
   def getUserRoleInSpace(userId: UUID, spaceId: UUID): Option[Role]
 
-  def getAllUserRolesInSpaceIncludingGroups(userId: UUID, spaceId: UUID) : List[Role]
-  
   /**
    * List the users that are associated with a specific space.
    * 

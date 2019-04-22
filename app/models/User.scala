@@ -27,7 +27,6 @@ trait User extends Identity {
   def followers: List[UUID]
   def viewed: Option[List[UUID]]
   def spaceandrole: List[UserSpaceAndRole]
-  def groupspaceandrole: List[GroupSpaceAndRole]
   def repositoryPreferences: Map[String,Any]
   def termsOfServices: Option[UserTermsOfServices]
   def lastLogin: Option[Date]
