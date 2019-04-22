@@ -318,7 +318,7 @@ object Permission extends Enumeration {
             if ((dataset.isPublic || (dataset.isDefault && dataset.spaces.find(sid => spaces.get(sid).exists(_.isPublic)).nonEmpty))
               && READONLY.contains(permission)) return true
             dataset.spaces.map{
-              spaceId => for(role <- users.getUserRoleInSpace(clowderUser.id, spaceId)) {
+              spaceId => for(role <- users.getUserRolesInSpaceIncludingGroups(clowderUser, spaceId)) {
                 if(role.permissions.contains(permission.toString))
                   return true
               }
@@ -329,7 +329,7 @@ object Permission extends Enumeration {
               if ((dataset.isPublic || (dataset.isDefault && dataset.spaces.find(sid => spaces.get(sid).exists(_.isPublic)).nonEmpty))
                 && READONLY.contains(permission)) return true
               dataset.spaces.map {
-                spaceId => for(role <- users.getUserRoleInSpace(clowderUser.id, spaceId)) {
+                spaceId => for(role <- users.getUserRolesInSpaceIncludingGroups(clowderUser, spaceId)) {
                   if(role.permissions.contains(permission.toString))
                     return true
                 }
@@ -347,7 +347,7 @@ object Permission extends Enumeration {
               if (permission.equals(Permission.DeleteDataset)){
                 for (clowderUser <- getUserByIdentity(user)) {
                   dataset.spaces.map {
-                    spaceId => for (role <- users.getUserRoleInSpace(clowderUser.id, spaceId)) {
+                    spaceId => for (role <- users.getUserRolesInSpaceIncludingGroups(clowderUser, spaceId)) {
                       if (role.permissions.contains(permission.toString))
                         return true
                     }
@@ -359,7 +359,7 @@ object Permission extends Enumeration {
                 && READONLY.contains(permission)) return true
               for (clowderUser <- getUserByIdentity(user)) {
                 dataset.spaces.map {
-                  spaceId => for (role <- users.getUserRoleInSpace(clowderUser.id, spaceId)) {
+                  spaceId => for (role <- users.getUserRolesInSpaceIncludingGroups(clowderUser, spaceId)) {
                     if (role.permissions.contains(permission.toString))
                       return true
                   }
@@ -379,7 +379,7 @@ object Permission extends Enumeration {
                 for (clowderUser <- getUserByIdentity(user)) {
                   collection.spaces.map {
                     spaceId =>
-                      for (role <- users.getUserRoleInSpace(clowderUser.id, spaceId)) {
+                      for (role <- users.getUserRolesInSpaceIncludingGroups(clowderUser, spaceId)) {
                         if (role.permissions.contains(permission.toString))
                           return true
                       }
@@ -391,7 +391,7 @@ object Permission extends Enumeration {
                 && READONLY.contains(permission)) return true
               for (clowderUser <- getUserByIdentity(user)) {
                 collection.spaces.map {
-                  spaceId => for (role <- users.getUserRoleInSpace(clowderUser.id, spaceId)) {
+                  spaceId => for (role <- users.getUserRolesInSpaceIncludingGroups(clowderUser, spaceId)) {
                     if (role.permissions.contains(permission.toString))
                       return true
                   }
@@ -407,11 +407,14 @@ object Permission extends Enumeration {
           case None => false
           case Some(space) => {
             if (space.isPublic && READONLY.contains(permission)) return true
-            val hasPermission: Option[Boolean] = for {clowderUser <- getUserByIdentity(user)
-                                                      role <- users.getUserRoleInSpace(clowderUser.id, space.id)
-                                                      if role.permissions.contains(permission.toString)
-            } yield true
-            hasPermission getOrElse(false)
+            var hasPermission: Option[Boolean] = None
+            val clowderUser = getUserByIdentity(user)
+            for (role <- users.getUserRolesInSpaceIncludingGroups(clowderUser.get, space.id)){
+              if (role.permissions.contains(permission.toString)){}
+              hasPermission = Some(true)
+            }
+
+            hasPermission.getOrElse(false)
           }
         }
       }
