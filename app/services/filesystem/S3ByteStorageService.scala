@@ -1,6 +1,7 @@
 package services.filesystem
 
 import java.io.{File, FileOutputStream, IOException, InputStream}
+import java.util.UUID
 
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, BasicAWSCredentials}
 import com.amazonaws.client.builder.AwsClientBuilder
@@ -82,10 +83,11 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
             val clientConfiguration = new ClientConfiguration
             clientConfiguration.setSignerOverride("AWSS3V4SignerType")
 
-            Logger.info("Created S3 Client for " + serviceEndpoint)
+            Logger.debug("Created S3 Client for " + serviceEndpoint)
 
             return Option(AmazonS3ClientBuilder.standard()
               // NOTE: Region is ignored for MinIO case?
+              // TODO: Allow user to set region for AWS case?
               .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(serviceEndpoint, Regions.US_EAST_1.name()))
               .withPathStyleAccessEnabled(true)
               .withClientConfiguration(clientConfiguration)
@@ -95,32 +97,9 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
         }
       }
     }
-  }
 
-  def handleIOE(err: IOException) = {
-    Logger.error("IOException occurred in the S3ByteStorageService: " + err)
-  }
-
-  def handleUnknownError(err: Exception = null) = {
-    if (err != null) {
-      Logger.error("An unknown error occurred in the S3ByteStorageService: " + err.toString())
-    } else {
-      Logger.error("An unknown error occurred in the S3ByteStorageService.")
-    }
-  }
-
-  def handleACE(ace: AmazonClientException) = {
-    Logger.error("Caught an AmazonClientException, which " + "means the client encountered " + "an internal error while trying to " + "communicate with S3, " + "such as not being able to access the network.")
-    Logger.error("Error Message: " + ace.getMessage)
-  }
-
-  def handleASE(ase: AmazonServiceException) = {
-    Logger.error("Caught an AmazonServiceException, which " + "means your request made it " + "to Amazon S3, but was rejected with an error response" + " for some reason.")
-    Logger.error("Error Message:    " + ase.getMessage)
-    Logger.error("HTTP Status Code: " + ase.getStatusCode)
-    Logger.error("AWS Error Code:   " + ase.getErrorCode)
-    Logger.error("Error Type:       " + ase.getErrorType)
-    Logger.error("Request ID:       " + ase.getRequestId)
+    // Return None (in case of failure)
+    None
   }
 
   /**
@@ -139,20 +118,22 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
           val tmpFile = saveToTmpFile(inputStream)
           try {
 
-            Logger.info("Saving file to: /" + bucketName)
+            Logger.debug("Saving file to: /" + bucketName)
 
             // TODO: How to build up a unique path based on the file/uploader?
-            val targetPath = "testing"
+            val targetPath = UUID.randomUUID().toString
 
             // Upload temp file to S3 bucket
             client.putObject(new PutObjectRequest(bucketName, targetPath, tmpFile))
 
-            Logger.info("File saved to: /" + bucketName + "/" + targetPath)
+            Logger.debug("File saved to: /" + bucketName + "/" + targetPath)
+
+            val length = tmpFile.length()
 
             // Clean-up temp file
             tmpFile.delete()
 
-            return Option(targetPath, 1234)
+            return Option((targetPath, length))
 
             // TODO: Verify transfered bytes with MD5?
           } catch {
@@ -162,18 +143,20 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
             case _: Throwable => handleUnknownError(_)
           }
 
-          // Clean-up temp file
+          // Clean-up temp file (in case of failure)
           tmpFile.delete()
         }
       }
     }
+
+    // Return None (in case of failure)
     None
   }
 
   /**
     * Given a path, retrieve the bytes located at that path inside the configured S3 bucket.
     *
-    * @param path the path of the file to load
+    * @param path    the path of the file to load from the bucket
     * @param ignored unused parameter in this context
     * @return
     */
@@ -183,7 +166,7 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
       case Some(client) => Play.current.configuration.getString(S3ByteStorageService.BucketName) match {
         case None => Logger.error("Failed fetching bytes: failed to find configured S3 bucketName.")
         case Some(bucketName) => {
-          Logger.info("Loading file from: /" + bucketName + "/" + path)
+          Logger.debug("Loading file from: /" + bucketName + "/" + path)
           try {
             // Download object from S3 bucket
             val rangeObjectRequest = new GetObjectRequest(bucketName, path)
@@ -199,6 +182,8 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
         }
       }
     }
+
+    // Return None (in case of failure)
     None
   }
 
@@ -216,12 +201,12 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
         case None => Logger.error("Failed deleting bytes: failed to find configured S3 bucketName.")
         case Some(bucketName) => {
           // delete the bytes
-          Logger.info("Removing file at: /" + bucketName + "/" + path)
+          Logger.debug("Removing file at: /" + bucketName + "/" + path)
           try {
             // Delete object from S3 bucket
             client.deleteObject(bucketName, path)
 
-            // TODO: Perform a GET to verify deletion??
+            // TODO: Perform an additional GET to verify deletion?
 
             return true
           } catch {
@@ -230,10 +215,38 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
             case ioe: IOException => handleIOE(ioe)
             case _: Throwable => handleUnknownError(_)
           }
-          return false
         }
       }
     }
+
+    // Return false (in case of failure)
     return false
+  }
+
+  /* Reusable handlers for various Exception types */
+  def handleUnknownError(err: Exception = null) = {
+    if (err != null) {
+      Logger.error("An unknown error occurred in the S3ByteStorageService: " + err.toString)
+    } else {
+      Logger.error("An unknown error occurred in the S3ByteStorageService.")
+    }
+  }
+
+  def handleIOE(err: IOException) = {
+    Logger.error("IOException occurred in the S3ByteStorageService: " + err)
+  }
+
+  def handleACE(ace: AmazonClientException) = {
+    Logger.error("Caught an AmazonClientException, which " + "means the client encountered " + "an internal error while trying to " + "communicate with S3, " + "such as not being able to access the network.")
+    Logger.error("Error Message: " + ace.getMessage)
+  }
+
+  def handleASE(ase: AmazonServiceException) = {
+    Logger.error("Caught an AmazonServiceException, which " + "means your request made it " + "to Amazon S3, but was rejected with an error response" + " for some reason.")
+    Logger.error("Error Message:    " + ase.getMessage)
+    Logger.error("HTTP Status Code: " + ase.getStatusCode)
+    Logger.error("AWS Error Code:   " + ase.getErrorCode)
+    Logger.error("Error Type:       " + ase.getErrorType)
+    Logger.error("Request ID:       " + ase.getRequestId)
   }
 }
