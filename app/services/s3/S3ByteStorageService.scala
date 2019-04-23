@@ -1,4 +1,4 @@
-package services.filesystem
+package services.s3
 
 import java.io.{File, FileOutputStream, IOException, InputStream}
 import java.util.UUID
@@ -21,6 +21,7 @@ object S3ByteStorageService {
   val BucketName: String = "clowder.s3.bucketName"
   val AccessKey: String = "clowder.s3.accessKey"
   val SecretKey: String = "clowder.s3.secretKey"
+  val Region: String = "clowder.s3.region"
 }
 
 /**
@@ -34,16 +35,17 @@ object S3ByteStorageService {
   *    clowder.s3.bucketName - the name of the bucket that should be used to store files
   *    clowder.s3.accessKey - access key with which to access the bucket
   *    clowder.s3.secretKey - secret key associated with the access key above
+  *    clowder.s3.region - the region where your S3 bucket lives (currently unused)
   *
   *
   * @author Mike Lambert
   *
   */
 class S3ByteStorageService @Inject()() extends ByteStorageService {
-  val tmpFileAbsPath = "/tmp/tmp-s3-upload.tmp"
 
   def saveToTmpFile(inputStream: InputStream): File = {
-    val tmpFile = new File(tmpFileAbsPath)
+    val randomTmpPath = "/tmp/" + UUID.randomUUID().toString
+    val tmpFile = new File(randomTmpPath)
     try {
       // Copy the contents of our InputStream to a temp file
       val outputStream = new FileOutputStream(tmpFile)
@@ -62,44 +64,37 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
     * Grabs config parameters from Clowder to return a
     * AmazonS3 pointing at the configured service endpoint.
     */
-  def s3Bucket(): Option[AmazonS3] = {
-    Play.current.configuration.getString(S3ByteStorageService.ServiceEndpoint) match {
-      case None => {
-        Logger.error("No service endpoint provided in " + S3ByteStorageService.ServiceEndpoint)
-        throw new RuntimeException("No service endpoint provided in " + S3ByteStorageService.ServiceEndpoint)
-      }
-      case Some(serviceEndpoint) => Play.current.configuration.getString(S3ByteStorageService.AccessKey) match {
-        case None => {
-          Logger.error("No access key provided in " + S3ByteStorageService.AccessKey)
-          throw new RuntimeException("No access key provided in " + S3ByteStorageService.AccessKey)
-        }
-        case Some(accessKey) => Play.current.configuration.getString(S3ByteStorageService.SecretKey) match {
-          case None => {
-            Logger.error("No secret key provided in " + S3ByteStorageService.SecretKey)
-            throw new RuntimeException("No secret key provided in " + S3ByteStorageService.SecretKey)
-          }
-          case Some(secretKey) => {
+  def s3Bucket(): AmazonS3 = {
+    (Play.current.configuration.getString(S3ByteStorageService.ServiceEndpoint),
+      Play.current.configuration.getString(S3ByteStorageService.AccessKey),
+        Play.current.configuration.getString(S3ByteStorageService.SecretKey)) match {
+          case (Some(serviceEndpoint), Some(accessKey), Some(secretKey)) => {
             val credentials = new BasicAWSCredentials(accessKey, secretKey)
             val clientConfiguration = new ClientConfiguration
             clientConfiguration.setSignerOverride("AWSS3V4SignerType")
 
             Logger.debug("Created S3 Client for " + serviceEndpoint)
 
-            return Option(AmazonS3ClientBuilder.standard()
+            val region = Play.current.configuration.getString(S3ByteStorageService.Region) match {
+              case Some(region) => region
+              case _ => Regions.US_EAST_1.name()
+            }
+
+            return AmazonS3ClientBuilder.standard()
               // NOTE: Region is ignored for MinIO case?
               // TODO: Allow user to set region for AWS case?
-              .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(serviceEndpoint, Regions.US_EAST_1.name()))
+              .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(serviceEndpoint, region))
               .withPathStyleAccessEnabled(true)
               .withClientConfiguration(clientConfiguration)
               .withCredentials(new AWSStaticCredentialsProvider(credentials))
-              .build())
+              .build()
+          }
+          case _ => {
+            val errMsg = "Bad S3 configuration: verify that you have set all configuration options."
+            Logger.error(errMsg)
+            throw new RuntimeException(errMsg)
           }
         }
-      }
-    }
-
-    // Return None (in case of failure)
-    None
   }
 
   /**
@@ -110,42 +105,39 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
     * @return
     */
   def save(inputStream: InputStream, ignored: String): Option[(String, Long)] = {
-    this.s3Bucket() match {
-      case None => Logger.error("Failed creating s3 client.")
-      case Some(client) => Play.current.configuration.getString(S3ByteStorageService.BucketName) match {
-        case None => Logger.error("Failed deleting bytes: failed to find configured S3 bucketName.")
-        case Some(bucketName) => {
-          val tmpFile = saveToTmpFile(inputStream)
-          try {
+    Play.current.configuration.getString(S3ByteStorageService.BucketName) match {
+      case None => Logger.error("Failed deleting bytes: failed to find configured S3 bucketName.")
+      case Some(bucketName) => {
+        val tmpFile = saveToTmpFile(inputStream)
+        try {
 
-            Logger.debug("Saving file to: /" + bucketName)
+          Logger.debug("Saving file to: /" + bucketName)
 
-            // TODO: How to build up a unique path based on the file/uploader?
-            val targetPath = UUID.randomUUID().toString
+          // TODO: How to build up a unique path based on the file/uploader?
+          val targetPath = tmpFile.getName
 
-            // Upload temp file to S3 bucket
-            client.putObject(new PutObjectRequest(bucketName, targetPath, tmpFile))
+          // Upload temp file to S3 bucket
+          this.s3Bucket.putObject(new PutObjectRequest(bucketName, targetPath, tmpFile))
 
-            Logger.debug("File saved to: /" + bucketName + "/" + targetPath)
+          Logger.debug("File saved to: /" + bucketName + "/" + targetPath)
 
-            val length = tmpFile.length()
+          val length = tmpFile.length()
 
-            // Clean-up temp file
-            tmpFile.delete()
-
-            return Option((targetPath, length))
-
-            // TODO: Verify transfered bytes with MD5?
-          } catch {
-            case ase: AmazonServiceException => handleASE(ase)
-            case ace: AmazonClientException => handleACE(ace)
-            case ioe: IOException => handleIOE(ioe)
-            case _: Throwable => handleUnknownError(_)
-          }
-
-          // Clean-up temp file (in case of failure)
+          // Clean-up temp file
           tmpFile.delete()
+
+          return Option((targetPath, length))
+
+          // TODO: Verify transfered bytes with MD5?
+        } catch {
+          case ase: AmazonServiceException => handleASE(ase)
+          case ace: AmazonClientException => handleACE(ace)
+          case ioe: IOException => handleIOE(ioe)
+          case _: Throwable => handleUnknownError(_)
         }
+
+        // Clean-up temp file (in case of failure)
+        tmpFile.delete()
       }
     }
 
@@ -161,24 +153,21 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
     * @return
     */
   def load(path: String, ignored: String): Option[InputStream] = {
-    this.s3Bucket() match {
-      case None => Logger.error("Failed creating s3 client.")
-      case Some(client) => Play.current.configuration.getString(S3ByteStorageService.BucketName) match {
-        case None => Logger.error("Failed fetching bytes: failed to find configured S3 bucketName.")
-        case Some(bucketName) => {
-          Logger.debug("Loading file from: /" + bucketName + "/" + path)
-          try {
-            // Download object from S3 bucket
-            val rangeObjectRequest = new GetObjectRequest(bucketName, path)
-            val objectPortion = client.getObject(rangeObjectRequest)
+    Play.current.configuration.getString(S3ByteStorageService.BucketName) match {
+      case None => Logger.error("Failed fetching bytes: failed to find configured S3 bucketName.")
+      case Some(bucketName) => {
+        Logger.debug("Loading file from: /" + bucketName + "/" + path)
+        try {
+          // Download object from S3 bucket
+          val rangeObjectRequest = new GetObjectRequest(bucketName, path)
+          val objectPortion = this.s3Bucket.getObject(rangeObjectRequest)
 
-            return Option(objectPortion.getObjectContent)
-          } catch {
-            case ase: AmazonServiceException => handleASE(ase)
-            case ace: AmazonClientException => handleACE(ace)
-            case ioe: IOException => handleIOE(ioe)
-            case _: Throwable => handleUnknownError(_)
-          }
+          return Option(objectPortion.getObjectContent)
+        } catch {
+          case ase: AmazonServiceException => handleASE(ase)
+          case ace: AmazonClientException => handleACE(ace)
+          case ioe: IOException => handleIOE(ioe)
+          case _: Throwable => handleUnknownError(_)
         }
       }
     }
@@ -195,26 +184,23 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
     * @return
     */
   def delete(path: String, ignored: String): Boolean = {
-    this.s3Bucket() match {
-      case None => Logger.error("Failed creating s3 client.")
-      case Some(client) => Play.current.configuration.getString(S3ByteStorageService.BucketName) match {
-        case None => Logger.error("Failed deleting bytes: failed to find configured S3 bucketName.")
-        case Some(bucketName) => {
-          // delete the bytes
-          Logger.debug("Removing file at: /" + bucketName + "/" + path)
-          try {
-            // Delete object from S3 bucket
-            client.deleteObject(bucketName, path)
+    Play.current.configuration.getString(S3ByteStorageService.BucketName) match {
+      case None => Logger.error("Failed deleting bytes: failed to find configured S3 bucketName.")
+      case Some(bucketName) => {
+        // delete the bytes
+        Logger.debug("Removing file at: /" + bucketName + "/" + path)
+        try {
+          // Delete object from S3 bucket
+          this.s3Bucket.deleteObject(bucketName, path)
 
-            // TODO: Perform an additional GET to verify deletion?
+          // TODO: Perform an additional GET to verify deletion?
 
-            return true
-          } catch {
-            case ase: AmazonServiceException => handleASE(ase)
-            case ace: AmazonClientException => handleACE(ace)
-            case ioe: IOException => handleIOE(ioe)
-            case _: Throwable => handleUnknownError(_)
-          }
+          return true
+        } catch {
+          case ase: AmazonServiceException => handleASE(ase)
+          case ace: AmazonClientException => handleACE(ace)
+          case ioe: IOException => handleIOE(ioe)
+          case _: Throwable => handleUnknownError(_)
         }
       }
     }
