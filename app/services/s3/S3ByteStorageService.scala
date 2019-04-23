@@ -6,7 +6,7 @@ import java.util.UUID
 import com.amazonaws.auth.{AWSStaticCredentialsProvider, BasicAWSCredentials}
 import com.amazonaws.client.builder.AwsClientBuilder
 import com.amazonaws.regions.Regions
-import com.amazonaws.services.s3.model.{GetObjectRequest, PutObjectRequest}
+import com.amazonaws.services.s3.model.{GetObjectRequest, ObjectMetadata, PutObjectRequest}
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
 import com.amazonaws.{AmazonClientException, AmazonServiceException, ClientConfiguration}
 import com.google.inject.Inject
@@ -42,23 +42,6 @@ object S3ByteStorageService {
   *
   */
 class S3ByteStorageService @Inject()() extends ByteStorageService {
-
-  def saveToTmpFile(inputStream: InputStream): File = {
-    val randomTmpPath = "/tmp/" + UUID.randomUUID().toString
-    val tmpFile = new File(randomTmpPath)
-    try {
-      // Copy the contents of our InputStream to a temp file
-      val outputStream = new FileOutputStream(tmpFile)
-      IOUtils.copy(inputStream, outputStream)
-      if (outputStream != null) {
-        outputStream.close()
-      }
-    } catch {
-      case ioe: IOException => handleIOE(ioe)
-      case _: Throwable => handleUnknownError(_)
-    }
-    return tmpFile
-  }
 
   /**
     * Grabs config parameters from Clowder to return a
@@ -108,23 +91,20 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
     Play.current.configuration.getString(S3ByteStorageService.BucketName) match {
       case None => Logger.error("Failed deleting bytes: failed to find configured S3 bucketName.")
       case Some(bucketName) => {
-        val tmpFile = saveToTmpFile(inputStream)
         try {
-
           Logger.debug("Saving file to: /" + bucketName)
 
           // TODO: How to build up a unique path based on the file/uploader?
-          val targetPath = tmpFile.getName
+          val targetPath = UUID.randomUUID().toString
+          val length = inputStream.available()
+
+          // TODO: What can this be used for?
+          val metadata = new ObjectMetadata()
 
           // Upload temp file to S3 bucket
-          this.s3Bucket.putObject(new PutObjectRequest(bucketName, targetPath, tmpFile))
+          this.s3Bucket.putObject(bucketName, targetPath, inputStream, metadata)
 
           Logger.debug("File saved to: /" + bucketName + "/" + targetPath)
-
-          val length = tmpFile.length()
-
-          // Clean-up temp file
-          tmpFile.delete()
 
           return Option((targetPath, length))
 
@@ -135,9 +115,6 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
           case ioe: IOException => handleIOE(ioe)
           case _: Throwable => handleUnknownError(_)
         }
-
-        // Clean-up temp file (in case of failure)
-        tmpFile.delete()
       }
     }
 
