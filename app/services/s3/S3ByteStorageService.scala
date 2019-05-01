@@ -42,13 +42,29 @@ object S3ByteStorageService {
   *
   */
 class S3ByteStorageService @Inject()() extends ByteStorageService {
+  /**
+    * Convenience method for calling s3Bucket with a String
+    * instead of an Option[String].
+    *
+    * @param serviceEndpoint the endpoint to connect to
+    * @return                an AmazonS3 client
+    */
+  def s3Bucket(serviceEndpoint: String): AmazonS3 = {
+    return s3Bucket(Option(serviceEndpoint))
+  }
 
   /**
     * Grabs config parameters from Clowder to return a
-    * AmazonS3 pointing at the configured service endpoint.
+    * AmazonS3 pointing at the given service endpoint.
+    * By default, the configured bucket will be used.
+    *
+    * @param serviceEndpoint the endpoint to connect to
+    * @return                an AmazonS3 client
     */
-  def s3Bucket(): AmazonS3 = {
-    (Play.current.configuration.getString(S3ByteStorageService.ServiceEndpoint),
+  def s3Bucket(serviceEndpoint: Option[String] = Play.current.configuration.getString(S3ByteStorageService.ServiceEndpoint)): AmazonS3 = {
+    // TODO: How can we easily support multiple buckets / endpoints?
+    // TODO: Given a serviceEndpoint, look up the corresponding credentials in the config?
+    (serviceEndpoint,
       Play.current.configuration.getString(S3ByteStorageService.AccessKey),
         Play.current.configuration.getString(S3ByteStorageService.SecretKey)) match {
           case (Some(serviceEndpoint), Some(accessKey), Some(secretKey)) => {
@@ -57,6 +73,7 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
             clientConfiguration.setSignerOverride("AWSS3V4SignerType")
 
             Logger.debug("Created S3 Client for " + serviceEndpoint)
+
 
             val region = Play.current.configuration.getString(S3ByteStorageService.Region) match {
               case Some(region) => region
@@ -81,17 +98,38 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
   }
 
   /**
+    * Given a fullPath (e.g. serviceEndpoint, bucketName, fileName), parse the
+    * path and return the separate segments.
+    *
+    * @param fullPath the full path to parse into segments
+    * @return         the different segments within the path
+    */
+  def parsePath(fullPath: String): (Option[String], Option[String], Option[String]) = {
+    val segments = fullPath.split("/")
+    if (segments.length != 3) {
+      Logger.error("ERROR: Invalid segment count: " + segments.length)
+    }
+    segments.length match {
+      case 3 => (Option(segments(0)), Option(segments(1)), Option(segments(2)))
+      case 2 => (Option(segments(0)), Option(segments(1)), None)
+      case 1 => (Option(segments(0)), None, None)
+      case _ => (None, None, None)
+    }
+  }
+
+  /**
     * Store bytes to the specified path within the configured S3 bucket.
     *
     * @param inputStream stream of bytes to save to the bucket
     * @param ignored     unused parameter in this context
-    * @return
+    * @return            (path to file aka loader_id, length of file)
     */
   def save(inputStream: InputStream, ignored: String): Option[(String, Long)] = {
     Play.current.configuration.getString(S3ByteStorageService.BucketName) match {
       case None => Logger.error("Failed deleting bytes: failed to find configured S3 bucketName.")
       case Some(bucketName) => {
         try {
+          val serviceEndpoint: String = Play.current.configuration.getString(S3ByteStorageService.ServiceEndpoint).getOrElse("")
           Logger.debug("Saving file to: /" + bucketName)
 
           // TODO: How to build up a unique path based on the file/uploader?
@@ -102,11 +140,12 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
           val metadata = new ObjectMetadata()
 
           // Upload temp file to S3 bucket
-          this.s3Bucket.putObject(bucketName, targetPath, inputStream, metadata)
+          this.s3Bucket(serviceEndpoint).putObject(bucketName, targetPath, inputStream, metadata)
 
-          Logger.debug("File saved to: /" + bucketName + "/" + targetPath)
+          val fullPath = serviceEndpoint + "/" + bucketName + "/" + targetPath
+          Logger.debug("File saved to: " + fullPath)
 
-          return Option((targetPath, length))
+          return Option((fullPath, length))
 
           // TODO: Verify transfered bytes with MD5?
         } catch {
@@ -125,19 +164,19 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
   /**
     * Given a path, retrieve the bytes located at that path inside the configured S3 bucket.
     *
-    * @param path    the path of the file to load from the bucket
-    * @param ignored unused parameter in this context
-    * @return
+    * @param fullPath  the full path of the file to load
+    * @param ignored   unused parameter in this context
+    * @return          a stream of bytes read from the file
     */
-  def load(path: String, ignored: String): Option[InputStream] = {
-    Play.current.configuration.getString(S3ByteStorageService.BucketName) match {
-      case None => Logger.error("Failed fetching bytes: failed to find configured S3 bucketName.")
-      case Some(bucketName) => {
-        Logger.debug("Loading file from: /" + bucketName + "/" + path)
+  def load(fullPath: String, ignored: String): Option[InputStream] = {
+    // Parse serviceEndpoint, bucketName, filename from fullPath
+    parsePath(fullPath) match {
+      case (Some(serviceEndpoint), Some(bucketName), Some(fileName)) => {
+
         try {
           // Download object from S3 bucket
-          val rangeObjectRequest = new GetObjectRequest(bucketName, path)
-          val objectPortion = this.s3Bucket.getObject(rangeObjectRequest)
+          val rangeObjectRequest = new GetObjectRequest(bucketName, fileName)
+          val objectPortion = this.s3Bucket(serviceEndpoint).getObject(rangeObjectRequest)
 
           return Option(objectPortion.getObjectContent)
         } catch {
@@ -146,6 +185,10 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
           case ioe: IOException => handleIOE(ioe)
           case _: Throwable => handleUnknownError(_)
         }
+      }
+      case _ => {
+        Logger.error("Unable to parse segments from fullPath: " + fullPath)
+        return None
       }
     }
 
@@ -156,19 +199,18 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
   /**
     * Given a path, delete the file located at the path within the configured S3 bucket.
     *
-    * @param path    the path of the file inside the bucket
-    * @param ignored unused parameter in this context
-    * @return
+    * @param fullPath   the path of the file inside the bucket
+    * @param ignored    unused parameter in this context
+    * @return           true, if bytes were deleted
     */
-  def delete(path: String, ignored: String): Boolean = {
-    Play.current.configuration.getString(S3ByteStorageService.BucketName) match {
-      case None => Logger.error("Failed deleting bytes: failed to find configured S3 bucketName.")
-      case Some(bucketName) => {
+  def delete(fullPath: String, ignored: String): Boolean = {
+    parsePath(fullPath) match {
+      case (Some(serviceEndpoint), Some(bucketName), Some(fileName)) => {
         // delete the bytes
-        Logger.debug("Removing file at: /" + bucketName + "/" + path)
+        Logger.debug("Removing file at: /" + bucketName + "/" + fileName)
         try {
           // Delete object from S3 bucket
-          this.s3Bucket.deleteObject(bucketName, path)
+          this.s3Bucket(serviceEndpoint).deleteObject(bucketName, fileName)
 
           // TODO: Perform an additional GET to verify deletion?
 
@@ -179,6 +221,10 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
           case ioe: IOException => handleIOE(ioe)
           case _: Throwable => handleUnknownError(_)
         }
+      }
+      case _ => {
+        Logger.error("Unable to parse segments from fullPath: " + fullPath)
+        return false
       }
     }
 
@@ -193,15 +239,24 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
     } else {
       Logger.error("An unknown error occurred in the S3ByteStorageService.")
     }
+
+    // Return None (in case of failure)
+    None
   }
 
   def handleIOE(err: IOException) = {
     Logger.error("IOException occurred in the S3ByteStorageService: " + err)
+
+    // Return None (in case of failure)
+    None
   }
 
   def handleACE(ace: AmazonClientException) = {
     Logger.error("Caught an AmazonClientException, which " + "means the client encountered " + "an internal error while trying to " + "communicate with S3, " + "such as not being able to access the network.")
     Logger.error("Error Message: " + ace.getMessage)
+
+    // Return None (in case of failure)
+    None
   }
 
   def handleASE(ase: AmazonServiceException) = {
@@ -211,5 +266,8 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
     Logger.error("AWS Error Code:   " + ase.getErrorCode)
     Logger.error("Error Type:       " + ase.getErrorType)
     Logger.error("Request ID:       " + ase.getRequestId)
+
+    // Return None (in case of failure)
+    None
   }
 }
