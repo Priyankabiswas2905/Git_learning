@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Added S3ByteStorageService for storing uploaded bytes in S3-compatible buckets.
   [CATS-992] (https://opensource.ncsa.illinois.edu/jira/browse/CATS-992)
 
+### Changed
+- Improved Advanced Search UI to retain search results between navigations.
+  [CATS-1001](https://opensource.ncsa.illinois.edu/jira/browse/CATS-1001)
+
 ## 1.6.1- 2019-05-07
 
 ### Fixed
