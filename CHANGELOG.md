@@ -6,14 +6,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## 1.6.1 - 2019-05-08
+
 ### Fixed
 - A double quote character in a metadata description disallows edit.
-  [CATS-991] (https://opensource.ncsa.illinois.edu/jira/browse/CATS-991)
+  [CATS-991](https://opensource.ncsa.illinois.edu/jira/browse/CATS-991)
 - About page should no longer show "0 Bytes", counts should be more accurate.
-  [CATS-779] (https://opensource.ncsa.illinois.edu/jira/browse/CATS-779)
+  [CATS-779](https://opensource.ncsa.illinois.edu/jira/browse/CATS-779)
 - Fixed creation of standard vocabularies in a single space case.
 - Slow load times in dataset page by removing queries for comments and tags on files within a dataset.
-  [CATS-999] (https://opensource.ncsa.illinois.edu/jira/browse/CATS-999)
+  [CATS-999](https://opensource.ncsa.illinois.edu/jira/browse/CATS-999)
 
 ### Changed
 - Changed the HTTP return codes for the generic error handlers in Clowder.
