@@ -99,8 +99,17 @@
 
         getBasicDefinitions(1);
         // Count is the batch size to get results; e.g. 60 would be 1-60, 61-120, 121-180, etc.
-        count_stepsize = 60;
-        count = 0;
+        var count_stepsize = 60;
+        var count = 0;
+
+        $(document).ready(function() {
+            // Load and execute searchQuery from query-string parameter, if present
+            var qsParams = new URLSearchParams(window.location.search.slice(1));
+            var searchQuery = qsParams.get('query');
+            if (searchQuery) {
+                performSearchAjax(searchQuery);
+            }
+        });
 
         // Add a new row to the set of criteria
         function getBasicDefinitions(rowId) {
@@ -314,29 +323,46 @@
             from_count = from_count || 0;
             console.log("Querying result set from "+String(from_count)+" with size "+String(count_stepsize));
             var query = generateSearchObject();
-            var grouping = $("#add-metadata-grouping").val();
             if (query != []) {
-                var request = jsRoutes.api.Search.searchJson(JSON.stringify(query), grouping, from_count, count_stepsize).ajax({
-                    type: 'GET',
-                    contentType: "application/json"
-                });
+                // Save searchQuery as a query-string parameter
+                var loc = window.location;
+                var qsParams = new URLSearchParams(loc.search.slice(1));
+                var searchQuery = JSON.stringify(query);
+                qsParams.set('query', searchQuery);
 
-                request.done(function(resp, status, err){
-                    if (from_count > 0) {
-                        parseSearchResults(resp, status, err, false)
-                    } else {
-                        parseSearchResults(resp, status, err)
-                    }
-                });
+                // Update query string without forcing navigation
+                var newurl = loc.protocol + "//" + loc.host + loc.pathname + '?' + qsParams;
+                window.history.pushState({path: newurl}, '', newurl);
 
-                request.fail(function (jqXHR, textStatus, errorThrown){
-                    console.error("The following error occured: " + textStatus, errorThrown);
-                });
+                // Perform a search with the given query
+                performSearchAjax(searchQuery, from_count);
 
                 return;
             }
 
             $( "#mt-search-feedback" ).text( " Not valid!" ).show().fadeOut( 2000 );
+        }
+
+        function performSearchAjax(searchQuery, from_count) {
+            var grouping = $("#add-metadata-grouping").val();
+
+            // Perform the search
+            var request = jsRoutes.api.Search.searchJson(searchQuery, grouping, from_count, count_stepsize).ajax({
+                type: 'GET',
+                contentType: "application/json"
+            });
+
+            request.done(function(resp, status, err){
+                if (from_count > 0) {
+                    parseSearchResults(resp, status, err, false)
+                } else {
+                    parseSearchResults(resp, status, err)
+                }
+            });
+
+            request.fail(function (jqXHR, textStatus, errorThrown){
+                console.error("The following error occured: " + textStatus, errorThrown);
+            });
         }
 
         function removeRow(rowId) {
