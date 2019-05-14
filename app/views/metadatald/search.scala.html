@@ -97,18 +97,50 @@
             width: "100%"
         });
 
-        getBasicDefinitions(1);
+        var metadata_definitions = [];
+
         // Count is the batch size to get results; e.g. 60 would be 1-60, 61-120, 121-180, etc.
         var count_stepsize = 60;
         var count = 0;
 
         $(document).ready(function() {
-            // Load and execute searchQuery from query-string parameter, if present
-            var qsParams = new URLSearchParams(window.location.search.slice(1));
-            var searchQuery = qsParams.get('query');
-            if (searchQuery) {
-                performSearchAjax(searchQuery);
-            }
+            // Fetch and cache metadata definitions
+            var request = jsRoutes.api.Metadata.getDefinitionsDistinctName().ajax({
+                type: 'GET',
+                contentType: "application/json"
+            });
+            request.done(function (response, textStatus, jqXHR) {
+                metadata_definitions = response;
+
+                // Load and execute searchQuery from query-string parameter, if present
+                var qsParams = new URLSearchParams(window.location.search.slice(1));
+                var grouping = qsParams.get('grouping');
+                var searchQuery = qsParams.get('query');
+                if (searchQuery || grouping) {
+                    // Set grouping based on query string param
+                    $("#add-metadata-grouping").val(grouping).trigger('change');
+
+                    // Parse the JSON search query into form fields
+                    var terms = JSON.parse(searchQuery);
+                    if (terms && terms.length) {
+                        parseSearchTerms(terms);
+                        performSearchAjax(searchQuery, grouping);
+                        return;
+                    }
+                }
+
+                // Fall-back to simply adding a placeholder row
+                getBasicDefinitions(1);
+            });
+
+            request.fail(function (jqXHR, textStatus, errorThrown){
+                console.error("The following error occured: " + textStatus, errorThrown);
+                var errMsg = "You must be logged in to retrieve metadata definitions";
+                if (!checkErrorAndRedirect(jqXHR, errMsg)) {
+                    notify("Unable to fetch Metadata definitions : " + errorThrown, "error");
+                }
+                reject(errMsg);
+            });
         });
 
         // Add a new row to the set of criteria
@@ -145,7 +177,7 @@
                 // Allow Enter key to perform search on any value box
                 if (evt.keyCode == 13) {
                     count = 0;
-                    search()
+                    search();
                     return false
                 } else return true
             };
@@ -157,106 +189,64 @@
                 allowClear: false,
                 width: "100%"
             });
-            $("#add-metadata-grouping-"+rowStr).select2({
+
+            var selector = "#add-metadata-select-" + rowStr;
+            $(selector).select2({
                 theme: "bootstrap",
-                allowClear: false,
+                placeholder: "Select a type or field key",
+                allowClear: true,
                 width: "100%"
+            }).empty();
+
+            var fields = metadata_definitions;
+            for (var i = 0; i < fields.length; i++) {
+                var elem = $("<option></option>");
+                elem.attr("data-type", fields[i].json.type);
+                elem.attr("data-id", fields[i].json.label);
+                elem.attr("value", "metadata."+fields[i].json.label);
+                elem.text(fields[i].json.label);
+                $(selector).append(elem);
+            }
+
+            if (fields.length > 0) {
+                var firstFieldKey = 'metadata.' + fields[0].json.label;
+                $(selector).val(firstFieldKey).trigger('change');
+            }
+        }
+
+        // Given a JSON object representing a search query,
+        // fill in the appropriate inputs to represent this search
+        function parseSearchTerms(terms) {
+            // search for a is a spaceid term
+            var spaceIdQueryTerm = terms.find(function (term) {
+                return !term.extractor_key && term.field_key === 'child_of';
             });
 
-            // fetch metadata definitions
-            var request = jsRoutes.api.Metadata.getDefinitionsDistinctName().ajax({
-                type: 'GET',
-                contentType: "application/json"
-            });
-            request.done(function (response, textStatus, jqXHR) {
-                var fields = response;
+            // If we find one, remove it from the list
+            if (spaceIdQueryTerm) {
+                // populate space id filter dropdown
+                $('#spaceid-filter-select').val(spaceIdQueryTerm.field_value).trigger('change');
+                terms.splice(spaceIdQueryTerm, 1);
+            }
 
-                $("#add-metadata-select-"+rowStr).empty()
-                for (var i = 0; i < fields.length; i++) {
-                    var elem = $("<option></option>");
-                    elem.attr("data-type", fields[i].json.type);
-                    elem.attr("data-id", fields[i].json.label);
-                    elem.attr("value", "metadata."+fields[i].json.label);
-                    elem.text(fields[i].json.label);
-                    $("#add-metadata-select-"+String(rowId)).append(elem);
-                }
+            // Remove any existing children from metadata rows (should be a noop)
+            $("#metadata-search-rows").empty();
 
-                // Select box will populate as user types, with metadata field autocomplete suggestions
-                $("#add-metadata-select-"+rowStr).select2({
-                    theme: "bootstrap",
-                    placeholder: "Select a type or field key",
-                    allowClear: true,
-                    width: "100%",
-                    ajax: {
-                        url: function(filter) {
-                            // Get autocomplete results if typing; otherwise return standard set of definitions
-                            if (filter.term == null || filter.term == "") {
-                                return jsRoutes.api.Metadata.getDefinitionsDistinctName().url
-                            }
-                            else {
-                                return jsRoutes.api.Metadata.getAutocompleteName(filter.term).url
-                            }
-                        },
-                        // Populate autocomplete as user types
-                        processResults: function(data, page) {
-                            var outMap = {};
+            terms.forEach(function (term, index) {
+                console.log('Term:', term);
+                if (term.extractor_key === 'metadata') {
+                    // term is a metadata field, create a new row
+                    var rowStr = String(index + 1);
 
-                            for (var rez=0; rez<data.length; rez++) {
-                                var entry = data[rez];
+                    // Fetch metadata definitions, then select based on search term
+                    getBasicDefinitions(rowStr);
 
-                                // Metadata Definitions
-                                if (typeof(entry) == 'object') {
-                                    var entryGroup = "Metadata Definitions";
-                                    var entryData = {text: entry.json.label, id: "metadata."+entry.json.label};
-                                // suggestions from elasticsearch
-                                } else {
-                                    if (entry.indexOf('.') > -1) {
-                                        if (entry.indexOf('/extractors/') > -1) {
-                                            // Group extractor-specific fields together under extractor
-                                            var entryGroup = entry.substring(entry.indexOf('/extractors/')+12, entry.lastIndexOf('.'))+" (Extractor)";
-                                        }
-                                        else if (entry.split('.').length > 2 ){
-                                            // Group user-submitted metadata under user's name
-                                            var entryGroup = entry.substring(entry.indexOf('.')+1, entry.lastIndexOf('.'))+" (User)";
-                                        }
-                                        else {
-                                            // This should be metadata definitions otherwise
-                                            var entryGroup = "Metadata Definitions";
-                                        }
-                                        var entryData = {id: entry, text: entry.substring(entry.lastIndexOf('.')+1, entry.length)}
-                                    } else {
-                                        // Simple entry
-                                        var entryGroup = "";
-                                        var entryData = {text: entry, id: entry}
-                                    }
-                                }
-                                if (!outMap.hasOwnProperty(entryGroup))
-                                    outMap[entryGroup] = [];
-                                outMap[entryGroup].push(entryData)
-                            }
-
-                            var outList = [];
-                            for (var group in outMap) {
-                                if (group == "") {
-                                    for (var ungrouped=0; ungrouped<outMap[group].length; ungrouped++)
-                                        outList.push(outMap[group][ungrouped])
-                                } else
-                                    outList.push({"text":group, "children": outMap[group]})
-                            }
-
-                            return {
-                                results: outList
-                            };
-                        }
-                    }
-                })
-            });
-
-            request.fail(function (jqXHR, textStatus, errorThrown){
-                console.error("The following error occured: " + textStatus, errorThrown);
-                var errMsg = "You must be logged in to retrieve metadata definitions";
-                if (!checkErrorAndRedirect(jqXHR, errMsg)) {
-                    notify("Metadata was not added due to : " + errorThrown, "error");
+                    // populate new row with search term
+                    $('#add-metadata-select-' + rowStr).val(term.field_key).trigger('change');
+                    $('#add-metadata-operator-' + rowStr).val(term.operator).trigger('change');
+                    $('#v-' + rowStr).val(term.field_value).trigger('change');
+                } else {
+                    console.log('WARNING: Unknown extractor_key encountered!');
                 }
             });
         }
@@ -324,9 +314,14 @@
             console.log("Querying result set from "+String(from_count)+" with size "+String(count_stepsize));
             var query = generateSearchObject();
             if (query != []) {
-                // Save searchQuery as a query-string parameter
                 var loc = window.location;
                 var qsParams = new URLSearchParams(loc.search.slice(1));
+
+                // Save grouping as query-string parameter first
+                var grouping = $("#add-metadata-grouping").val();
+                qsParams.set('grouping', grouping);
+
+                // Save searchQuery as query-string parameter
                 var searchQuery = JSON.stringify(query);
                 qsParams.set('query', searchQuery);
 
@@ -334,8 +329,8 @@
                 var newurl = loc.protocol + "//" + loc.host + loc.pathname + '?' + qsParams;
                 window.history.pushState({path: newurl}, '', newurl);
 
-                // Perform a search with the given query
-                performSearchAjax(searchQuery, from_count);
+                // Perform a search with the given query and grouping
+                performSearchAjax(searchQuery, grouping, from_count);
 
                 return;
             }
@@ -343,8 +338,7 @@
             $( "#mt-search-feedback" ).text( " Not valid!" ).show().fadeOut( 2000 );
         }
 
-        function performSearchAjax(searchQuery, from_count) {
-            var grouping = $("#add-metadata-grouping").val();
+        function performSearchAjax(searchQuery, grouping, from_count) {
 
             // Perform the search
             var request = jsRoutes.api.Search.searchJson(searchQuery, grouping, from_count, count_stepsize).ajax({
