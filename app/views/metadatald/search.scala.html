@@ -64,9 +64,10 @@
                     </div>
 
                     <!-- SUBMIT BTN -->
-                    <div class="form-group col-lg-4 col-md-4">
+                    <div class="form-group col-lg-12 col-md-12">
                         <button type="submit" class="btn btn-primary"><span class="glyphicon glyphicon-search"></span> Search</button>
                         <span id="mt-search-feedback"></span>
+                        <button id="resetBtn" type="reset" class="btn btn-default pull-right"><span class="glyphicon glyphicon-cancel"></span> Reset</button>
                     </div>
                 </form>
 
@@ -233,7 +234,6 @@
             $("#metadata-search-rows").empty();
 
             terms.forEach(function (term, index) {
-                console.log('Term:', term);
                 if (term.extractor_key === 'metadata') {
                     // term is a metadata field, create a new row
                     var rowStr = String(index + 1);
@@ -246,7 +246,7 @@
                     $('#add-metadata-operator-' + rowStr).val(term.operator).trigger('change');
                     $('#v-' + rowStr).val(term.field_value).trigger('change');
                 } else {
-                    console.log('WARNING: Unknown extractor_key encountered!');
+                    console.log('WARNING: Unknown extractor_key encountered', term);
                 }
             });
         }
@@ -403,6 +403,24 @@
             }
 
         }
+
+        // Wire up reset button
+        $('#resetBtn').click(function(evt) {
+            // Reset results state
+            $('#datasets-results').empty();
+            $('#files-results').empty();
+
+            // Reset form state
+            row_list = [];
+            $(this).closest('form').find('select').prop('selectedIndex', 0).trigger('change');
+            $('#metadata-search-rows').empty();
+
+            // Reinitialize form
+            getBasicDefinitions(1);
+
+            // Reset query state
+            window.location.assign(window.location.protocol + "//" + window.location.host + window.location.pathname);
+        });
 
         // form submission
         $( "form[id='metadata-search']").submit(function( event ) {
