@@ -1,19 +1,25 @@
 package services.s3
 
 import java.io.{File, FileOutputStream, IOException, InputStream}
+import java.net.URI
+import java.nio.ByteBuffer
 import java.util.UUID
 
-import com.amazonaws.auth.{AWSStaticCredentialsProvider, BasicAWSCredentials}
-import com.amazonaws.client.builder.AwsClientBuilder
-import com.amazonaws.regions.Regions
-import com.amazonaws.services.s3.model.{GetObjectRequest, ObjectMetadata, PutObjectRequest}
-import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
-import com.amazonaws.{AmazonClientException, AmazonServiceException, ClientConfiguration}
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration
+import software.amazon.awssdk.http.apache.{ApacheHttpClient, ProxyConfiguration}
+import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, AwsSessionCredentials, StaticCredentialsProvider}
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.model.{DeleteObjectRequest, GetObjectRequest, PutObjectRequest}
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.core.exception.{SdkClientException, SdkException}
 import com.google.inject.Inject
 import org.apache.commons.io.IOUtils
+import org.apache.commons.io.output.ByteArrayOutputStream
 import play.Logger
 import play.api.Play
 import services.ByteStorageService
+import software.amazon.awssdk.core.sync.{RequestBody, ResponseTransformer}
+import software.amazon.awssdk.http.AbortableInputStream
 
 /** Available configuration options for s3 storage */
 object S3ByteStorageService {
@@ -47,30 +53,31 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
     * Grabs config parameters from Clowder to return a
     * AmazonS3 pointing at the configured service endpoint.
     */
-  def s3Bucket(): AmazonS3 = {
+  def s3Bucket(): S3Client = {
     (Play.current.configuration.getString(S3ByteStorageService.ServiceEndpoint),
       Play.current.configuration.getString(S3ByteStorageService.AccessKey),
         Play.current.configuration.getString(S3ByteStorageService.SecretKey)) match {
           case (Some(serviceEndpoint), Some(accessKey), Some(secretKey)) => {
-            val credentials = new BasicAWSCredentials(accessKey, secretKey)
-            val clientConfiguration = new ClientConfiguration
-            clientConfiguration.setSignerOverride("AWSS3V4SignerType")
 
             Logger.debug("Created S3 Client for " + serviceEndpoint)
 
             val region = Play.current.configuration.getString(S3ByteStorageService.Region) match {
-              case Some(region) => region
-              case _ => Regions.US_EAST_1.name()
+              case Some(region) => Region.of(region)
+              case _ => Region.US_EAST_1
             }
 
-            return AmazonS3ClientBuilder.standard()
-              // NOTE: Region is ignored for MinIO case?
-              // TODO: Allow user to set region for AWS case?
-              .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(serviceEndpoint, region))
-              .withPathStyleAccessEnabled(true)
-              .withClientConfiguration(clientConfiguration)
-              .withCredentials(new AWSStaticCredentialsProvider(credentials))
-              .build()
+            val credentials = AwsBasicCredentials.create(accessKey, secretKey)
+            val proxyConfig = ProxyConfiguration.builder
+            val httpClientBuilder = ApacheHttpClient.builder.proxyConfiguration(proxyConfig.build)
+            val overrideConfig = ClientOverrideConfiguration.builder
+
+            // NOTE: Region is ignored for MinIO case
+            return S3Client.builder
+              .credentialsProvider(StaticCredentialsProvider.create(credentials))
+              .httpClientBuilder(httpClientBuilder)
+              .endpointOverride(new URI(serviceEndpoint))
+              .overrideConfiguration(overrideConfig.build)
+              .region(region).build
           }
           case _ => {
             val errMsg = "Bad S3 configuration: verify that you have set all configuration options."
@@ -97,12 +104,11 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
           // TODO: How to build up a unique path based on the file/uploader?
           val targetPath = UUID.randomUUID().toString
           val length = inputStream.available()
-
-          // TODO: What can this be used for?
-          val metadata = new ObjectMetadata()
-
+          val builder = PutObjectRequest.builder
+          val request = builder.bucket(bucketName).key(targetPath).build
           // Upload temp file to S3 bucket
-          this.s3Bucket.putObject(bucketName, targetPath, inputStream, metadata)
+          val inputBytes = ByteBuffer.wrap(IOUtils.toByteArray(inputStream))
+          this.s3Bucket.putObject(request, RequestBody.fromByteBuffer(inputBytes))
 
           Logger.debug("File saved to: /" + bucketName + "/" + targetPath)
 
@@ -110,8 +116,8 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
 
           // TODO: Verify transfered bytes with MD5?
         } catch {
-          case ase: AmazonServiceException => handleASE(ase)
-          case ace: AmazonClientException => handleACE(ace)
+          case sdkce: SdkClientException => handleSDKCE(sdkce)
+          case sdke: SdkException => handleSDKE(sdke)
           case ioe: IOException => handleIOE(ioe)
           case _: Throwable => handleUnknownError(_)
         }
@@ -136,13 +142,14 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
         Logger.debug("Loading file from: /" + bucketName + "/" + path)
         try {
           // Download object from S3 bucket
-          val rangeObjectRequest = new GetObjectRequest(bucketName, path)
-          val objectPortion = this.s3Bucket.getObject(rangeObjectRequest)
-
-          return Option(objectPortion.getObjectContent)
+          val builder = GetObjectRequest.builder
+          val request = builder.bucket(bucketName).key(path).build
+          val objectPortion = this.s3Bucket.getObject(request)
+          //, ResponseTransformer.toInputStream
+          return Option(objectPortion)
         } catch {
-          case ase: AmazonServiceException => handleASE(ase)
-          case ace: AmazonClientException => handleACE(ace)
+          case sdkce: SdkClientException => handleSDKCE(sdkce)
+          case sdke: SdkException => handleSDKE(sdke)
           case ioe: IOException => handleIOE(ioe)
           case _: Throwable => handleUnknownError(_)
         }
@@ -168,14 +175,16 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
         Logger.debug("Removing file at: /" + bucketName + "/" + path)
         try {
           // Delete object from S3 bucket
-          this.s3Bucket.deleteObject(bucketName, path)
+          val builder = DeleteObjectRequest.builder
+          val deleteRequest = builder.bucket(bucketName).key(path).build
+          this.s3Bucket.deleteObject(deleteRequest)
 
           // TODO: Perform an additional GET to verify deletion?
 
           return true
         } catch {
-          case ase: AmazonServiceException => handleASE(ase)
-          case ace: AmazonClientException => handleACE(ace)
+          case sdkce: SdkClientException => handleSDKCE(sdkce)
+          case sdke: SdkException => handleSDKE(sdke)
           case ioe: IOException => handleIOE(ioe)
           case _: Throwable => handleUnknownError(_)
         }
@@ -199,17 +208,13 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
     Logger.error("IOException occurred in the S3ByteStorageService: " + err)
   }
 
-  def handleACE(ace: AmazonClientException) = {
-    Logger.error("Caught an AmazonClientException, which " + "means the client encountered " + "an internal error while trying to " + "communicate with S3, " + "such as not being able to access the network.")
-    Logger.error("Error Message: " + ace.getMessage)
+  def handleSDKCE(sdkce: SdkClientException) = {
+    Logger.error("Caught an SdkClientException, which " + "means the client encountered " + "an error while trying to " + "communicate with S3.")
+    Logger.error("Error Message: " + sdkce.getMessage)
   }
 
-  def handleASE(ase: AmazonServiceException) = {
-    Logger.error("Caught an AmazonServiceException, which " + "means your request made it " + "to Amazon S3, but was rejected with an error response" + " for some reason.")
-    Logger.error("Error Message:    " + ase.getMessage)
-    Logger.error("HTTP Status Code: " + ase.getStatusCode)
-    Logger.error("AWS Error Code:   " + ase.getErrorCode)
-    Logger.error("Error Type:       " + ase.getErrorType)
-    Logger.error("Request ID:       " + ase.getRequestId)
+  def handleSDKE(sdke: SdkException) = {
+    Logger.error("Caught an SdkException, which linkely " + "means the server encountered " + "an error while trying to " + "process this request.")
+    Logger.error("Error Message: " + sdke.getMessage)
   }
 }
