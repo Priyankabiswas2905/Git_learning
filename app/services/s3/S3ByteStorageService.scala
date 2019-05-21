@@ -49,18 +49,20 @@ object S3ByteStorageService {
   */
 class S3ByteStorageService @Inject()() extends ByteStorageService {
 
-  // Only run a single thread at a time when verifying bucket existence
-  synchronized {
+  // Verify access to the configured bucket, create it if it does not exist
+  // NOTE: Use a single thread when verifying/creating bucket
+  this.synchronized {
     Play.current.configuration.getString(S3ByteStorageService.BucketName) match {
       case Some(bucketName) => {
         try {
-          // Validate configuration by checking for bucket existence on startup
+          // Validate configuration by checking for bucket existence/access
           val builder = HeadBucketRequest.builder
           val checkBucketReq = builder.bucket(bucketName).build
           this.s3Bucket.headBucket(checkBucketReq)
         } catch {
           case sdke @ (_: SdkException | _: SdkClientException) => {
             if (sdke.getMessage.indexOf("Status Code: 404") != -1) {
+              Logger.warn("Configured S3 bucket does not exist - creating it now...")
               try {
                 // Bucket does not exist - create the bucket
                 val builder = CreateBucketRequest.builder
@@ -72,14 +74,14 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
               }
             } else if (sdke.getMessage.indexOf("Status Code: 403") != -1) {
               // Bucket exists, but you do not have permission to access it
-              throw new RuntimeException("Bad S3 configuration: You do not have access to the configured bucket.")
+              throw new RuntimeException("Bad S3 configuration: You do not have access to the configured S3 bucket.")
             } else {
               // Unknown error - print status code for further investigation
               Logger.error(sdke.getLocalizedMessage)
-              throw new RuntimeException("Bad S3 configuration: an unknown error has occurred.")
+              throw new RuntimeException("Bad S3 configuration: an unhandled error has occurred.")
             }
           }
-          case _: Throwable => handleUnknownError(_)
+          case _: Throwable => throw new RuntimeException("Bad S3 configuration: an unknown error has occurred.")
         }
       }
       case _ => throw new RuntimeException("Bad S3 configuration: verify that you have set all configuration options.")
