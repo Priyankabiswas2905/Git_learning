@@ -9,7 +9,7 @@ import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration
 import software.amazon.awssdk.http.apache.{ApacheHttpClient, ProxyConfiguration}
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, AwsSessionCredentials, StaticCredentialsProvider}
 import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.model.{DeleteObjectRequest, GetObjectRequest, PutObjectRequest}
+import software.amazon.awssdk.services.s3.model.{CreateBucketRequest, DeleteObjectRequest, GetObjectRequest, HeadBucketRequest, PutObjectRequest}
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.core.exception.{SdkClientException, SdkException}
 import com.google.inject.Inject
@@ -49,6 +49,43 @@ object S3ByteStorageService {
   */
 class S3ByteStorageService @Inject()() extends ByteStorageService {
 
+  // Only run a single thread at a time when verifying bucket existence
+  synchronized {
+    Play.current.configuration.getString(S3ByteStorageService.BucketName) match {
+      case Some(bucketName) => {
+        try {
+          // Validate configuration by checking for bucket existence on startup
+          val builder = HeadBucketRequest.builder
+          val checkBucketReq = builder.bucket(bucketName).build
+          this.s3Bucket.headBucket(checkBucketReq)
+        } catch {
+          case sdke @ (_: SdkException | _: SdkClientException) => {
+            if (sdke.getMessage.indexOf("Status Code: 404") != -1) {
+              try {
+                // Bucket does not exist - create the bucket
+                val builder = CreateBucketRequest.builder
+                val createBucketReq = builder.bucket(bucketName).build
+                this.s3Bucket.createBucket(createBucketReq)
+              } catch {
+                // Bucket could not be created - abort
+                case _: Throwable => throw new RuntimeException("Bad S3 configuration: Bucket does not exist and could not be created.")
+              }
+            } else if (sdke.getMessage.indexOf("Status Code: 403") != -1) {
+              // Bucket exists, but you do not have permission to access it
+              throw new RuntimeException("Bad S3 configuration: You do not have access to the configured bucket.")
+            } else {
+              // Unknown error - print status code for further investigation
+              Logger.error(sdke.getLocalizedMessage)
+              throw new RuntimeException("Bad S3 configuration: an unknown error has occurred.")
+            }
+          }
+          case _: Throwable => handleUnknownError(_)
+        }
+      }
+      case _ => throw new RuntimeException("Bad S3 configuration: verify that you have set all configuration options.")
+    }
+  }
+
   /**
     * Grabs config parameters from Clowder to return a
     * AmazonS3 pointing at the configured service endpoint.
@@ -79,11 +116,7 @@ class S3ByteStorageService @Inject()() extends ByteStorageService {
               .overrideConfiguration(overrideConfig.build)
               .region(region).build
           }
-          case _ => {
-            val errMsg = "Bad S3 configuration: verify that you have set all configuration options."
-            Logger.error(errMsg)
-            throw new RuntimeException(errMsg)
-          }
+          case _ => throw new RuntimeException("Bad S3 configuration: verify that you have set all configuration options.")
         }
   }
 
