@@ -400,6 +400,7 @@ POST           /api/files/:id/reindex                                           
 GET            /api/files/:id/users                                                     @api.Files.users(id: UUID)
 GET            /api/files/:id/paths                                                     @api.Files.paths(id: UUID)
 POST           /api/files/:id/archive                                                   @api.Files.archive(id: UUID)
+POST           /api/files/:id/unarchive                                                 @api.Files.unarchive(id: UUID)
 
 # ----------------------------------------------------------------------
 # EXTRACTORS ENDPOINTS

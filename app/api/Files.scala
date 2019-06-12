@@ -3,16 +3,15 @@ package api
 import scala.annotation.tailrec
 import java.io.FileInputStream
 import java.net.{URL, URLEncoder}
+
 import javax.inject.Inject
 import javax.mail.internet.MimeUtility
-
-import _root_.util.{FileUtils, Parsers, JSONLD, SearchUtils, RequestUtils}
-
+import _root_.util.{FileUtils, JSONLD, Parsers, RequestUtils, SearchUtils}
 import com.mongodb.casbah.Imports._
 import controllers.Previewers
 import jsonutils.JsonUtil
 import models._
-import play.api.Logger
+import play.api.{Logger, Play}
 import play.api.Play.{configuration, current}
 import play.api.i18n.Messages
 import play.api.libs.concurrent.Execution.Implicits._
@@ -20,16 +19,15 @@ import play.api.libs.iteratee.Enumerator
 import play.api.libs.json.Json._
 import play.api.libs.json._
 import play.api.mvc.{ResponseHeader, SimpleResult}
-
 import services._
 
 import scala.collection.mutable.ListBuffer
 import scala.util.parsing.json.JSONArray
-
 import java.text.SimpleDateFormat
 import java.util.Date
 
 import controllers.Utils
+import services.s3.S3ByteStorageService
 
 /**
  * Json API for files.
@@ -792,6 +790,25 @@ class Files @Inject()(
             "authorId" -> file.author.id.stringify,
             "status" -> file.status)
         else
+          defaultMap
+      }
+      case "services.s3.S3ByteStorageService" => {
+        if (serverAdmin) {
+          val bucketName = Play.current.configuration.getString(S3ByteStorageService.BucketName).getOrElse("")
+          val serviceEndpoint = Play.current.configuration.getString(S3ByteStorageService.ServiceEndpoint).getOrElse("")
+          Map(
+            "id" -> file.id.toString,
+            "filename" -> file.filename,
+            "service-endpoint" -> serviceEndpoint,
+            "bucket-name" -> bucketName,
+            "object-key" -> file.loader_id,
+            "filedescription" -> file.description,
+            "content-type" -> file.contentType,
+            "date-created" -> file.uploadDate.toString(),
+            "size" -> file.length.toString,
+            "authorId" -> file.author.id.stringify,
+            "status" -> file.status)
+        } else
           defaultMap
       }
       case _ => defaultMap
@@ -1910,6 +1927,19 @@ class Files @Inject()(
     files.get(id) match {
       case Some(file) => {
         files.setStatus(id, FileStatus.ARCHIVED)
+        Ok(toJson(Map("status" -> "success")))
+      }
+      case None => {
+        Logger.error("Error getting file " + id);
+        InternalServerError
+      }
+    }
+  }
+
+  def unarchive(id: UUID) = PermissionAction(Permission.AddFile, Some(ResourceRef(ResourceRef.file, id))) { implicit request =>
+    files.get(id) match {
+      case Some(file) => {
+        files.setStatus(id, FileStatus.PROCESSED)
         Ok(toJson(Map("status" -> "success")))
       }
       case None => {
