@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   [CATS-1001](https://opensource.ncsa.illinois.edu/jira/browse/CATS-1001)
 - Display more info on the manual submission page, link to ExtractorDetails view.
   [CATS-959](https://opensource.ncsa.illinois.edu/jira/browse/CATS-959)
+- Refactored S3ByteStorageService to use the new AWS SDK for Java 2.0.
 
 ## 1.6.2 - 2019-05-23
 
