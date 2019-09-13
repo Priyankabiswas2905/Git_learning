@@ -93,7 +93,7 @@ class Reporting @Inject()(selections: SelectionService,
   def spaceMetrics() = ServerAdminAction { implicit request =>
     Logger.debug("Generating space metrics report")
 
-    var contents: String = "type,id,name,description,creator_id,created,datasets,collections,users\n"
+    var contents: String = "type,id,name,description,owner_id,created,datasets,collections,users\n"
 
     spaces.listAccess(0, Set[Permission](Permission.ViewSpace), request.user, true, false, false, false).foreach(sp => {
       val creator_id = users.get(sp.creator) match {
