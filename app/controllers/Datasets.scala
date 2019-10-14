@@ -48,14 +48,8 @@ class Datasets @Inject() (
   def newDataset(space: Option[String], collection: Option[String]) = PermissionAction(Permission.CreateDataset) { implicit request =>
     implicit val user = request.user
     val spacesList = user.get.spaceandrole.map(_.spaceId).flatMap(spaceService.get(_))
-    var decodedSpaceList = new ListBuffer[models.ProjectSpace]()
-    for (aSpace <- spacesList) {
-      //For each space in the list, check if the user has permission to add something to it, if so
-      //decode it and add it to the list to pass back to the view.
-      if (Permission.checkPermission(Permission.AddResourceToSpace, ResourceRef(ResourceRef.space, aSpace.id))) {
-        decodedSpaceList += Utils.decodeSpaceElements(aSpace)
-      }
-    }
+    val perms = Permission.checkPermissions(Permission.AddResourceToSpace, spacesList.map(s => ResourceRef(ResourceRef.space, s.id))).approved
+    val decodedSpaceList = spacesList.filter(sp => perms.map(_.id).exists(_ == sp.id)).map(Utils.decodeSpaceElements(_))
 
     var hasVerifiedSpace = false
     val (spaceId, spaceName) = space match {
@@ -158,26 +152,7 @@ class Datasets @Inject() (
           -1
         }
 
-        for (tidObject <- datasetIdsToUse) {
-          val followedDataset = datasets.get(tidObject.id)
-          followedDataset match {
-            case Some(fdset) => {
-              datasetList += fdset
-            }
-            case None =>
-          }
-        }
-
-        val commentMap = datasetList.map { dataset =>
-          var allComments = comments.findCommentsByDatasetId(dataset.id)
-          dataset.files.map { file =>
-            allComments ++= comments.findCommentsByFileId(file)
-            sections.findByFileId(file).map { section =>
-              allComments ++= comments.findCommentsBySectionId(section.id)
-            }
-          }
-          dataset.id -> allComments.size
-        }.toMap
+        datasets.get(datasetIdsToUse.map(_.id)).found.foreach(followedDataset => datasetList += followedDataset)
 
         //Modifications to decode HTML entities that were stored in an encoded fashion as part
         //of the datasets names or descriptions
@@ -206,7 +181,7 @@ class Datasets @Inject() (
         Logger.debug("User selection " + userSelections)
 
         //Pass the viewMode into the view
-        Ok(views.html.users.followingDatasets(decodedDatasetList.toList, commentMap, prev, next, limit, viewMode, None, title, None, userSelections))
+        Ok(views.html.users.followingDatasets(decodedDatasetList.toList, prev, next, limit, viewMode, None, title, None, userSelections))
       }
       case None => InternalServerError("No User found")
     }
@@ -356,17 +331,6 @@ class Datasets @Inject() (
       ""
     }
 
-    val commentMap = datasetList.map { dataset =>
-      var allComments = comments.findCommentsByDatasetId(dataset.id)
-      dataset.files.map { file =>
-        allComments ++= comments.findCommentsByFileId(file)
-        sections.findByFileId(file).map { section =>
-          allComments ++= comments.findCommentsBySectionId(section.id)
-        }
-      }
-      dataset.id -> allComments.size
-    }.toMap
-
     //Modifications to decode HTML entities that were stored in an encoded fashion as part
     //of the datasets names or descriptions
     val decodedDatasetList = ListBuffer.empty[models.Dataset]
@@ -397,7 +361,9 @@ class Datasets @Inject() (
       case Some(s) if !Permission.checkPermission(Permission.ViewSpace, ResourceRef(ResourceRef.space, UUID(s))) => {
         BadRequest(views.html.notAuthorized("You are not authorized to access the " + spaceTitle + ".", s, "space"))
       }
-      case _ => Ok(views.html.datasetList(decodedDatasetList.toList, commentMap, prev, next, limit, viewMode, space, spaceName, status, title, owner, ownerName, when, date, userSelections, showTrash))
+      case _ =>
+        Ok(views.html.datasetList(decodedDatasetList.toList, prev, next, limit, viewMode, space, spaceName,
+        status, title, owner, ownerName, when, date, userSelections, showTrash))
     }
   }
 
@@ -512,7 +478,7 @@ class Datasets @Inject() (
           ""
         }
         val date = ""
-        Ok(views.html.datasetList(decodedDatasetList.toList, commentMap, prev, next, limit, viewMode, Some(space), spaceName, None, title, None, None, "a", date, userSelections))
+        Ok(views.html.datasetList(decodedDatasetList.toList, prev, next, limit, viewMode, Some(space), spaceName, None, title, None, None, "a", date, userSelections))
       }
     }
   }
@@ -526,54 +492,30 @@ class Datasets @Inject() (
     Previewers.findDatasetPreviewers().foreach(p => Logger.debug("Previewer found " + p.id))
     datasets.get(id) match {
       case Some(dataset) => {
-
-        // get files info sorted by date
-        val filesInDataset = dataset.files.flatMap(f => files.get(f) match {
-          case Some(file) => Some(file)
-          case None => Logger.debug(s"Unable to find file $f"); None
-        }).asInstanceOf[List[File]].sortBy(_.uploadDate)
-
-        var datasetWithFiles = dataset.copy(files = filesInDataset.map(_.id))
-        datasetWithFiles = Utils.decodeDatasetElements(datasetWithFiles)
-
+        // previewers
         val filteredPreviewers = Previewers.findDatasetPreviewers
 
+        // metadata
         val m = metadata.getMetadataByAttachTo(ResourceRef(ResourceRef.dataset, dataset.id))
 
+        // collections
         val collectionsInside = collections.listInsideDataset(id, request.user, request.user.fold(false)(_.superAdminMode)).sortBy(_.name)
         var decodedCollectionsInside = new ListBuffer[models.Collection]()
-        var filesTags = TreeSet.empty[String]
-
         for (aCollection <- collectionsInside) {
           val dCollection = Utils.decodeCollectionElements(aCollection)
           decodedCollectionsInside += dCollection
         }
 
-        var commentsByDataset = comments.findCommentsByDatasetId(id)
-        filesInDataset.map {
-          file =>
-
-            commentsByDataset ++= comments.findCommentsByFileId(file.id)
-            sections.findByFileId(UUID(file.id.toString)).map { section =>
-              commentsByDataset ++= comments.findCommentsBySectionId(section.id)
-            }
-        }
-        commentsByDataset = commentsByDataset.sortBy(_.posted)
-
-        //Decode the comments so that their free text will display correctly in the view
+        // comments
+        var commentsByDataset = comments.findCommentsByDatasetId(id).sortBy(_.posted)
+        // decode the comments so that their free text will display correctly in the view
         var decodedCommentsByDataset = ListBuffer.empty[Comment]
         for (aComment <- commentsByDataset) {
           val dComment = Utils.decodeCommentElements(aComment)
           decodedCommentsByDataset += dComment
         }
 
-        filesInDataset.map { file =>
-          file.tags.map {
-            tag => filesTags += tag.name
-          }
-        }
-
-        // associated sensors
+        // sensors
         val sensors: List[(String, String, String)] = current.plugin[PostgresPlugin] match {
           case Some(db) if db.isEnabled => {
             // findRelationships will return a "Relation" model with all information about the relationship
@@ -591,8 +533,8 @@ class Datasets @Inject() (
           case _ => List.empty[(String, String, String)]
         }
 
+        // spaces
         var datasetSpaces: List[ProjectSpace] = List.empty[ProjectSpace]
-
         var decodedSpaces_canRemove: Map[ProjectSpace, Boolean] = Map.empty
         var isInPublicSpace = false
         dataset.spaces.map {
@@ -607,17 +549,17 @@ class Datasets @Inject() (
               case None => Logger.error(s"space with id $sp on $Messages('dataset.title') $id doesn't exist.")
             }
         }
-
-        val fileList: List[File] = dataset.files.reverse.map(f => files.get(f)).flatten
-
-        //dataset is in at least one space with editstagingarea permission, or if the user is the owner of dataset.
-        val stagingarea = datasetSpaces filter (space => Permission.checkPermission(Permission.EditStagingArea, ResourceRef(ResourceRef.space, space.id)))
+        // dataset is in at least one space with editstagingarea permission, or if the user is the owner of dataset
+        val perms = Permission.checkPermissions(Permission.EditStagingArea, datasetSpaces.map(ds => ResourceRef(ResourceRef.space, ds.id))).approved
+        val stagingarea = datasetSpaces.filter(sp => perms.map(_.id).exists(_ == sp.id))
         val toPublish = !stagingarea.isEmpty
-
-        val curObjectsPublished: List[CurationObject] = curationService.getCurationObjectByDatasetId(dataset.id).filter(_.status == 'Published)
-        val curObjectsPermission: List[CurationObject] = curationService.getCurationObjectByDatasetId(dataset.id).filter(curation => Permission.checkPermission(Permission.EditStagingArea, ResourceRef(ResourceRef.curationObject, curation.id)))
+        val curObjs = curationService.getCurationObjectByDatasetId(dataset.id)
+        val curObjectsPublished = curObjs.filter(_.status == 'Published)
+        val coperms = Permission.checkPermissions(Permission.EditStagingArea, curObjs.map(co => ResourceRef(ResourceRef.curationObject, co.id))).approved
+        val curObjectsPermission = curObjs.filter(co => coperms.map(_.id).exists(_ == co.id))
         val curPubObjects: List[CurationObject] = curObjectsPublished ::: curObjectsPermission
 
+        // download button
         var showDownload: Boolean = dataset.files.length > 0
         if (!showDownload) {
           val foldersList = folders.findByParentDatasetId(dataset.id)
@@ -625,8 +567,9 @@ class Datasets @Inject() (
             if (folder.files.length > 0) { showDownload = true }
           }
         }
-        var showAccess = false
 
+        // access control based on config flags `verifySpaces`, `enablePublic`
+        var showAccess = false
         if (play.Play.application().configuration().getBoolean("verifySpaces")) {
           showAccess = !dataset.isTRIAL
         } else {
@@ -649,31 +592,33 @@ class Datasets @Inject() (
         } else {
           accessOptions.append(spaceTitle + " Default (Private)")
         }
-        accessOptions.append(DatasetStatus.PRIVATE.toString.substring(0, 1).toUpperCase() + DatasetStatus.PRIVATE.toString.substring(1).toLowerCase())
-        accessOptions.append(DatasetStatus.PUBLIC.toString.substring(0, 1).toUpperCase() + DatasetStatus.PUBLIC.toString.substring(1).toLowerCase())
-
+        accessOptions.append(DatasetStatus.PRIVATE.toString.substring(0, 1).toUpperCase() +
+          DatasetStatus.PRIVATE.toString.substring(1).toLowerCase())
+        accessOptions.append(DatasetStatus.PUBLIC.toString.substring(0, 1).toUpperCase() +
+          DatasetStatus.PUBLIC.toString.substring(1).toLowerCase())
         val accessData = new models.DatasetAccess(showAccess, access, accessOptions.toList)
 
+        // add to collection permissions
         var canAddDatasetToCollection = Permission.checkOwner(user, ResourceRef(ResourceRef.dataset, dataset.id))
         if (!canAddDatasetToCollection) {
-          datasetSpaces.map(space =>
-            if (Permission.checkPermission(Permission.AddResourceToCollection, ResourceRef(ResourceRef.space, space.id))) {
-              canAddDatasetToCollection = true
-           }
-          )
+          val parent_space_refs = datasetSpaces.map(space => ResourceRef(ResourceRef.space, space.id))
+          canAddDatasetToCollection = !Permission.checkPermissions(Permission.AddResourceToCollection, parent_space_refs).approved.isEmpty
         }
+
+        // staging area
         val stagingAreaDefined = play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined
 
+        // extraction logs
         val extractionsByDataset = extractions.findById(new ResourceRef('dataset, id))
         val extractionGroups = extractions.groupByType(extractionsByDataset)
 
-        // Increment view count for dataset
+        // increment view count for dataset
         val view_data = datasets.incrementViews(id, user)
 
         // view_data is passed as tuple in dataset case only, because template is at limit of 22 parameters
-        Ok(views.html.dataset(datasetWithFiles, commentsByDataset, filteredPreviewers.toList, m,
-          decodedCollectionsInside.toList, sensors, Some(decodedSpaces_canRemove), fileList,
-          filesTags, toPublish, curPubObjects, currentSpace, limit, showDownload, accessData, canAddDatasetToCollection,
+        Ok(views.html.dataset(dataset, commentsByDataset, filteredPreviewers.toList, m,
+          decodedCollectionsInside.toList, sensors, Some(decodedSpaces_canRemove), toPublish, curPubObjects,
+          currentSpace, limit, showDownload, accessData, canAddDatasetToCollection,
           stagingAreaDefined, view_data, extractionGroups))
       }
       case None => {
@@ -698,14 +643,14 @@ class Datasets @Inject() (
           case Some(fId) => {
             folders.get(UUID(fId)) match {
               case Some(folder) => {
-                val (foldersList: List[Folder], limitFileList: List[File]) = if(play.Play.application().configuration().getBoolean("sortInMemory")) {
-                  (SortingUtils.sortFolders(folder.folders.flatMap(f => folders.get(f)), sortOrder).slice(limit * filepageUpdate, limit * (filepageUpdate + 1)),
-                   SortingUtils.sortFiles(folder.files.flatMap(f => files.get(f)), sortOrder).slice(limit * filepageUpdate - folder.folders.length, limit * (filepageUpdate + 1) - folder.folders.length))
-                } else {
-                  (folder.folders.reverse.slice(limit * filepageUpdate, limit * (filepageUpdate+1)).flatMap(f => folders.get(f)),
-                   folder.files.reverse.slice(limit * filepageUpdate - folder.folders.length, limit * (filepageUpdate+1) - folder.folders.length).flatMap(f => files.get(f)))
-                }
-
+                val (foldersList: List[Folder], limitFileList: List[File]) =
+                  if(play.Play.application().configuration().getBoolean("sortInMemory")) {
+                    (SortingUtils.sortFolders(folder.folders.flatMap(f => folders.get(f)), sortOrder).slice(limit * filepageUpdate, limit * (filepageUpdate + 1)),
+                     SortingUtils.sortFiles(files.get(folder.files).found, sortOrder).slice(limit * filepageUpdate - folder.folders.length, limit * (filepageUpdate + 1) - folder.folders.length))
+                  } else {
+                    (folder.folders.reverse.slice(limit * filepageUpdate, limit * (filepageUpdate+1)).flatMap(f => folders.get(f)),
+                     folder.files.reverse.slice(limit * filepageUpdate - folder.folders.length, limit * (filepageUpdate+1) - folder.folders.length).flatMap(f => files.get(f)))
+                  }
                 var folderHierarchy = new ListBuffer[Folder]()
                 folderHierarchy += folder
                 var f1: Folder = folder
@@ -736,7 +681,7 @@ class Datasets @Inject() (
           case None => {
             val (foldersList: List[Folder], limitFileList: List[File]) = if(play.Play.application().configuration().getBoolean("sortInMemory")) {
               (SortingUtils.sortFolders(dataset.folders.flatMap(f => folders.get(f)), sortOrder).slice(limit * filepageUpdate, limit * (filepageUpdate + 1)),
-               SortingUtils.sortFiles(dataset.files.flatMap(f => files.get(f)), sortOrder).slice(limit * filepageUpdate - dataset.folders.length, limit * (filepageUpdate + 1) - dataset.folders.length))
+               SortingUtils.sortFiles(files.get(dataset.files).found, sortOrder).slice(limit * filepageUpdate - dataset.folders.length, limit * (filepageUpdate + 1) - dataset.folders.length))
             } else {
               (dataset.folders.reverse.slice(limit * filepageUpdate, limit * (filepageUpdate+1)).flatMap(f => folders.get(f)),
                dataset.files.reverse.slice(limit * filepageUpdate - dataset.folders.length, limit * (filepageUpdate+1) - dataset.folders.length).flatMap(f => files.get(f)))
@@ -783,6 +728,7 @@ class Datasets @Inject() (
    */
   def submit(folderId: Option[String]) = PermissionAction(Permission.CreateDataset)(parse.multipartFormData) { implicit request =>
     implicit val user = request.user
+
     Logger.debug("------- in Datasets.submit ---------")
 
     val folder = folderId.flatMap(id => folders.get(UUID(id)))
@@ -790,7 +736,8 @@ class Datasets @Inject() (
       case Some(ds) => {
         datasets.get(UUID(ds)) match {
           case Some(dataset) => {
-            val uploadedFiles = FileUtils.uploadFilesMultipart(request, showPreviews = "DatasetLevel", dataset = Some(dataset), folder = folder)
+            val uploadedFiles = FileUtils.uploadFilesMultipart(request, showPreviews = "DatasetLevel",
+              dataset = Some(dataset), folder = folder, apiKey=request.apiKey)
             Map("files" -> uploadedFiles.map(f => toJson(Map(
               "name" -> toJson(f.filename),
               "size" -> toJson(f.length),

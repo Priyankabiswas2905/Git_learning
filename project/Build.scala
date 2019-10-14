@@ -13,14 +13,14 @@ import NativePackagerKeys._
 object ApplicationBuild extends Build {
 
   val appName = "clowder"
-  val version = "1.x"
+  val version = "1.7.3"
   val jvm = "1.7"
 
   def appVersion: String = {
     if (gitBranchName == "master") {
-      version
+      getVersion
     } else {
-      s"${version}-SNAPSHOT"
+      s"${getVersion}-SNAPSHOT"
     }
   }
 
@@ -37,29 +37,38 @@ object ApplicationBuild extends Build {
     res.toSeq
   }
 
+  def getVersion: String = {
+    sys.env.getOrElse("VERSION", version)
+  }
+
   def gitShortHash: String = {
-    try {
-      val hash = exec("git rev-parse --short HEAD")
-      assert(hash.length == 1)
-      hash(0)
-    } catch {
-      case e: Exception => "N/A"
-    }
+    sys.env.getOrElse("GITSHA1", default = {
+      try {
+        val hash = exec("git rev-parse --short HEAD")
+        assert(hash.length == 1)
+        hash(0)
+      } catch {
+        case e: Exception => "N/A"
+      }
+    })
   }
 
   def gitBranchName: String = {
-    try {
-      val branch = exec("git rev-parse --abbrev-ref HEAD")
-      assert(branch.length == 1)
-      if (branch(0) == "HEAD") return "detached"
-      branch(0)
-    } catch {
-      case e: Exception => "N/A"
-    }
+    val branch = sys.env.getOrElse("BRANCH", default = {
+      try {
+        val branch = exec("git rev-parse --abbrev-ref HEAD")
+        assert(branch.length == 1)
+        branch(0)
+      } catch {
+        case e: Exception => "N/A"
+      }
+    })
+    if (branch == "HEAD")  return "detached"
+    branch
   }
 
   def getBambooBuild: String = {
-    sys.env.getOrElse("bamboo_buildNumber", default = "local")
+    sys.env.getOrElse("BUILDNUMBER", default = "local")
   }
 
   val appDependencies = Seq(
@@ -129,7 +138,12 @@ object ApplicationBuild extends Build {
     "org.irods.jargon" % "jargon-core" % "3.3.3-beta1",
 
     // jsonp return from /api
-    "org.julienrf" %% "play-jsonp-filter" % "1.1"
+    "org.julienrf" %% "play-jsonp-filter" % "1.1",
+
+    // Official AWS Java SDK
+    "com.amazonaws" % "aws-java-sdk-bom" % "1.11.106",
+
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.106"
   )
 
   // Only compile the bootstrap bootstrap.less file and any other *.less file in the stylesheets directory

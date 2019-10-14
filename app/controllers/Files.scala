@@ -144,7 +144,7 @@ class Files @Inject() (
 
         //Decode the datasets so that their free text will display correctly in the view
         val datasetsContainingFile = datasets.findByFileIdDirectlyContain(file.id).sortBy(_.name)
-        val allDatasets = (folders.findByFileId(id).map(folder => datasets.get(folder.parentDatasetId)).flatten ++ datasetsContainingFile)
+        val allDatasets = datasets.get(folders.findByFileId(id).map(_.parentDatasetId)).found ++ datasetsContainingFile
 
         val access = if (allDatasets == Nil) {
           "Private"
@@ -276,23 +276,7 @@ class Files @Inject() (
           -1
         }
 
-        for (tidObject <- fileIdsToUse) {
-          val followedFile = files.get(tidObject.id)
-          followedFile match {
-            case Some(ffile) => {
-              fileList += ffile
-            }
-            case None =>
-          }
-        }
-
-        val commentMap = fileList.map { file =>
-          var allComments = comments.findCommentsByFileId(file.id)
-          sections.findByFileId(file.id).map { section =>
-            allComments ++= comments.findCommentsBySectionId(section.id)
-          }
-          file.id -> allComments.size
-        }.toMap
+        files.get(fileIdsToUse.map(_.id)).found.foreach(ffile => fileList += ffile)
 
         //Code to read the cookie data. On default calls, without a specific value for the mode, the cookie value is used.
         //Note that this cookie will, in the long run, pertain to all the major high-level views that have the similar
@@ -308,7 +292,7 @@ class Files @Inject() (
           }
 
         //Pass the viewMode into the view
-        Ok(views.html.users.followingFiles(fileList.toList, commentMap, prev, next, limit, viewMode))
+        Ok(views.html.users.followingFiles(fileList.toList, prev, next, limit, viewMode))
       }
       case None => InternalServerError("User not found")
     }
@@ -452,7 +436,7 @@ class Files @Inject() (
                 // submit for extraction
                 current.plugin[RabbitmqPlugin].foreach {
                   // FIXME dataset not available?
-                  _.fileCreated(f, None, Utils.baseUrl(request))
+                  _.fileCreated(f, None, Utils.baseUrl(request), request.apiKey)
                 }
 
                 /** *** Inserting DTS Requests   **/
@@ -595,7 +579,7 @@ class Files @Inject() (
               /****************************/
 	            current.plugin[RabbitmqPlugin].foreach{
                 // FIXME dataset not available?
-                _.fileCreated(f, None, Utils.baseUrl(request))
+                _.fileCreated(f, None, Utils.baseUrl(request), request.apiKey)
               }
 	            
 	            //for metadata files
@@ -694,7 +678,7 @@ class Files @Inject() (
       //Check the license type before doing anything. 
       files.get(id) match {
         case Some(file) => {
-          if (file.licenseData.isDownloadAllowed(request.user) || Permission.checkPermission(request.user, Permission.DownloadFiles, ResourceRef(ResourceRef.file, file.id))) {
+          if (file.licenseData.isDownloadAllowed(request.user)) {
             files.getBytes(id) match {
               case Some((inputStream, filename, contentType, contentLength)) => {
                 files.incrementDownloads(id, user)
@@ -974,7 +958,7 @@ class Files @Inject() (
             }
 
             current.plugin[RabbitmqPlugin].foreach {
-              _.multimediaQuery(f.id, f.contentType, f.length.toString, Utils.baseUrl(request))
+              _.multimediaQuery(f.id, f.contentType, f.length.toString, Utils.baseUrl(request), request.apiKey)
             }
 
             //for metadata files
@@ -1071,7 +1055,7 @@ class Files @Inject() (
             val extra = Map("filename" -> f.filename, "action" -> "upload")
 
             current.plugin[RabbitmqPlugin].foreach {
-              _.fileCreated(f, host)
+              _.fileCreated(f, host, request.apiKey)
             }
 
             //for metadata files
@@ -1209,8 +1193,8 @@ class Files @Inject() (
 
                     // notify extractors that a file has been uploaded and added to a dataset
                     current.plugin[RabbitmqPlugin].foreach { rabbitMQ =>
-                      rabbitMQ.fileCreated(f, Some(dataset), Utils.baseUrl(request))
-                      rabbitMQ.fileAddedToDataset(f, dataset, Utils.baseUrl(request))
+                      rabbitMQ.fileCreated(f, Some(dataset), Utils.baseUrl(request), request.apiKey)
+                      rabbitMQ.fileAddedToDataset(f, dataset, Utils.baseUrl(request), request.apiKey)
                     }
 
                     // add file to RDF triple store if triple store is used

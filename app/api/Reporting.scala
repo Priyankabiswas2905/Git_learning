@@ -109,7 +109,7 @@ class Reporting @Inject()(selections: SelectionService,
       contents += dateFormat.format(sp.created)+","
       contents += sp.datasetCount.toString+","
       contents += sp.collectionCount.toString+","
-      contents += sp.userCount.toString+","
+      contents += sp.userCount.toString
       contents += "\n"
     })
 
@@ -127,7 +127,7 @@ class Reporting @Inject()(selections: SelectionService,
     // Hard-code Anonymous user for now
     contents += "\"user\",\"000000000000000000000000\",\"Anonymous User\",\"\",\"\",,,,,,\n"
 
-    users.list().foreach(u => {
+    users.list(limit=0).foreach(u => {
       // Get owned and member space counts
       var admin_spaces = 0
       var member_spaces = 0
@@ -174,20 +174,40 @@ class Reporting @Inject()(selections: SelectionService,
     var coll_list = ""
     var space_list = ""
     var i = 1
+    var j = 1
+    var k = 1
     parent_datasets.foreach(ds => {
       ds_list += (if (i>1) ", " else "") + ds.id
-      var j = 1
       ds.collections.foreach(coll => {
-        coll_list += (if (j>1) ", " else "") + coll.uuid
-        j += 1
+        if (!coll_list.contains(coll.uuid)) {
+          coll_list += (if (j>1) ", " else "") + coll.uuid
+          j += 1
+        }
       })
-      var k = 1
       ds.spaces.foreach(sp => {
-        space_list += (if (k>1) ", " else "") + sp.uuid
-        k += 1
+        if (!space_list.contains(sp.uuid)) {
+          space_list += (if (k>1) ", " else "") + sp.uuid
+          k += 1
+        }
       })
       i += 1
     })
+
+    // Get stats if they exist, otherwise use default values
+    val vwcount = if (f.stats == null) "0" else f.stats.views.toString
+    val lvstr = if (f.stats == null) "" else {
+      f.stats.last_viewed match {
+        case Some(lvdate) => dateFormat.format(lvdate)
+        case None => ""
+      }
+    }
+    val dlcount = if (f.stats == null) "0" else f.stats.downloads.toString
+    val ldstr = if (f.stats == null) "" else {
+      f.stats.last_downloaded match {
+        case Some(lddate) => dateFormat.format(lddate)
+        case None => ""
+      }
+    }
 
     contents += "\"file\","
     contents += "\""+f.id.toString+"\","
@@ -196,17 +216,9 @@ class Reporting @Inject()(selections: SelectionService,
     contents += "\""+f.author.id+"\","
     contents += (f.length/1000).toInt.toString+","
     contents += dateFormat.format(f.uploadDate)+","
-    contents += f.stats.views.toString+","
-    contents += f.stats.downloads.toString+","
-    val lvstr = f.stats.last_viewed match {
-      case Some(lvdate) => dateFormat.format(lvdate)
-      case None => ""
-    }
+    contents += vwcount+","
+    contents += dlcount+","
     contents += lvstr+","
-    val ldstr = f.stats.last_downloaded match {
-      case Some(lddate) => dateFormat.format(lddate)
-      case None => ""
-    }
     contents += ldstr+","
     contents += "\""+f.loader_id+"\","
     contents += "\""+ds_list+"\","
@@ -235,6 +247,22 @@ class Reporting @Inject()(selections: SelectionService,
       k += 1
     })
 
+    // Get stats if they exist, otherwise use default values
+    val vwcount = if (ds.stats == null) "0" else ds.stats.views.toString
+    val lvstr = if (ds.stats == null) "" else {
+      ds.stats.last_viewed match {
+        case Some(lvdate) => dateFormat.format(lvdate)
+        case None => ""
+      }
+    }
+    val dlcount = if (ds.stats == null) "0" else ds.stats.downloads.toString
+    val ldstr = if (ds.stats == null) "" else {
+      ds.stats.last_downloaded match {
+        case Some(lddate) => dateFormat.format(lddate)
+        case None => ""
+      }
+    }
+
     contents += "\"dataset\","
     contents += "\""+ds.id.toString+"\","
     contents += "\""+ds.name.replace("\"", "\"\"")+"\","
@@ -242,17 +270,9 @@ class Reporting @Inject()(selections: SelectionService,
     contents += "\""+ds.author.id+"\","
     if (returnAllColums) contents += "," // datasets do not have size
     contents += dateFormat.format(ds.created)+","
-    contents += ds.stats.views.toString+","
-    contents += ds.stats.downloads.toString+","
-    val lvstr = ds.stats.last_viewed match {
-      case Some(lvdate) => dateFormat.format(lvdate)
-      case None => ""
-    }
+    contents += vwcount+","
+    contents += dlcount+","
     contents += lvstr+","
-    val ldstr = ds.stats.last_downloaded match {
-      case Some(lddate) => dateFormat.format(lddate)
-      case None => ""
-    }
     contents += ldstr+","
     if (returnAllColums) contents += "," // datasets do not have location
     if (returnAllColums) contents += "," // datasets do not have parent_datasets
@@ -282,6 +302,15 @@ class Reporting @Inject()(selections: SelectionService,
       k += 1
     })
 
+    // Get stats if they exist, otherwise use default values
+    val vwcount = if (coll.stats == null) "0" else coll.stats.views.toString
+    val lvstr = if (coll.stats == null) "" else {
+      coll.stats.last_viewed match {
+        case Some(lvdate) => dateFormat.format(lvdate)
+        case None => ""
+      }
+    }
+
     contents += "\"collection\","
     contents += "\""+coll.id.toString+"\","
     contents += "\""+coll.name.replace("\"", "\"\"")+"\","
@@ -289,12 +318,8 @@ class Reporting @Inject()(selections: SelectionService,
     contents += "\""+coll.author.id+"\","
     if (returnAllColums) contents += "," // collections do not have size
     contents += dateFormat.format(coll.created)+","
-    contents += coll.stats.views.toString+","
+    contents += vwcount+","
     if (returnAllColums) contents += "," // collections do not have downloads
-    val lvstr = coll.stats.last_viewed match {
-        case Some(lvdate) => dateFormat.format(lvdate)
-        case None => ""
-      }
     contents += lvstr+","
     if (returnAllColums) contents += "," // collections do not have last_downloaded
     if (returnAllColums) contents += "," // collections do not have location

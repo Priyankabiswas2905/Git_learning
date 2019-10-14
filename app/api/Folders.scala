@@ -9,7 +9,9 @@ import javax.inject.{Inject, Singleton}
 import play.api.libs.json.JsValue
 import services._
 import play.api.Logger
+import play.api.Play.current
 import play.api.libs.json.Json._
+import play.api.mvc.Request
 
 import scala.collection.mutable.ListBuffer
 
@@ -143,15 +145,60 @@ class Folders @Inject() (
     ))
   }
 
-  def deleteFolder(parentDatasetId: UUID, folderId: UUID) = PermissionAction(Permission.RemoveResourceFromDataset, Some(ResourceRef(ResourceRef.dataset, parentDatasetId))) { implicit request =>
+  /**
+    * traverse subfiles directly/indirectly under this folder and send file deletion event to rabbitmq.
+    * @param folder a Folder object
+    * @param host Clowder host
+    * @param requestAPIKey user apikey
+    */
+  def subfilesDeletionRabbitmqNotification(folderId: UUID, host: String, requestAPIKey: Option[String]): Unit = {
+    Logger.debug(s"[subfilesDeletionRabbitmqNotification] under folderid $folderId")
+    folders.get(folderId) match {
+      case Some(folder) => {
+        files.get(folder.files).found.foreach(file => {
+          // notify rabbitmq
+          Logger.debug(s"[subfilesDeletionRabbitmqNotification] rabbitmq delete event of fileid ${file.id} under folderid $folderId")
+          current.plugin[RabbitmqPlugin].foreach { p =>
+            datasets.findByFileIdAllContain(file.id).foreach { ds =>
+              p.fileRemovedFromDataset(file, ds, host, requestAPIKey)
+            }
+          }
+        })
+        folder.folders.map {
+          // Don't need to do a get here since it's done first thing in the recursive call
+          subfolderId => subfilesDeletionRabbitmqNotification(subfolderId, host, requestAPIKey)
+        }
+      }
+      case None => Logger.warn(s"[subfilesDeletionRabbitmqNotification] folder: $folderId not exist!")
+    }
+
+  }
+
+  /**
+    * Delete a folder and all its children (files and folders).
+    *
+    * FIXME: Messages go out on RabbitMQ and then files are deleted. If an extractor needs a file that has just been
+    * deleted it might not find it (depending on the length of the queue. This is not the only place where this can happen
+    * and it's a common issue with delete RabbitMQ messages.
+    *
+    * @param parentDatasetId
+    * @param folderId
+    * @return
+    */
+  def deleteFolder(parentDatasetId: UUID, folderId: UUID) =
+    PermissionAction(Permission.RemoveResourceFromDataset, Some(ResourceRef(ResourceRef.dataset, parentDatasetId))) { implicit request =>
     Logger.debug("--- Api Deleting Folder ---")
     datasets.get(parentDatasetId) match {
       case Some(parentDataset) => {
         folders.get(folderId) match {
           case Some(folder) => {
 
+            // 1. traverse subfiles directly/indirectly under this folder and send file deletion event to rabbitmq.
+            subfilesDeletionRabbitmqNotification(folderId, Utils.baseUrl(request), request.apiKey)
+
             events.addObjectEvent(request.user, parentDatasetId, parentDataset.name, "deleted_folder")
-            folders.delete(folderId, Utils.baseUrl(request))
+            // 2. delete folders and files from Clowder.
+            folders.delete(folderId, Utils.baseUrl(request), request.apiKey, request.user)
             if(folder.parentType == "dataset") {
               datasets.removeFolder(parentDatasetId, folderId)
             } else if(folder.parentType == "folder") {

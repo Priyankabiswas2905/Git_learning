@@ -19,6 +19,7 @@ import play.api.libs.ws.{Response, WS}
 import play.api.mvc.MultipartFormData
 import services._
 
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 
 
@@ -43,7 +44,8 @@ class Extractions @Inject()(
    * This may change accordingly.
    */
   def uploadExtract(showPreviews: String = "DatasetLevel", extract: Boolean = true) = PermissionAction(Permission.AddFile)(parse.multipartFormData) { implicit request =>
-    val uploadedFiles = _root_.util.FileUtils.uploadFilesMultipart(request, key="File", index=false, showPreviews=showPreviews, runExtractors=extract, insertDTSRequests = true)
+    val uploadedFiles = _root_.util.FileUtils.uploadFilesMultipart(request, key="File", index=false,
+      showPreviews=showPreviews, runExtractors=extract, insertDTSRequests = true, apiKey=request.apiKey)
     uploadedFiles.length match {
       case 0 => BadRequest("No files uploaded")
       case 1 => Ok(toJson(Map("id" -> uploadedFiles.head.id)))
@@ -56,7 +58,8 @@ class Extractions @Inject()(
    *
    */
   def uploadByURL(extract: Boolean = true) = PermissionAction(Permission.AddFile)(parse.json) { implicit request =>
-    val uploadedFiles = _root_.util.FileUtils.uploadFilesJSON(request, key="fileurl", index=false, runExtractors=extract, insertDTSRequests = true)
+    val uploadedFiles = _root_.util.FileUtils.uploadFilesJSON(request, key="fileurl", index=false, runExtractors=extract,
+      insertDTSRequests = true, apiKey=request.apiKey)
     uploadedFiles.length match {
       case 0 => BadRequest("No fileurls uploaded")
       case 1 => Ok(toJson(Map("id" -> uploadedFiles.head.id)))
@@ -91,7 +94,7 @@ class Extractions @Inject()(
                     // notify extractors
                     current.plugin[RabbitmqPlugin].foreach {
                       // FIXME dataset not available?
-                      _.fileCreated(f, None, Utils.baseUrl(request))
+                      _.fileCreated(f, None, Utils.baseUrl(request), request.apiKey)
                     }
                     /*--- Insert DTS Requests  ---*/
                     val clientIP = request.remoteAddress
@@ -140,7 +143,7 @@ class Extractions @Inject()(
             case Some(file) => {
               current.plugin[RabbitmqPlugin].foreach {
                 // FIXME dataset not available?
-                _.fileCreated(file, None, Utils.baseUrl(request))
+                _.fileCreated(file, None, Utils.baseUrl(request), request.apiKey)
               }
               Ok("Sent for Extraction. check the status")
             }
@@ -309,7 +312,6 @@ class Extractions @Inject()(
       } //user
   }
 
-
   def computeStatus(response: Response, file: models.File, l: scala.collection.mutable.Map[String, String]): String = {
 
     var isActivity = "false"
@@ -380,8 +382,8 @@ class Extractions @Inject()(
     Ok(Json.obj("Servers" -> listServersIPs))
   }
 
-  def getExtractorNames() = AuthenticatedAction { implicit request =>
-    val listNames = extractors.getExtractorNames()
+  def getExtractorNames(categories: List[String]) = AuthenticatedAction { implicit request =>
+    val listNames = extractors.getExtractorNames(categories)
     val listNamesJson = toJson(listNames)
     Ok(toJson(Map("Extractors" -> listNamesJson)))
    }
@@ -394,7 +396,6 @@ class Extractions @Inject()(
     val listNamesJson = toJson(listNames)
     Ok(listNamesJson)
   }
-
 
   def getExtractorInputTypes() = AuthenticatedAction { implicit request =>
     val listInputTypes = extractors.getExtractorInputTypes()
@@ -434,8 +435,8 @@ class Extractions @Inject()(
     Ok(jarr)
   }
 
-  def listExtractors() = AuthenticatedAction  { implicit request =>
-    Ok(Json.toJson(extractors.listExtractorsInfo()))
+  def listExtractors(categories: List[String]) = AuthenticatedAction  { implicit request =>
+    Ok(Json.toJson(extractors.listExtractorsInfo(categories)))
   }
 
   def getExtractorInfo(extractorName: String) = AuthenticatedAction { implicit request =>
@@ -449,9 +450,15 @@ class Extractions @Inject()(
 
     // If repository is of type object, change it into an array.
     // This is for backward compatibility with requests from existing extractors.
-    val requestJson = request.body \ "repository" match {
+    var requestJson = request.body \ "repository" match {
       case rep: JsObject => request.body.as[JsObject] ++ Json.obj("repository" ->  Json.arr(rep))
       case _ => request.body
+    }
+
+    // If extractor doesn't have categories specified, set a default
+    requestJson = requestJson \ "categories" match {
+      case cats: JsUndefined => requestJson.as[JsObject] ++ Json.obj("categories" ->  Json.arr(ExtractorCategory.EXTRACT.toString))
+      case _ => requestJson
     }
 
     val extractionInfoResult = requestJson.validate[ExtractorInfo]
@@ -518,9 +525,10 @@ class Extractions @Inject()(
               // if extractor_id is not specified default to execution of all extractors matching mime type
               val key = (request.body \ "extractor").asOpt[String] match {
                 case Some(extractorId) =>
-                  p.submitFileManually(new UUID(originalId), file, Utils.baseUrl(request), extractorId, extra, datasetId, newFlags)
+                  p.submitFileManually(new UUID(originalId), file, Utils.baseUrl(request), extractorId, extra,
+                    datasetId, newFlags, request.apiKey, request.user)
                 case None =>
-                  p.fileCreated(file, None, Utils.baseUrl(request))
+                  p.fileCreated(file, None, Utils.baseUrl(request), request.apiKey)
               }
               Ok(Json.obj("status" -> "OK"))
             } else {
@@ -558,11 +566,11 @@ class Extractions @Inject()(
               "parameters" -> parameters.toString,
               "action" -> "manual-submission")
 
-            p.submitDatasetManually(host, key, extra, ds_id, "")
+            p.submitDatasetManually(host, key, extra, ds_id, "", request.apiKey, request.user)
             Ok(Json.obj("status" -> "OK"))
           }
           case None =>
-            BadRequest(toJson(Map("request" -> "File not found")))
+            BadRequest(toJson(Map("request" -> "Dataset not found")))
         }
       case None =>
         Ok(Json.obj("status" -> "error", "msg"-> "RabbitmqPlugin disabled"))
@@ -573,4 +581,78 @@ class Extractions @Inject()(
   private def getJsonArray(list: List[JsObject]): JsArray = {
     list.foldLeft(JsArray())((acc, x) => acc ++ Json.arr(x))
   }
+
+  def cancelFileExtractionSubmission(file_id: models.UUID, msg_id: UUID) = PermissionAction(Permission.EditFile, Some(ResourceRef(ResourceRef.file,
+    file_id)))(parse.json) { implicit request =>
+    Logger.debug(s"Cancel file submitted extraction with body $request.body")
+    // send file to rabbitmq for processing
+    current.plugin[RabbitmqPlugin] match {
+      case Some(p) =>
+        files.get(file_id) match {
+          case Some(file) => {
+            // check that the file is ready for processing
+            if (file.status.equals(models.FileStatus.PROCESSED.toString)) {
+              (request.body \ "extractor").asOpt[String] match {
+                case Some(extractorId) =>
+                  p.cancelPendingSubmission(file_id, extractorId, msg_id)
+                    Ok(Json.obj("status" -> "OK"))
+                case None =>
+                  BadRequest(toJson(Map("request" -> "extractor field not found")))
+              }
+            } else {
+              Conflict(toJson(Map("status" -> "error", "msg" -> "File is not ready. Please wait and try again.")))
+            }
+          }
+          case None =>
+            BadRequest(toJson(Map("request" -> "File not found")))
+        }
+      case None =>
+        Ok(Json.obj("status" -> "error", "msg"-> "RabbitmqPlugin disabled"))
+    }
+  }
+
+  def cancelDatasetExtractionSubmission(ds_id: models.UUID, msg_id: UUID)= PermissionAction(Permission.EditDataset, Some(ResourceRef(ResourceRef.dataset,
+    ds_id)))(parse.json)  { implicit request =>
+    Logger.debug(s"Cancel dataset submitted extraction with body $request.body")
+    current.plugin[RabbitmqPlugin] match {
+      case Some(p) =>
+        datasets.get(ds_id) match {
+          case Some(ds) => {
+            (request.body \ "extractor").asOpt[String] match {
+              case Some(extractorId) =>
+                p.cancelPendingSubmission(ds_id, extractorId, msg_id)
+                Ok(Json.obj("status" -> "OK"))
+              case None => BadRequest(toJson(Map("request" -> "extractor field not found")))
+            }
+          }
+          case None =>
+            BadRequest(toJson(Map("request" -> "File not found")))
+        }
+      case None =>
+        Ok(Json.obj("status" -> "error", "msg"-> "RabbitmqPlugin disabled"))
+    }
+
+  }
+
+  def addNewFilesetEvent(datasetid: String, fileids: List[String]) = AuthenticatedAction {implicit request =>
+    datasets.get(UUID(datasetid)) match {
+      case Some(ds) => {
+        val filelist: ListBuffer[File] = ListBuffer()
+        var missingfile = false
+        files.get(fileids.map(fid => UUID(fid))).found.foreach(f =>
+          filelist += f
+        )
+        if (missingfile)
+          BadRequest(toJson("Not all files found"))
+        else
+          current.plugin[RabbitmqPlugin].foreach {
+            _.fileSetAddedToDataset(ds, filelist.toList, Utils.baseUrl(request), request.apiKey)
+          }
+      }
+      case None => BadRequest(toJson("Dataset "+datasetid+" not found"))
+    }
+
+    Ok(toJson("added new event"))
+  }
+
 }

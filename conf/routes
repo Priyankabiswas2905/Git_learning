@@ -16,7 +16,7 @@ GET            /*path/                                                          
 GET            /                                                                        @controllers.Application.index
 GET            /about                                                                   @controllers.Application.about
 GET            /tos                                                                     @controllers.Application.tos(redirect: Option[String] ?= None)
-GET            /email                                                                   @controllers.Application.email(subject: String ?= "")
+GET            /email                                                                   @controllers.Application.email(subject: String ?= "", body: String ?= "")
 
 # ----------------------------------------------------------------------
 # Map static resources from the /public folder to the /assets URL path
@@ -97,9 +97,17 @@ POST           /uploadSelectQuery                                               
 POST           /uploaddnd/:id                                                           @controllers.Files.uploaddnd(id: UUID)
 #POST  	       /reactiveUpload					                                        @controllers.Files.reactiveUpload
 POST           /uploadDragDrop                                                          @controllers.Files.uploadDragDrop
+# deprecrated use thumbnails
 GET            /fileThumbnail/:id/blob                                                  @controllers.Files.thumbnail(id: UUID)
 GET            /file_by_section/:id                                                     @controllers.Files.fileBySection(id: UUID)
 GET            /files/:file_id/extractions                                              @controllers.Extractors.submitFileExtraction(file_id: UUID)
+
+# ----------
+# File Links
+# ----------
+GET            /files/:fileId/share                                                     @controllers.FileLinks.share(fileId: UUID)
+GET            /files/links/:linkId                                                     @controllers.FileLinks.download(linkId: UUID)
+POST           /files/:fileId/links                                                     @controllers.FileLinks.createLink(fileId: UUID)
 
 # ----------------------------------------------------------------------
 # DATASETS
@@ -182,7 +190,6 @@ GET            /metadata/:id                                                    
 GET            /files/:file_id/metadata                                                 @controllers.Metadata.file(file_id: UUID)
 GET            /datasets/:dataset_id/metadata                                           @controllers.Metadata.dataset(dataset_id: UUID)
 # Tags
-GET            /tags/search                                                             @controllers.Tags.search(tag, start: String ?= "", size: Integer ?= 12, mode: String ?= "")
 GET            /tags/list/ordered                                                       @controllers.Tags.tagListOrdered
 GET            /tags/list/weighted                                                      @controllers.Tags.tagListWeighted
 
@@ -316,6 +323,7 @@ DELETE         /api/metadata.jsonld/:id                                         
 
 #GET            /api/metadata.jsonld                                                     @api.Metadata.getUserMetadata()
 
+GET            /api/metadata/definition/:id                                             @api.Metadata.getMetadataDefinition(id: UUID)
 GET            /api/metadata/definitions                                                @api.Metadata.getDefinitions()
 GET            /api/metadata/distinctdefinitions                                        @api.Metadata.getDefinitionsDistinctName()
 GET            /api/metadata/autocompletenames                                          @api.Metadata.getAutocompleteName(filter: String)
@@ -363,6 +371,8 @@ POST           /api/files/sendJob/:fileId/:fileType                             
 GET            /api/files/getRDFURLsForFile/:id                                         @api.Files.getRDFURLsForFile(id: UUID)
 GET            /api/files/rdfUserMetadata/:id                                           @api.Files.getRDFUserMetadata(id: UUID, mappingNum: String ?= "1")
 GET            /api/files/:id/blob                                                      @api.Files.download(id: UUID, tracking: Boolean ?= true)
+
+# deprecrated use DELETE
 POST           /api/files/:id/remove                                                    @api.Files.removeFile(id: UUID)
 GET            /api/files/:id/metadata                                                  @api.Files.get(id: UUID)
 POST           /api/files/:id/metadata                                                  @api.Files.addMetadata(id: UUID)
@@ -380,6 +390,7 @@ POST           /api/files/:id/comment                                           
 DELETE         /api/files/:id                                                           @api.Files.removeFile(id: UUID)
 GET            /api/files/:id/tags                                                      @api.Files.getTags(id: UUID)
 POST           /api/files/:id/tags                                                      @api.Files.addTags(id: UUID)
+# deprecrated use DELETE
 POST           /api/files/:id/tags/remove                                               @api.Files.removeTags(id: UUID)
 POST           /api/files/:id/tags/remove_all                                           @api.Files.removeAllTags(id: UUID)
 DELETE         /api/files/:id/tags                                                      @api.Files.removeTags(id: UUID)
@@ -389,11 +400,15 @@ PUT            /api/files/:id/filename                                          
 POST           /api/files/:id/reindex                                                   @api.Files.reindex(id:UUID)
 GET            /api/files/:id/users                                                     @api.Files.users(id: UUID)
 GET            /api/files/:id/paths                                                     @api.Files.paths(id: UUID)
+POST           /api/files/:id/archive                                                   @api.Files.archive(id: UUID)
+POST           /api/files/:id/sendArchiveRequest                                        @api.Files.sendArchiveRequest(id: UUID)
+POST           /api/files/:id/unarchive                                                 @api.Files.unarchive(id: UUID)
+POST           /api/files/:id/sendUnarchiveRequest                                      @api.Files.sendUnarchiveRequest(id: UUID)
 
 # ----------------------------------------------------------------------
 # EXTRACTORS ENDPOINTS
 # ----------------------------------------------------------------------
-GET            /api/extractors                                                          @api.Extractions.listExtractors()
+GET            /api/extractors                                                          @api.Extractions.listExtractors(categories: List[String] ?= List.empty)
 GET            /api/extractors/:name                                                    @api.Extractions.getExtractorInfo(name: String)
 POST           /api/extractors                                                          @api.Extractions.addExtractorInfo()
 
@@ -402,7 +417,7 @@ POST           /api/datasets/:ds_id/extractions                                 
 
 GET            /api/extractions/requests                                                @api.Extractions.getDTSRequests()
 GET            /api/extractions/servers_ips                                             @api.Extractions.getExtractorServersIP()
-GET            /api/extractions/extractors_names                                        @api.Extractions.getExtractorNames()
+GET            /api/extractions/extractors_names                                        @api.Extractions.getExtractorNames(categories: List[String] ?= List.empty)
 GET            /api/extractions/supported_input_types                                   @api.Extractions.getExtractorInputTypes()
 #API for temporary fix for BD-289
 GET            /api/extractions/extractors_details                                      @api.Extractions.getExtractorDetails()
@@ -412,6 +427,10 @@ POST           /api/extractions/upload_file                                     
 GET            /api/extractions/:id/status                                              @api.Extractions.checkExtractorsStatus(id:UUID)
 GET            /api/extractions/:id/metadata                                            @api.Extractions.fetch(id:UUID)
 GET            /api/extractions/:id/statuses                                            @api.Extractions.checkExtractionsStatuses(id:UUID)
+
+DELETE         /api/files/:file_id/extractions/:msg_id                                  @api.Extractions.cancelFileExtractionSubmission(file_id:UUID, msg_id: UUID)
+DELETE         /api/datasets/:ds_id/extractions/:msg_id                               @api.Extractions.cancelDatasetExtractionSubmission(ds_id:UUID, msg_id: UUID)
+
 # End of change segment
 
 # ----------------------------------------------------------------------
@@ -545,9 +564,10 @@ POST           /api/datasets/:id/usermetadata                                   
 GET            /api/datasets/:id/technicalmetadatajson                                  @api.Datasets.getTechnicalMetadataJSON(id: UUID)
 GET            /api/datasets/:id/xmlmetadatajson                                        @api.Datasets.getXMLMetadataJSON(id: UUID)
 GET            /api/datasets/:id/usermetadatajson                                       @api.Datasets.getUserMetadataJSON(id: UUID)
-GET            /api/datasets/:id/listFiles                                              @api.Datasets.datasetFilesList(id: UUID)
-GET            /api/datasets/:id/listAllFiles                                           @api.Datasets.datasetAllFilesList(id:UUID, max: Option[Int] ?= None)
-GET            /api/datasets/:id/files                                                  @api.Datasets.datasetAllFilesList(id: UUID, max: Option[Int] ?= None)
+POST           /api/datasets/:id/filesetUploadEvent                                     @api.Extractions.addNewFilesetEvent(id: String, fileids: List[String])
+GET            /api/datasets/:id/listFiles                                              @api.Datasets.datasetFilesList(id: UUID, count: Boolean ?= false)
+GET            /api/datasets/:id/listAllFiles                                           @api.Datasets.datasetAllFilesList(id:UUID, max: Int ?= -1)
+GET            /api/datasets/:id/files                                                  @api.Datasets.datasetAllFilesList(id: UUID, max: Int ?= -1)
 POST           /api/datasets/:id/files                                                  @api.Datasets.uploadToDatasetFile(id: UUID)
 POST           /api/datasets/:id/urls                                                   @api.Datasets.uploadToDatasetJSON(id: UUID)
 GET            /api/datasets/:id/download                                               @api.Datasets.download(id: UUID, compression: Int ?= -1, tracking: Boolean ?= true)
@@ -558,6 +578,7 @@ POST           /api/datasets/:id/unfollow                                       
 POST           /api/datasets/:id/removeTag                                              @api.Datasets.removeTag(id: UUID)
 GET            /api/datasets/:id/tags                                                   @api.Datasets.getTags(id: UUID)
 POST           /api/datasets/:id/tags                                                   @api.Datasets.addTags(id: UUID)
+# deprecrated use DELETE
 POST           /api/datasets/:id/tags/remove                                            @api.Datasets.removeTags(id: UUID)
 POST           /api/datasets/:id/tags/remove_all                                        @api.Datasets.removeAllTags(id: UUID)
 DELETE         /api/datasets/:id/tags                                                   @api.Datasets.removeTags(id: UUID)
@@ -609,6 +630,7 @@ POST           /api/sections/:id/description                                    
 POST           /api/sections/:id/thumbnails/:thumbnail_id                               @api.Sections.attachThumbnail(id: UUID,thumbnail_id: UUID)
 GET            /api/sections/:id/tags                                                   @api.Sections.getTags(id: UUID)
 POST           /api/sections/:id/tags                                                   @api.Sections.addTags(id: UUID)
+# Deprecated for delete
 POST           /api/sections/:id/tags/remove                                            @api.Sections.removeTags(id: UUID)
 POST           /api/sections/:id/tags/remove_all                                        @api.Sections.removeAllTags(id: UUID)
 DELETE         /api/sections/:id/tags                                                   @api.Sections.removeTags(id: UUID)
@@ -620,7 +642,7 @@ DELETE         /api/sections/:id                                                
 # ----------------------------------------------------------------------
 GET            /api/search/json                                                         @api.Search.searchJson(query: String ?= "", grouping: String ?= "AND", from: Option[Int], size: Option[Int])
 GET            /api/search/multimediasearch                                             @api.Search.searchMultimediaIndex(section_id: UUID)
-GET            /api/search                                                              @api.Search.search(query: String ?= "")
+GET            /api/search                                                              @api.Search.search(query: String ?= "", resource_type: Option[String], datasetid: Option[String], collectionid: Option[String], spaceid: Option[String], folderid: Option[String], field: Option[String], tag: Option[String], from: Option[Int], size: Option[Int], page: Option[Int])
 
 # ----------------------------------------------------------------------
 # GEOSTREAMS ENDPOINT
@@ -661,6 +683,7 @@ GET            /api/geostreams/config                                           
 # ----------------------------------------------------------------------
 POST           /api/fileThumbnail                                                       @api.Thumbnails.uploadThumbnail
 GET            /api/thumbnails                                                          @api.Thumbnails.list
+GET            /api/thumbnails/:id/blob                                                 @api.Thumbnails.get(id: UUID)
 DELETE         /api/thumbnails/:id                                                      @api.Thumbnails.removeThumbnail(id: UUID)
 
 # ----------------------------------------------------------------------
@@ -815,6 +838,17 @@ POST        /api/vocabuliaries/:vocab_id/removeFromSpace/:space_id              
 GET         /api/vocabterms/list                                                        @api.VocabularyTerms.list()
 GET         /api/vocabterms/:id                                                         @api.VocabularyTerms.get(id : UUID)
 
+
+# ----------------------------------------------------------------------
+# STANDARDVOCABULARY API
+# ----------------------------------------------------------------------
+
+GET          /api/standardvocab                                                            @api.Metadata.getVocabularies()
+POST         /api/standardvocab                                                            @api.Metadata.createVocabulary()
+GET          /api/standardvocab/:id                                                        @api.Metadata.getVocabulary(id: UUID)
+GET          /api/standardvocab/:id/terms                                                  @api.Metadata.getVocabularyTerms(id: UUID)
+PUT          /api/standardvocab/:id                                                        @api.Metadata.updateVocabulary(id:UUID)
+DELETE       /api/standardvocab/:id                                                        @api.Metadata.deleteVocabulary(id: UUID)
 
 # ----------------------------------------------------------------------
 # PROXY API

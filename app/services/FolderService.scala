@@ -1,6 +1,6 @@
 package services
 
-import models.{TypedID, UUID, Folder}
+import models.{DBResult, TypedID, UUID, Folder}
 /**
  * Generic Folder Service
  */
@@ -11,6 +11,8 @@ trait FolderService {
    */
   def get(id: UUID): Option[Folder]
 
+  def get(ids: List[UUID]): DBResult[Folder]
+
   /**
    * Create a Folder
    */
@@ -19,7 +21,7 @@ trait FolderService {
   /**
    * Delete folder and any reference of it.
    */
-  def delete(folderId: UUID, host: String)
+  def delete(folderId: UUID, host: String, apiKey: Option[String], user: Option[models.User])
 
   /**
    * Update a Folder

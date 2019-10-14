@@ -9,7 +9,7 @@ import com.novus.salat._
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import models._
 import org.bson.types.ObjectId
-import securesocial.core.{AuthenticationMethod, Identity, _}
+import securesocial.core.{AuthenticationMethod, Identity, IdentityId, UserServicePlugin}
 import play.api.Application
 import play.api.Play.current
 import com.mongodb.casbah.commons.MongoDBObject
@@ -220,6 +220,19 @@ class MongoDBUserService @Inject() (
 
   def getUserKeys(identityId: IdentityId): List[UserApiKey] = {
     UserApiKeyDAO.dao.find(MongoDBObject("identityId.userId" -> identityId.userId, "identityId.providerId" -> identityId.providerId)).toList
+  }
+
+  /**
+    * Get extraction API key. If it doesn't exist create it.
+    */
+  def getExtractionApiKey(identityId: IdentityId): UserApiKey = {
+    val userKeys = getUserKeys(identityId)
+    val key = userKeys.find(k => k.name.startsWith("_")).getOrElse {
+      val userApiKey = UserApiKey("_extraction_key", java.util.UUID.randomUUID().toString, identityId)
+      addUserKey(userApiKey.identityId, userApiKey.name, userApiKey.key)
+      userApiKey
+    }
+    key
   }
 
   def addUserKey(identityId: IdentityId, name: String, key: String): Unit = {
@@ -549,29 +562,26 @@ class MongoDBUserService @Inject() (
    */
   override def getTopRecommendations(followerIDs: List[UUID], excludeIDs: List[UUID], num: Int): List[MiniEntity] = {
     val followerIDObjects = followerIDs.map(id => new ObjectId(id.stringify))
-    val excludeIDObjects = excludeIDs.map(id => new ObjectId(id.stringify))
 
-    val recs = UserDAO.dao.collection.aggregate(
-        MongoDBObject("$match" -> MongoDBObject("_id" -> MongoDBObject("$in" -> followerIDObjects))),
-        MongoDBObject("$unwind" -> "$followedEntities"),
-        MongoDBObject("$group" -> MongoDBObject(
-          "_id" -> "$followedEntities._id",
-          "objectType" -> MongoDBObject("$first" -> "$followedEntities.objectType"),
-          "score" -> MongoDBObject("$sum" -> 1)
-        )),
-        MongoDBObject("$match" -> MongoDBObject("_id" -> MongoDBObject("$nin" -> excludeIDObjects))),
-        MongoDBObject("$sort" -> MongoDBObject("score" -> -1)),
-        MongoDBObject("$limit" -> num)
-    )
+    // will contain all objects that are followed and how frequently it was seen
+    var recmap = scala.collection.mutable.Map[UUID, (UUID, String, Long)]()
 
-    recs.results.map(entity => new MiniEntity(
-      UUID(entity.as[ObjectId]("_id").toString),
-      getEntityName(
-        UUID(entity.as[ObjectId]("_id").toString),
-        entity.as[String]("objectType")
-      ),
-      entity.as[String]("objectType"))
-    ).toList
+    // get list of all followers
+    UserDAO.find(MongoDBObject("_id" -> MongoDBObject("$in" -> followerIDObjects))).flatMap{x =>
+      // find all objects followed by them and count how frequently it was seen.
+      x.followedEntities.map{y =>
+        if (!excludeIDs.contains(y.id)) {
+          val r = recmap.get(y.id).getOrElse((y.id, y.objectType, 0L))
+          recmap.put(y.id, (r._1, r._2, r._3 + 1L))
+        }
+      }
+    }
+
+    // order list by frequency
+    val recommendations = recmap.values.toList.sortBy(_._3)(Ordering[Long].reverse).take(num)
+
+    // return list of followed entities
+    for(x <- recommendations) yield new MiniEntity(x._1, getEntityName(x._1, x._2), x._2)
   }
 
   def getEntityName(uuid: UUID, objType: String): String = {

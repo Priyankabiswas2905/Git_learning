@@ -4,13 +4,139 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+## Unreleased
+
+### Changed
+- `/api/search` endpoint now returns JSON objects describing each result rather than just the ID. This endpoint has three
+  new parameters - from, size, and page. The result JSON objects will also return pagination data such as next and 
+  previous page if Elasticsearch plugin is enabled and these parameters are used.
+- S3ByteStorageService now uses AWS TransferManager for saving bytes - uploads larger than ~1GB should now save more reliably.
+- `/api/search` endpoint now returns JSON objects describing each result rather than just the ID.
+- Clean up docker build. Use new buildkit to speed up builds. Store version/branch/git as environment variables in 
+  docker image so that they can be inspected at runtime with Docker.
+- Extractors are now in their own docker-compose file. Use traefik for proxy. Run monitor. Use env file for options.
+- Utilize bulk get methods for resources widely across the application, including checking permissions for many resources
+  at once. Several instances where checks for resource existince were being done multiple times (e.g. in a method and then
+  in another method the first one calls) to reduce MongoDB query load. These bulk requests will also report any missing
+  IDs in the requested list so developers can handle those appropriately if needed.
+- Clowder is now capable of using MongoDB 3.6 and below. This required the removal of aggregators which can result in
+  operations taking a little longer. This is needed to support clowder as a helmchart.
+  [CATS-806](https://opensource.ncsa.illinois.edu/jira/browse/CATS-806)
 
 ### Added
+- New `/api/thumbnails/:id` endpoint to download a thumbnail image from ID found in search results.
+- New utility methods in services to retrieve multiple MongoDB resources in one query instead of iterating over a list.
+- Ability to pass runtime parameters to an extractor, with a UI form dynamically generated UI from extractor_info.json.
+  [CATS-1019](https://opensource.ncsa.illinois.edu/jira/browse/CATS-1019)
+- Trigger archival process automatically based on when a file was last viewed/downloaded and the size of the file.
+- Script to check if mongodb/rabbitmq is up and running, used by helm chart for clowder.
+
+## 1.7.3 - 2019-08-19
+
+### Fixed
+- Fixed bug where metadata field names in the search box were being forced to lowercase, omitting search results due to
+  case sensitivity.
+
+## 1.7.2 - 2019-08-01
+
+### Fixed
+- RabbitMQ plugin would throw an exception if rabbitmq server restarted. 
+  [CATS-1012](https://opensource.ncsa.illinois.edu/jira/browse/CATS-1012)
+
+### Changed
+- Changed internal regex wrapping syntax on search box queries to better handle complex terms.
+- Updated core documentation, both the content and version of Sphinx.
+  [CATS-865](https://opensource.ncsa.illinois.edu/jira/browse/CATS-865)
+
+## 1.7.1 - 2019-07-09
+
+### Fixed
+- Logging was accidently set to DEBUG, reverted it back to INFO
+
+## 1.7.0 - 2019-07-08
+
+**This update will require a reindex of Elasticsearch. After deploying the update either call `POST to /api/reindex`
+or navigate to the `Admin > Indexes` menu and click on the `Reindex` button.**
+
+### Fixed
+- HTTP 500 error when posting new metadata.
+
+### Added
+- Add archive button on file page which can trigger archive extractor to archive this file.
+
+- Added S3ByteStorageService for storing uploaded bytes in S3-compatible buckets.
+  [CATS-992](https://opensource.ncsa.illinois.edu/jira/browse/CATS-992)
+- Added support for archiving files in Clowder and preparing an admin email if user attempts to download archived file.
+  [CATS-981](https://opensource.ncsa.illinois.edu/jira/browse/CATS-981)
+- Listen for heartbeat messages from extractors and update list of registered extractors
+  based on extractor info received. For extractors using this method they will not need
+  to manually register themselves through API to be listed.
+  [CATS-1004](https://opensource.ncsa.illinois.edu/jira/browse/CATS-1004)
+- Added support for extractor categories that can be used for retrieving filtered lists of extrators by category.
+
+### Changed
+- Improved Advanced Search UI to retain search results between navigations.
+  [CATS-1001](https://opensource.ncsa.illinois.edu/jira/browse/CATS-1001)
+- Display more info on the manual submission page, link to ExtractorDetails view.
+  [CATS-959](https://opensource.ncsa.illinois.edu/jira/browse/CATS-959)
+- Clean up of Search pages. Renamed Advanced Search to Metadata Search. Added search form and Metadata Search link to 
+  main Search page. Consistent and improved search results on both search pages.
+  [CATS-994](https://opensource.ncsa.illinois.edu/jira/browse/CATS-994)
+- Updated the mongo-init docker image to aks for inputs if not specified as
+  an environment variable.
+  `docker run -ti --rm --network clowder_clowder clowder/mongo-init`
+- Rework of the Elasticsearch index to include improved syntax and better documentation on the basic search page.
+
+## 1.6.2 - 2019-05-23
+
+### Fixed
+- Mimetype of RabbitMQ message body should be `application/json` instead of `application\json`.
+  [GH-12](https://github.com/ncsa/clowder/issues/12)
+
+## 1.6.1 - 2019-05-07
+
+### Fixed
+- A double quote character in a metadata description disallowing edit of metadata definition.
+  [CATS-991](https://opensource.ncsa.illinois.edu/jira/browse/CATS-991)
+- About page should no longer show "0 Bytes", counts should be more accurate.
+  [CATS-779](https://opensource.ncsa.illinois.edu/jira/browse/CATS-779)
+- Fixed creation of standard vocabularies within a space.
+- Slow load times in dataset page by removing queries for comments and tags on files within a dataset.
+  [CATS-999](https://opensource.ncsa.illinois.edu/jira/browse/CATS-999)
+- Send file delete events over RabbitMQ when a folder is deleted that contains files.
+  [CATS-995](https://opensource.ncsa.illinois.edu/jira/browse/CATS-995)
+
+### Changed
+- Improved the HTTP return codes for the generic error handlers in Clowder.
+- Adjusted display of Advanced Search matching options to include (AND) / (OR).
+  [CATS-998](https://opensource.ncsa.illinois.edu/jira/browse/CATS-998)
+- Dataset page does not show comments on files within the dataset anymore.
+- dataset-image previewer turned off by default since it is expensive for datasets with many files but does not much
+  information to the dataset page.
+- Removed unused queries for comments throughout the application.
+
+### Added
+- Script to cleanup/migrate userpass account data to cilogon accounts.
+
+## 1.6.0 - 2019-04-01
+
+### Added
+- User API Keys are now sent over to extractors (instead of the global key). If user doesn't provide a user key with the
+  request, one is gets created with name `_extraction_key`. If no user is available, the global key is used.
+  [CATS-901](https://opensource.ncsa.illinois.edu/jira/browse/CATS-901)
+- Ability to cancel a submission to the extraction bus. A cancel button is available in the list of extraction events.
+  [CATS-970](https://opensource.ncsa.illinois.edu/jira/browse/CATS-970)
+- Allow user to create and manage controlled vocabularies within Clowder.
+- Cascade creation and deletion of global metadata definitions to all spaces.
+  [CATS-967](https://opensource.ncsa.illinois.edu/jira/browse/CATS-967)
+- New view for files and datasets offering a table view of the attached metadata.
+- Add SUBMITTED event on the GUI of extractions and pass this submitted event id in extraction message.
+  [CATS-969](https://opensource.ncsa.illinois.edu/jira/browse/CATS-969)
+- Send email address of user who initiated an extraction so that extractors can notify user by email when job is done.
+  [CATS-963](https://opensource.ncsa.illinois.edu/jira/browse/CATS-963)
 - Extraction history for dataset extractors is now displayed on dataset page.
   [CATS-796](https://opensource.ncsa.illinois.edu/jira/browse/CATS-796)
 - Script to verify / fix mongo uploads collection if file bytes are missing.
-- Loading indicator should now show on Datasets page while files/folders are loading.
 - Additional columns added to reporting API endpoint including date, parent resources, file location, size and ownership.
 - Previewer for displaying internal contents of Zip Files.
   [CATS-936](https://opensource.ncsa.illinois.edu/jira/browse/CATS-936)
@@ -18,22 +144,43 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   [CATS-941](https://opensource.ncsa.illinois.edu/jira/browse/CATS-941)
 - Optional form to adding multiple metadata fields at once via UI under "Advanced."
   [CATS-940](https://opensource.ncsa.illinois.edu/jira/browse/CATS-940)
+- CONTAINS operator added to Advanced Search interface and wildcards (e.g. ".*") now supported in search box.
+  [CATS-962](https://opensource.ncsa.illinois.edu/jira/browse/CATS-962)
+- New widget to add standard name mappings.
+  [BD-2321](https://opensource.ncsa.illinois.edu/jira/browse/BD-2321)
+- Add a new event for extractors "dataset.files.added" that is triggered when a user uploads multiple files at once via UI.
+  [CATS-973](https://opensource.ncsa.illinois.edu/jira/browse/CATS-973)
+- `/api/search` endpoint now supports additional flags including tag, field, datasetid, and others detailed in SwaggerAPI.
+  [CATS-968](https://opensource.ncsa.illinois.edu/jira/browse/CATS-968)
+- Add a dropdown to Advanced Search UI for filtering by space.
+  [CATS-985](https://opensource.ncsa.illinois.edu/jira/browse/CATS-985)
   
 ### Fixed
-- Enhancements to reporting date and string formatting. Space listing on spaces report and on New Collections page now correctly
-  return space list depending on user permissions even if instance is set to private.
+- Enhancements to reporting date and string formatting. Space listing on spaces report and on New Collections page now 
+  correctly return space list depending on user permissions even if instance is set to private.
 - GeospatialViewer previewer added content to incorrect tab.
   [CATS-946](https://opensource.ncsa.illinois.edu/jira/browse/CATS-946)
+- Handle 403 errors appropriately from the ZipFile Previewer.
+  [CATS-948](https://opensource.ncsa.illinois.edu/jira/browse/CATS-948)
 - Error when showing ordered list of tags and Elasticsearch included an empty tag. Also removed the ability to add empty 
   tags both from the UI as well as the API.
   [CATS-952](https://opensource.ncsa.illinois.edu/jira/browse/CATS-952)
 - In SuperAdmin mode, the Spaces page will correctly show all spaces.
   [CATS-958](https://opensource.ncsa.illinois.edu/jira/browse/CATS-958)
+- In FileMetrics report, space and collection IDs are only added to the report once to avoid repeating.
+- Apply 'max' restriction when fetching dataset file lists earlier, to avoid long load times for certain previewers.
+  [CATS-899](https://opensource.ncsa.illinois.edu/jira/browse/CATS-899)
+- Unable to edit metadata definition when description included newlines characters.
+- Fixed user events not being created. Migrated to EventType enum class for tracking event types.
+  [CATS-961](https://opensource.ncsa.illinois.edu/jira/browse/CATS-961)
+- Loading indicator should now show on datasets page while files and folders are loading.
   
 ### Changed 
 - Extraction events on File and Dataset pages are now grouped by extractor. The events view has been moved to a tab for both,
   and the File pages now have metadata and comments under tabs as well.
   [CATS-942](https://opensource.ncsa.illinois.edu/jira/browse/CATS-942)
+- Cleaned up clowder init code docker image see README.
+- Updated Sphinx dependencies in `doc/src/sphinx/requirements.txt` for building documentation.
 
 ## 1.5.2 - 2018-12-14
 

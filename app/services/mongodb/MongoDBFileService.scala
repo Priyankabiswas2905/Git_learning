@@ -3,7 +3,7 @@ package services.mongodb
 import play.api.mvc.Request
 import services._
 import models._
-import com.mongodb.casbah.commons.MongoDBObject
+import com.mongodb.casbah.commons.{Imports, MongoDBObject}
 import java.text.SimpleDateFormat
 
 import _root_.util.{License, Parsers, SearchUtils}
@@ -19,11 +19,11 @@ import play.api.libs.json.{JsValue, Json}
 import com.mongodb.util.JSON
 import java.nio.file.{FileSystems, Files}
 import java.nio.file.attribute.BasicFileAttributes
+import java.time.LocalDateTime
 
 import collection.JavaConverters._
 import scala.collection.JavaConversions._
 import javax.inject.{Inject, Singleton}
-
 import com.mongodb.casbah.WriteConcern
 import play.api.Logger
 
@@ -38,6 +38,7 @@ import MongoContext.context
 import play.api.Play._
 import com.mongodb.casbah.Imports._
 import models.FileStatus.FileStatus
+import org.bson.types.ObjectId
 
 
 /**
@@ -59,7 +60,8 @@ class MongoDBFileService @Inject() (
   userService: UserService,
   folders: FolderService,
   metadatas: MetadataService,
-  events: EventService) extends FileService {
+  events: EventService,
+  appConfig: AppConfigurationService) extends FileService {
 
   object MustBreak extends Exception {}
 
@@ -71,18 +73,13 @@ class MongoDBFileService @Inject() (
   }
 
   def statusCount(): Map[FileStatus, Long] = {
-    val results = FileDAO.dao.collection.aggregate(MongoDBObject("$group" ->
-      MongoDBObject("_id" -> "$status", "count" -> MongoDBObject("$sum" -> 1L))))
-    results.results.map(x => FileStatus.withName(x.getAsOrElse[String]("_id", FileStatus.UNKNOWN.toString)) -> x.getAsOrElse[Long]("count", 0L)).toMap
+    FileStatus.values.map(x =>
+      (x, FileDAO.dao.count(MongoDBObject("status" -> x.toString)))
+    ).toMap
   }
 
   def bytes(): Long = {
-    val results = FileDAO.dao.collection.aggregate(MongoDBObject("$group" ->
-      MongoDBObject("_id" -> "size", "total" -> MongoDBObject("$sum" -> "$length"))))
-    results.results.find(x => x.containsField("total")) match {
-      case Some(x) => x.getAsOrElse[Long]("total", 0L)
-      case None => 0L
-    }
+    FileDAO.dao.find(MongoDBObject()).map(_.length).sum
   }
 
   def save(file: File): Unit = {
@@ -161,6 +158,126 @@ class MongoDBFileService @Inject() (
     }
   }
 
+  /**
+    * Submit a single archival operation to the appropriate queue/extractor
+    */
+  def submitArchivalOperation(file: File, id:UUID, host: String, parameters: JsObject, apiKey: Option[String], user: Option[User]) = {
+    val idAndFlags = ""
+    val extra = Map("filename" -> file.filename,
+      "parameters" -> parameters,
+      "action" -> "manual-submission")
+    val showPreviews = file.showPreviews
+    val newFlags = if (showPreviews.equals("FileLevel"))
+      idAndFlags + "+filelevelshowpreviews"
+    else if (showPreviews.equals("None"))
+      idAndFlags + "+nopreviews"
+    else
+      idAndFlags
+
+    val originalId = if (!file.isIntermediate) {
+      file.id.toString()
+    } else {
+      idAndFlags
+    }
+
+    var datasetId: UUID = null
+    // search datasets containing this file, either directly under dataset or indirectly.
+    val datasetslists: List[Dataset] = datasets.findByFileIdAllContain(id)
+    // Note, we assume only at most one dataset will contain a given file.
+    if (0 != datasetslists.length) {
+      datasetId = datasetslists.head.id
+    }
+    val extractorId = play.Play.application().configuration().getString("archiveExtractorId")
+    val plugins = current.plugin[RabbitmqPlugin]
+    plugins.foreach { p =>
+      p.submitFileManually(new UUID(originalId), file, host, extractorId, extra,
+        datasetId, newFlags, apiKey, user)
+      Logger.info("Sent archive request for file " + id)
+    }
+    if (plugins.isEmpty) {
+      Logger.warn("RabbitMQ plugin not detected: archival may be disabled")
+    }
+  }
+
+  /**
+    * Submit all archival candidates to the appropriate queue/extractor.
+    * This may be expanded to support per-space configuration in the future.
+    *
+    * Reads the following parameters from Clowder configuration:
+    *     - archiveAutoAfterDaysInactive - timeout after which files are considered
+    *         to be candidates for archival (see below)
+    *     - archiveMinimumStorageSize - files below this size (in Bytes) should not be archived
+    *     - clowder.rabbitmq.clowderurl - the Clowder hostname to pass to the archival extractor
+    *     - commKey - the admin key to pass to the archival extractor
+    *
+    * Archival candidates are currently defined as follows:
+    *    - file must be over `archiveMinimumStorageSize` Bytes in size
+    *    - file must be over `archiveAutoAfterDaysInactive` days old
+    *    - AND one of the following must be true:
+    *       - file has never been downloaded (0 downloads)
+    *                 OR
+    *       - file has not been downloaded in the past `archiveAutoAfterDaysInactive` days
+    *
+    *
+    */
+  def autoArchiveCandidateFiles() = {
+    val timeout = configuration(play.api.Play.current).getInt("archiveAutoAfterDaysInactive")
+    timeout match {
+      case None => Logger.info("No archival auto inactivity timeout set - skipping auto archival loop.")
+      case Some(days) => {
+        if (days == 0) {
+          Logger.info("Archival auto inactivity timeout set to 0 - skipping auto archival loop.")
+        } else {
+          // DEBUG ONLY: query for files that were uploaded within the past hour
+          val archiveDebug = configuration(play.api.Play.current).getBoolean("archiveDebug").getOrElse(false)
+          val oneHourAgo = LocalDateTime.now.minusHours(1).toString + "-00:00"
+
+          // Query for files that haven't been accessed for at least this many days
+          val daysAgo = LocalDateTime.now.minusDays(days).toString + "-00:00"
+          val notDownloadedWithinTimeout = if (archiveDebug) {
+            ("stats.last_downloaded" $gte Parsers.fromISO8601(oneHourAgo)) ++ ("status" $eq FileStatus.PROCESSED.toString)
+          } else {
+            ("stats.last_downloaded" $lt Parsers.fromISO8601(daysAgo)) ++ ("status" $eq FileStatus.PROCESSED.toString)
+          }
+
+          // Include files that have never been downloaded, but make sure they are old enough
+          val neverDownloaded = if (archiveDebug) {
+            ("stats.downloads" $eq 0) ++ ("uploadDate" $gte Parsers.fromISO8601(oneHourAgo)) ++ ("status" $eq FileStatus.PROCESSED.toString)
+          } else {
+            ("stats.downloads" $eq 0) ++ ("uploadDate" $lt Parsers.fromISO8601(daysAgo)) ++ ("status" $eq FileStatus.PROCESSED.toString)
+          }
+
+          // TODO: How to get host / apiKey / admin internally without a request?
+          val host = configuration(play.api.Play.current).getString("clowder.rabbitmq.clowderurl").getOrElse("http://localhost:9000")
+          val adminApiKey = configuration(play.api.Play.current).getString("commKey")
+          val adminUser = Option(userService.getAdmins.head)
+          val params = JsObject(Seq.empty[(String, JsValue)]) + FileService.ARCHIVE_PARAMETER
+
+          // Submit our queries and determine the union
+          val ndFiles = FileDAO.find(neverDownloaded).toList
+          val ndwtoFiles = FileDAO.find(notDownloadedWithinTimeout).toList
+          val matchingFiles = ndFiles.union(ndwtoFiles)
+          Logger.info("Archival candidates found: " + matchingFiles.length)
+
+          // Exclude candidates that do not exceed our minimum file size threshold
+          val minSize = configuration(play.api.Play.current).getLong("archiveMinimumStorageSize").getOrElse(1000000L)
+
+          // Loop all candidate files and submit each one for archival
+          for (file <- matchingFiles) {
+            if (file.length > minSize) {
+              Logger.debug("Submitting file " + file.id + " for archival")
+              submitArchivalOperation(file, file.id, host, params, adminApiKey, adminUser)
+            } else {
+              Logger.debug("Skipping file " + file.id + ": below threshold (" +
+                file.length.toString + " B < " + minSize.toString + " B)")
+            }
+          }
+          Logger.info("Auto archival loop completed successfully")
+        }
+      }
+    }
+  }
+
   def latest(): Option[File] = {
     val results = FileDAO.find("isIntermediate" $ne true).sort(MongoDBObject("uploadDate" -> -1)).limit(1).toList
     if (results.size > 0)
@@ -234,32 +351,30 @@ class MongoDBFileService @Inject() (
    * Return a list of tags and counts found in sections
    */
   def getTags(user: Option[User]): Map[String, Long] = {
-    if(configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public"){
-      val x = FileDAO.dao.collection.aggregate(MongoDBObject("$unwind" -> "$tags"),
-        MongoDBObject("$group" -> MongoDBObject("_id" -> "$tags.name", "count" -> MongoDBObject("$sum" -> 1L))))
-      x.results.map(x => (x.getAsOrElse[String]("_id", "??"), x.getAsOrElse[Long]("count", 0L))).toMap
-    } else {
-      val x = FileDAO.dao.collection.aggregate(MongoDBObject("$match"-> buildTagFilter(user)), MongoDBObject("$unwind" -> "$tags"),
-        MongoDBObject("$group" -> MongoDBObject("_id" -> "$tags.name", "count" -> MongoDBObject("$sum" -> 1L))))
-      x.results.map(x => (x.getAsOrElse[String]("_id", "??"), x.getAsOrElse[Long]("count", 0L))).toMap
+    val filter = MongoDBObject("tags" -> MongoDBObject("$not" -> MongoDBObject("$size" -> 0)))
+    var tags = scala.collection.mutable.Map[String, Long]()
+    FileDAO.dao.find(buildTagFilter(user) ++ filter).foreach{ x =>
+      x.tags.foreach{ t =>
+        tags.put(t.name, tags.get(t.name).getOrElse(0L) + 1L)
+      }
     }
+    tags.toMap
   }
 
-
   private def buildTagFilter(user: Option[User]): MongoDBObject = {
+    if (user.isDefined && user.get.superAdminMode)
+      return MongoDBObject()
+
     val orlist = collection.mutable.ListBuffer.empty[MongoDBObject]
 
-    user match {
-      case Some(u) => {
-        orlist += MongoDBObject("author._id" -> new ObjectId(u.id.stringify))
-        //Get all datasets you have access to.
-        val datasetsList= datasets.listUser(u)
-        val foldersList = folders.findByParentDatasetIds(datasetsList.map(x=> x.id))
-        val fileIds = datasetsList.map(x=> x.files) ++ foldersList.map(x=> x.files)
-        orlist += ("_id" $in fileIds.flatten.map(x=> new ObjectId(x.stringify)))
-      }
-      case None => Map.empty
-    }
+    // all files where user is the author
+    user.foreach{u => orlist += MongoDBObject("author._id" -> new ObjectId(u.id.stringify))}
+
+    // Get all files in all datasets you have access to.
+    val datasetsList = datasets.listUser(user)
+    val foldersList = folders.findByParentDatasetIds(datasetsList.map(x => x.id))
+    val fileIds = datasetsList.map(x => x.files) ++ foldersList.map(x => x.files)
+    orlist += ("_id" $in fileIds.flatten.map(x => new ObjectId(x.stringify)))
 
     $or(orlist.map(_.asDBObject))
   }
@@ -270,7 +385,6 @@ class MongoDBFileService @Inject() (
       modifyRDFUserMetadata(changedFile.id)
     }
   }
-
 
   def modifyRDFUserMetadata(id: UUID, mappingNumber: String = "1") = { implicit request: Request[Any] =>
     sparql.removeFileFromGraphs(id, "rdfCommunityGraphName")
@@ -404,9 +518,6 @@ class MongoDBFileService @Inject() (
       }
     }
   }
-  
- 
-  
 
   def removeTags(id: UUID, userIdStr: Option[String], eid: Option[String], tags: List[String]) {
     Logger.debug("Removing tags in file " + id + " : " + tags + ", userId: " + userIdStr + ", eid: " + eid)
@@ -450,10 +561,21 @@ class MongoDBFileService @Inject() (
     }
   }
 
+  def get(ids: List[UUID]): DBResult[File] = {
+    if (ids.length == 0) return DBResult(List.empty, List.empty)
+
+    val query = MongoDBObject("_id" -> MongoDBObject("$in" -> ids.map(id => new ObjectId(id.stringify))))
+    val found = FileDAO.find(query).toList
+    val notFound = ids.diff(found.map(_.id))
+
+    if (notFound.length > 0)
+      Logger.error("Not all file IDs found for bulk get request")
+    return DBResult(found, notFound)
+  }
+
   override def setStatus(id: UUID, status: FileStatus): Unit = {
     FileDAO.dao.update(MongoDBObject("_id" -> new ObjectId(id.toString())), $set("status" -> status.toString))
   }
-
 
   def listOutsideDataset(dataset_id: UUID): List[File] = {
     datasets.get(dataset_id) match{
@@ -685,7 +807,7 @@ class MongoDBFileService @Inject() (
       false, false, WriteConcern.Safe)
   }
 
-  def removeFile(id: UUID, host: String){
+  def removeFile(id: UUID, host: String, apiKey: Option[String], user: Option[User]){
     get(id) match{
       case Some(file) => {
         if(!file.isIntermediate){
@@ -699,18 +821,13 @@ class MongoDBFileService @Inject() (
             if(!file.thumbnail_id.isEmpty && !fileDataset.thumbnail_id.isEmpty){            
               if(file.thumbnail_id.get.equals(fileDataset.thumbnail_id.get)){ 
                 datasets.newThumbnail(fileDataset.id)
-                	for(collectionId <- fileDataset.collections){
-                    collections.get(collectionId) match{
-                      case Some(collection) =>{
-                        if(!collection.thumbnail_id.isEmpty){
-                          if(collection.thumbnail_id.get.equals(fileDataset.thumbnail_id.get)){
-                            collections.createThumbnail(collection.id)
-                          }
-                        }
-                      }
-                      case None=>Logger.debug(s"Could not find collection $collectionId")
+                collections.get(fileDataset.collections).found.foreach(collection => {
+                  if(!collection.thumbnail_id.isEmpty){
+                    if(collection.thumbnail_id.get.equals(fileDataset.thumbnail_id.get)){
+                      collections.createThumbnail(collection.id)
                     }
                   }
+                })
 		          }
             }
                      
@@ -746,9 +863,14 @@ class MongoDBFileService @Inject() (
 
         import UUIDConversions._
         FileDAO.removeById(file.id)
+        appConfig.incrementCount('files, -1)
+        appConfig.incrementCount('bytes, -file.length)
+        current.plugin[ElasticsearchPlugin].foreach {
+          _.delete(id.stringify)
+        }
 
         // finally remove metadata - if done before file is deleted, document metadataCounts won't match
-        metadatas.removeMetadataByAttachTo(ResourceRef(ResourceRef.file, id), host)
+        metadatas.removeMetadataByAttachTo(ResourceRef(ResourceRef.file, id), host, apiKey, user)
       }
       case None => Logger.debug("File not found")
     }
@@ -793,7 +915,6 @@ class MongoDBFileService @Inject() (
     Logger.debug("thequery: "+theQuery.toString)
     FileDAO.find(theQuery).toList
   }
-
 
   def searchUserMetadataFormulateQuery(requestedMetadataQuery: Any): List[File] = {
     Logger.debug("top: "+ requestedMetadataQuery.asInstanceOf[java.util.LinkedHashMap[String,Any]].toString()  )
@@ -944,14 +1065,14 @@ class MongoDBFileService @Inject() (
     }
   }
 
-  def removeOldIntermediates(){
+  def removeOldIntermediates(apiKey: Option[String], user: Option[User]){
     val cal = Calendar.getInstance()
     val timeDiff = play.Play.application().configuration().getInt("intermediateCleanup.removeAfter")
     cal.add(Calendar.HOUR, -timeDiff)
     val oldDate = cal.getTime()
     val fileList = FileDAO.find($and("isIntermediate" $eq true, "uploadDate" $lt oldDate)).toList
     for(file <- fileList)
-      removeFile(file.id, "")
+      removeFile(file.id, "", apiKey, user)
   }
 
   /**
@@ -1091,7 +1212,7 @@ class MongoDBFileService @Inject() (
   }
 
   def getMetrics(user: Option[User]): Iterable[File] = {
-    FileDAO.find(MongoDBObject("stats" -> MongoDBObject("$exists" -> true))).toIterable
+    FileDAO.find(MongoDBObject()).toIterable
   }
 }
 

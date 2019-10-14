@@ -164,14 +164,16 @@ trait DatasetService {
   /**
     * Return a list of all the datasets the user can view or has created.
     */
-  def listUser( user: User): List[Dataset]
+  def listUser(user: Option[User]): List[Dataset]
 
-  def listUserTrash(user : Option[User],limit : Integer ) : List[Dataset]
+  def listUserTrash(user: Option[User], limit: Integer ) : List[Dataset]
 
   /**
    * Get dataset.
    */
   def get(id: UUID): Option[Dataset]
+
+  def get(ids: List[UUID]): DBResult[Dataset]
 
   /**
    * Insert dataset.
@@ -266,7 +268,7 @@ trait DatasetService {
 
   def searchAllMetadataFormulateQuery(requestedMetadataQuery: Any): List[Dataset]
 
-  def removeDataset(id: UUID, host: String)
+  def removeDataset(id: UUID, host: String, apiKey: Option[String], user: Option[User])
 
   def findOneByFileId(file_id: UUID): Option[Dataset]
 

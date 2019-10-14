@@ -1,6 +1,7 @@
 package services.mongodb
 
 import models._
+import play.api.Logger
 import services._
 import play.api.Play.current
 import javax.inject.{Inject, Singleton}
@@ -15,13 +16,25 @@ import services.mongodb.MongoContext.context
  * Use Mongodb to store folders
  */
 @Singleton
-class MongoDBFolderService @Inject() (files: FileService, datasets: DatasetService) extends FolderService{
+class MongoDBFolderService @Inject() (files: FileService, datasets: DatasetService) extends FolderService {
 
   /**
    * Get Folder
    */
   def get(id: UUID): Option[Folder] = {
     FolderDAO.findOneById(new ObjectId(id.stringify))
+  }
+
+  def get(ids: List[UUID]): DBResult[Folder] = {
+    if (ids.length == 0) return DBResult(List.empty, List.empty)
+
+    val query = MongoDBObject("_id" -> MongoDBObject("$in" -> ids.map(id => new ObjectId(id.stringify))))
+    val found = FolderDAO.find(query).toList
+    val notFound = ids.diff(found.map(ds => ds.id))
+
+    if (notFound.length > 0)
+      Logger.error("Not all dataset IDs found for bulk get request")
+    return DBResult(found, notFound)
   }
 
   /**
@@ -39,22 +52,21 @@ class MongoDBFolderService @Inject() (files: FileService, datasets: DatasetServi
   /**
    * Delete folder and any reference of it.
    */
-  def delete(folderId: UUID, host: String) {
+  def delete(folderId: UUID, host: String, apiKey: Option[String], user: Option[User]) {
 
     get(folderId) match {
       case Some(folder) => {
-        folder.files.map {
-          fileId => {
-            files.get(fileId) match {
-              case Some(file) => files.removeFile(file.id, host)
-              case None =>
-            }
-          }
-        }
+        files.get(folder.files).found.foreach(file => {
+          // Check the file doesn't exist in other folders/datasets before deleting
+          val notTheDataset = for (currDataset <- datasets.findByFileIdDirectlyContain(file.id) if !folder.parentDatasetId.toString.equals(currDataset.id.toString)) yield currDataset
+          val notTheFolder = for (currFolder <- findByFileId(file.id) if !folder.id.toString.equals(currFolder.id.toString)) yield currFolder
+          if (notTheDataset.size == 0 && notTheFolder.size == 0)
+            files.removeFile(file.id, host, apiKey, user)
+        })
         folder.folders.map {
           subfolderId => {
             get(subfolderId)  match {
-              case Some(subfolder) => delete(subfolder.id, host)
+              case Some(subfolder) => delete(subfolder.id, host, apiKey, user)
               case None =>
             }
           }

@@ -1,12 +1,15 @@
 package util
 
+import api.Permission
 import models._
 import play.api.Logger
+import play.api.libs.json.Json._
 import play.api.libs.json._
 import services._
 
 import java.util.Date
 import scala.collection.immutable.List
+import scala.collection.mutable.ListBuffer
 
 
 object SearchUtils {
@@ -22,12 +25,38 @@ object SearchUtils {
     val id = f.id
 
     // Get child_of relationships for File
-    val child_of = datasets.findByFileIdDirectlyContain(id).map(ds => ds.id.toString ) ++
-      folders.findByFileId(id).map( fld => fld.parentDatasetId.toString )
+    var child_of: ListBuffer[String] = ListBuffer()
+    datasets.findByFileIdDirectlyContain(id).map(ds => {
+      child_of += ds.id.toString
+      ds.spaces.map(spid => child_of += spid.toString)
+      ds.collections.map(collid => child_of += collid.toString)
+    })
+    val folderlist = folders.findByFileId(id).map(fld => {
+      child_of += fld.id.toString
+      child_of += fld.parentDatasetId.toString
+      fld.id
+    })
+    datasets.get(folderlist).found.foreach(ds => {
+      child_of += ds.id.toString
+      ds.spaces.map(spid => child_of += spid.toString)
+      ds.collections.map(collid => child_of += collid.toString)
+    })
+    val child_of_distinct = child_of.toList.distinct
+
+    // Get tags for file and its sections
+    var ftags: ListBuffer[String] = ListBuffer()
+    f.tags.foreach(t =>
+      ftags += t.name
+    )
+    f.sections.foreach(sect => {
+      sect.tags.foreach(sect_tag =>
+        ftags += sect_tag.name
+      )
+    })
 
     // Get comments for file
     val fcomments = for (c <- comments.findCommentsByFileId(id)) yield {
-      Comment.toElasticsearchComment(c)
+      c.text
     }
 
     // Get metadata for File
@@ -71,9 +100,9 @@ object SearchUtils {
       f.uploadDate,
       f.originalname,
       List.empty,
-      child_of,
+      child_of_distinct,
       f.description,
-      f.tags.map( (t:Tag) => Tag.toElasticsearchTag(t) ),
+      ftags.toList,
       fcomments,
       metadata
     ))
@@ -83,9 +112,21 @@ object SearchUtils {
   def getElasticsearchObject(ds: Dataset): Option[ElasticsearchObject] = {
     val id = ds.id
 
+    // Get parent collections and spaces
+    var child_of: ListBuffer[String] = ListBuffer()
+    ds.collections.map(collId => child_of += collId.toString)
+    ds.spaces.map(spid => child_of += spid.toString)
+    val child_of_distinct = child_of.toList.distinct
+
+    // Get child files & folders
+    var parent_of: ListBuffer[String] = ListBuffer()
+    ds.files.map(fileId => parent_of += fileId.toString)
+    ds.folders.map(folderId => parent_of += folderId.toString)
+    val parent_of_distinct = parent_of.toList.distinct
+
     // Get comments for dataset
     val dscomments = for (c <- comments.findCommentsByDatasetId(id)) yield {
-      Comment.toElasticsearchComment(c)
+      c.text
     }
 
     // Get metadata for Dataset
@@ -129,10 +170,10 @@ object SearchUtils {
       ds.author.id.toString,
       ds.created,
       "",
-      ds.files.map(fileId => fileId.toString),
-      ds.collections.map(collId => collId.toString),
+      parent_of_distinct,
+      child_of_distinct,
       ds.description,
-      ds.tags.map( (t:Tag) => Tag.toElasticsearchTag(t) ),
+      ds.tags.map( (t:Tag) => t.name ),
       dscomments,
       metadata
     ))
@@ -143,7 +184,13 @@ object SearchUtils {
     // Get parent_of relationships for Collection
     // TODO: Re-enable after listCollection implements Iterator; crashes on large databases otherwise
     //var parent_of = datasets.listCollection(c.id.toString).map( ds => ds.id.toString )
-    var parent_of = c.parent_collection_ids.map( pc_id => pc_id.toString) //++ parent_of
+    var parent_of = c.child_collection_ids.map( cc_id => cc_id.toString)
+
+    // Get child relationships
+    var child_of: ListBuffer[String] = ListBuffer()
+    c.parent_collection_ids.map( pc_id => child_of += pc_id.toString)
+    c.spaces.map( spid => child_of += spid.toString)
+    val child_of_distinct = child_of.toList.distinct
 
     Some(new ElasticsearchObject(
       ResourceRef(ResourceRef.collection, c.id),
@@ -152,7 +199,7 @@ object SearchUtils {
       c.created,
       "",
       parent_of,
-      c.child_collection_ids.map( cc_id => cc_id.toString),
+      child_of_distinct,
       c.description,
       List.empty,
       List.empty,
@@ -210,7 +257,7 @@ object SearchUtils {
       List.empty,
       child_of,
       s.description.getOrElse(""),
-      s.tags.map( (t:Tag) => Tag.toElasticsearchTag(t) ),
+      s.tags.map( (t:Tag) => t.name ),
       List.empty,
       metadata
     ))
@@ -231,5 +278,67 @@ object SearchUtils {
       List.empty,
       Map()
     ))
+  }
+
+  /**Format a simple search result*/
+  def prepareSearchResponse(response: ElasticsearchResult, source_url: String, user: Option[User]): Map[String, JsValue] = {
+    var results = ListBuffer.empty[JsValue]
+
+    // Use bulk Mongo queries to get many resources at once
+    val filesList = files.get(Permission.checkPermissions(user, Permission.ViewFile,
+      response.results.filter(_.resourceType == 'file)).approved.map(_.id)).found
+    val datasetsList = datasets.get(Permission.checkPermissions(user, Permission.ViewDataset,
+      response.results.filter(_.resourceType == 'dataset)).approved.map(_.id)).found
+    val collectionsList = collections.get(Permission.checkPermissions(user, Permission.ViewCollection,
+      response.results.filter(_.resourceType == 'collection)).approved.map(_.id)).found
+
+    // Now reorganize the separate lists back into Elasticsearch score order
+    for (resource <- response.results) {
+      resource.resourceType match {
+        case ResourceRef.file => filesList.filter(_.id == resource.id).foreach(f => results += toJson(f))
+        case ResourceRef.dataset => datasetsList.filter(_.id == resource.id).foreach(d => results += toJson(d))
+        case ResourceRef.collection => collectionsList.filter(_.id == resource.id).foreach(c => results += toJson(c))
+      }
+    }
+
+    // TODO: add views etc. other properties for the handlebars template
+
+    val result = Map[String, JsValue](
+      "results" -> toJson(results.distinct),
+      "count" -> toJson(response.results.length),
+      "size" -> toJson(response.size),
+      "scanned_size" -> toJson(response.scanned_size),
+      "from" -> toJson(response.from),
+      "total_size" -> toJson(response.total_size)
+    )
+
+    addPageURLs(result, source_url, response)
+  }
+
+  /**Provide URLs referring to first/last/next/previous pages of current result set if possible*/
+  def addPageURLs(result: Map[String, JsValue], url_root: String, response: ElasticsearchResult): Map[String, JsValue] = {
+    var paged_result = result
+
+    val lead = if (url_root.contains('?')) "&" else "?"
+
+    // Add pagination fields if necessary
+    if (response.from > 0) {
+      val prev = List(response.from - response.size, 0).max
+      paged_result += ("first" -> toJson(url_root + lead + s"from=0&size=${response.size}"))
+      paged_result += ("prev"  -> toJson(url_root + lead + s"from=$prev&size=${response.size}"))
+    }
+
+    if (response.from + response.scanned_size < response.total_size) {
+      val next = List[Long](response.from + response.scanned_size, response.total_size).min
+      var last = next
+      while (last < response.total_size - response.size) {
+        last += response.size
+      }
+      val last_size = response.total_size - last
+      paged_result += ("last" -> toJson(url_root + lead + s"from=$last&size=${last_size}"))
+      paged_result += ("next"  -> toJson(url_root + lead + s"from=$next&size=${response.size}"))
+    }
+
+    paged_result
   }
 }

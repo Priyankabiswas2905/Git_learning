@@ -13,7 +13,7 @@ import play.api.Logger
 import play.api.Play.current
 import javax.inject.Inject
 import services._
-import models.{Dataset, UUID, User}
+import models.{Dataset, EventType, UUID, User}
 import util.FileUtils
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -97,7 +97,7 @@ class Selected @Inject()(selections: SelectionService,
     request.user match {
       case Some(user) => {
         selections.get(user.email.get).map(d => {
-          datasets.removeDataset(d.id, Utils.baseUrl(request))
+          datasets.removeDataset(d.id, Utils.baseUrl(request), request.apiKey, request.user)
           selections.remove(d.id, user.email.get)
         })
         Ok(toJson(Map("sucess"->"true")))
@@ -186,7 +186,7 @@ class Selected @Inject()(selections: SelectionService,
       case Some(user) => {
         selections.get(user.email.get).map(d => {
           datasets.addTags(d.id, Some(user.id.toString), None, tags)
-          events.addObjectEvent(request.user, d.id, d.name, "add_tags_dataset")
+          events.addObjectEvent(request.user, d.id, d.name, EventType.ADD_TAGS_DATASET.toString)
           datasets.index(d.id)
         })
         Ok(toJson(Map("sucess"->"true")))
