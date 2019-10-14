@@ -880,4 +880,4 @@ POST        /extractors                                                         
 # TREE API
 # ----------------------------------------------------------------------
 
-GET         /api/tree/getChildrenOfNode                                                     @api.Tree.getChildrenOfNode(nodeType : String ?= "space", nodeId : Option[String] ?= None, mine : Boolean ?= false)
+GET         /api/tree/getChildrenOfNode                                                     @api.Tree.getChildrenOfNode(nodeType : String ?= "root", nodeId : Option[String] ?= None, mine : Boolean ?= false)
