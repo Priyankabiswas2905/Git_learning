@@ -256,12 +256,12 @@ class TreeService @Inject()(
       hasChildren = true
     }
     Json.obj("id" -> collection.id.toString, "name" -> collection.name, "text" -> collection.name,
-      "authorId" -> collection.author.id, "children"->hasChildren,"type"->"collection")
+      "authorId" -> collection.author.id, "children"->hasChildren,"type"->"collection", "data"->"collection")
   }
 
   private def datasetJson(dataset: Dataset) : JsValue = {
     Json.obj("id" -> dataset.id.toString, "name" -> dataset.name,"text"->dataset.name, "authorId" -> dataset.author.id,
-      "spaces" -> dataset.spaces, "type"->"dataset", "icon"->"glyphicon glyphicon-briefcase")
+      "spaces" -> dataset.spaces, "type"->"dataset","data"->"dataset", "icon"->"glyphicon glyphicon-briefcase")
 
   }
 
@@ -270,11 +270,11 @@ class TreeService @Inject()(
     if (space.datasetCount > 0 || space.collectionCount > 0){
       hasChildren = true
     }
-    Json.obj("id"-> space.id.toString, "name"->space.name ,"text"->space.name , "children"->hasChildren, "type"->"space", "icon" -> "glyphicon glyphicon-hdd")
+    Json.obj("id"-> space.id.toString, "name"->space.name ,"text"->space.name , "children"->hasChildren, "type"->"space","data"->"space", "icon" -> "glyphicon glyphicon-hdd")
   }
 
   private def fileJson(file: File) : JsValue = {
-    Json.obj("id"->file.id, "name"->file.filename, "text"->file.filename, "type"->"file","icon"-> "glyphicon glyphicon-file")
+    Json.obj("id"->file.id, "name"->file.filename, "text"->file.filename, "type"->"file","data"->"file","icon"-> "glyphicon glyphicon-file")
   }
 
   private def folderJson(folder: Folder) : JsValue = {

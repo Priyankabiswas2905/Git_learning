@@ -550,9 +550,11 @@
                            core: {
                                data: {
                                    url: function(node) {
+                                       console.log('node');
+                                       console.log(node);
                                        return node.id === "#" ?
                                        "api/tree/getChildrenOfNode?nodeType=root" :
-                                       "api/tree/getChildrenOfNode?nodeId="+node.id+"&nodeType="+node.type+"&role="+node.role+"";
+                                       "api/tree/getChildrenOfNode?nodeId="+node.id+"&nodeType="+node.data+"&role="+node.role+"";
                                    },
                                    type: 'GET'
                                }
