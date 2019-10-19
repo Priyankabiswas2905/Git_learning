@@ -255,11 +255,13 @@ class TreeService @Inject()(
     if (collection.child_collection_ids.size > 0 || collection.datasetCount > 0){
       hasChildren = true
     }
-    Json.obj("id" -> collection.id.toString, "name" -> collection.name, "thumbnail" -> collection.thumbnail_id, "authorId" -> collection.author.id, "hasChildren"->hasChildren,"type"->"collection")
+    Json.obj("id" -> collection.id.toString, "name" -> collection.name, "text" -> collection.name,
+      "authorId" -> collection.author.id, "children"->hasChildren,"type"->"collection")
   }
 
   private def datasetJson(dataset: Dataset) : JsValue = {
-    Json.obj("id" -> dataset.id.toString, "name" -> dataset.name, "thumbnail" -> dataset.thumbnail_id, "authorId" -> dataset.author.id, "spaces" -> dataset.spaces, "type"->"dataset")
+    Json.obj("id" -> dataset.id.toString, "name" -> dataset.name,"text"->dataset.name, "authorId" -> dataset.author.id,
+      "spaces" -> dataset.spaces, "type"->"dataset", "icon"->"glyphicon glyphicon-briefcase")
 
   }
 
@@ -268,15 +270,15 @@ class TreeService @Inject()(
     if (space.datasetCount > 0 || space.collectionCount > 0){
       hasChildren = true
     }
-    Json.obj("id"-> space.id.toString, "name"->space.name ,"hasChildren"->hasChildren, "type"->"space")
+    Json.obj("id"-> space.id.toString, "name"->space.name ,"text"->space.name , "children"->hasChildren, "type"->"space", "icon" -> "glyphicon glyphicon-hdd")
   }
 
   private def fileJson(file: File) : JsValue = {
-    Json.obj("id"->file.id, "name"->file.filename, "type"->"file")
+    Json.obj("id"->file.id, "name"->file.filename, "text"->file.filename, "type"->"file","icon"-> "glyphicon glyphicon-file")
   }
 
   private def folderJson(folder: Folder) : JsValue = {
-    Json.obj("id"->folder.id, "name"->folder.name, "type"->"folder")
+    Json.obj("id"->folder.id, "name"->folder.name,"text"->folder.name, "type"->"folder","icon"->"glyphicon glyphicon-folder")
 
   }
 
