@@ -144,9 +144,9 @@ class TreeService @Inject()(
         case None =>
       }
     }
-    var ds_folder_ids = dataset.get.folders
-    for (ds_folder_id <- ds_folder_ids){
-      folderService.get(ds_folder_id) match {
+    var ds_folders= folderService.findByParentDatasetId(dataset.get.id)
+    for (ds_folder <- ds_folders){
+      folderService.get(ds_folder.id) match {
         case Some(folder) => {
           var fjson :JsValue  = folderJson(folder)
           children += fjson
@@ -260,8 +260,12 @@ class TreeService @Inject()(
   }
 
   private def datasetJson(dataset: Dataset) : JsValue = {
+    var children = false;
+    if (dataset.files.length > 0 || dataset.folders.length > 0) {
+      children = true;
+    }
     Json.obj("id" -> dataset.id.toString, "name" -> dataset.name,"text"->dataset.name, "authorId" -> dataset.author.id,
-      "spaces" -> dataset.spaces, "type"->"dataset","data"->"dataset", "icon"->"glyphicon glyphicon-briefcase")
+      "spaces" -> dataset.spaces,"children"->children, "type"->"dataset","data"->"dataset", "icon"->"glyphicon glyphicon-briefcase")
 
   }
 
@@ -278,7 +282,11 @@ class TreeService @Inject()(
   }
 
   private def folderJson(folder: Folder) : JsValue = {
-    Json.obj("id"->folder.id, "name"->folder.name,"text"->folder.name, "type"->"folder","icon"->"glyphicon glyphicon-folder")
+    var children = false;
+    if (folder.files.length > 0 || folder.folders.length > 0) {
+      children = true;
+    }
+    Json.obj("id"->folder.id, "name"->folder.name,"text"->folder.name, "data"->"folder", "children"->children)
 
   }
 

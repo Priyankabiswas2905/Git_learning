@@ -496,62 +496,18 @@
                         <p>Space, Collections, Datasets, Folders, and Files, in hierarchical tree</p>
                     </div>
                 </div>
-                <div class="well" id="treeview_div">
-                    <ul>
-                        <li>Electronics
-                            <ul>
-                                <li>Mobile
-                                    <ul>
-                                        <li>Samsung</li>
-                                        <li>Apple</li>
-                                    </ul>
-                                </li>
-                                <li>Laptop
-                                    <ul>
-                                        <li>Dell</li>
-                                        <li>Computer Peripherals
-                                            <ul>
-                                                <li>Printers</li>
-                                                <li>Monitor</li>
-                                            </ul>
-                                        </li>
-                                        <li>Keyboard</li>
-                                    </ul>
-                                </li>
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
                 <script>
                         $(function() {
                             $('#treeview_div').jstree();
                         });
                 </script>
-                <div id="container"></div>
-                <script>
-                        $(function() {
-                            $('#container').jstree({
-                                'core' : {
-                                    'data' : [
-                                        { "text" : "Root node", "children" : [
-                                                { "text" : "Child node 1" },
-                                                { "text" : "Child node 2" }
-                                            ]
-                                        }
-                                    ]
-                                }
-                            });
-                        });
-                </script>
-                <div id="test"></div>
+                <div class="well" id="tree_view_div"></div>
                 <script>
                     $(function() {
-                        $('#test').jstree({
+                        $('#tree_view_div').jstree({
                            core: {
                                data: {
                                    url: function(node) {
-                                       console.log('node');
-                                       console.log(node);
                                        return node.id === "#" ?
                                        "api/tree/getChildrenOfNode?nodeType=root" :
                                        "api/tree/getChildrenOfNode?nodeId="+node.id+"&nodeType="+node.data+"&role="+node.role+"";
@@ -560,6 +516,21 @@
                                }
                            }
                         });
+                        $("#tree_view_div").on("select_node.jstree", function (e, data) {
+                            if (data.node.data == "space"){
+                                window.location.href="spaces/"+data.node.id;
+                            } else if (data.node.data == "collection") {
+                                window.location.href="collections/"+data.node.id;
+                            } else if (data.node.data == "dataset") {
+                                window.location.href="datasets/"+data.node.id;
+                            } else if (data.node.data == "folder") {
+                                window.location.href="datasets/"+data.node.parent+'#folderId='+data.node.id;
+                            } else if (data.node.data == "file") {
+                                console.log("a file");
+                                window.location.href="files/"+data.node.id;
+                            }
+                        });
+
                     })
                 </script>
         </div>
