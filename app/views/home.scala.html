@@ -508,24 +508,25 @@
                            core: {
                                data: {
                                    url: function(node) {
+                                       console.log(node);
                                        return node.id === "#" ?
                                        "api/tree/getChildrenOfNode?nodeType=root" :
-                                       "api/tree/getChildrenOfNode?nodeId="+node.id+"&nodeType="+node.data+"&role="+node.role+"";
+                                       "api/tree/getChildrenOfNode?nodeId="+node.id+"&nodeType="+node.data.type+"&role="+node.role+"";
                                    },
                                    type: 'GET'
                                }
                            }
                         });
                         $("#tree_view_div").on("select_node.jstree", function (e, data) {
-                            if (data.node.data == "space"){
+                            if (data.node.data.type == "space"){
                                 window.location.href="spaces/"+data.node.id;
-                            } else if (data.node.data == "collection") {
+                            } else if (data.node.data.type == "collection") {
                                 window.location.href="collections/"+data.node.id;
-                            } else if (data.node.data == "dataset") {
+                            } else if (data.node.data.type == "dataset") {
                                 window.location.href="datasets/"+data.node.id;
-                            } else if (data.node.data == "folder") {
-                                window.location.href="datasets/"+data.node.parent+'#folderId='+data.node.id;
-                            } else if (data.node.data == "file") {
+                            } else if (data.node.data.type == "folder") {
+                                window.location.href="datasets/"+data.node.data.parentDataset+'#folderId='+data.node.id;
+                            } else if (data.node.data.type == "file") {
                                 console.log("a file");
                                 window.location.href="files/"+data.node.id;
                             }
