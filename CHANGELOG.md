@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
+- 'api/tree/getChildrenOfNode' returns JSON that represents the spaces, collections, datasets, 
+   folders and files as if they were a hierarchical tree. Each call to this returns either (no parameters)
+   the root level (spaces and datasets, collections not in a space) or else takes a node of the tree by id and type,
+   and returns its children. Tree View tab added to main page. 
 
 ### Changed
 - `/api/search` endpoint now returns JSON objects describing each result rather than just the ID. This endpoint has three
