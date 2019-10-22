@@ -148,8 +148,10 @@ class TreeService @Inject()(
     for (ds_folder <- ds_folders){
       folderService.get(ds_folder.id) match {
         case Some(folder) => {
-          var fjson :JsValue  = folderJson(folder)
-          children += fjson
+          if (folder.parentType == "dataset"){
+            var fjson :JsValue  = folderJson(folder)
+            children += fjson
+          }
         }
         case None =>
       }
