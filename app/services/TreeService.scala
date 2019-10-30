@@ -84,8 +84,11 @@ class TreeService @Inject()(
   def getChildrenOfSpace(space: Option[ProjectSpace], mine: Boolean, user : User): List[JsValue] = {
     var children : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
 
-    var collectionsInSpace = spaceService.getCollectionsInSpace(Some(space.get.id.stringify),None)
-    var datasetsInSpace = spaceService.getDatasetsInSpace(Some(space.get.id.stringify),None)
+    val numCollectionsInSpace : Long = collections.countSpace(space.get.id.toString())
+    var collectionsInSpace = spaceService.getCollectionsInSpace(Some(space.get.id.stringify),Some(numCollectionsInSpace.toInt))
+
+    val numDatasetsInSpace : Long = datasets.countSpace(space.get.id.stringify)
+    var datasetsInSpace = spaceService.getDatasetsInSpace(Some(space.get.id.stringify),Some(numDatasetsInSpace.toInt))
     // filters datasets that have a collection in the space
     datasetsInSpace = datasetsInSpace.filter((d: Dataset) => (!datasetHasCollectionInSpace(d,space.get)))
     if (mine){
