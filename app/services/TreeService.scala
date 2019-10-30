@@ -266,7 +266,7 @@ class TreeService @Inject()(
     }
     var data = Json.obj("type"->"collection")
     Json.obj("id" -> collection.id.toString, "name" -> collection.name, "text" -> collection.name,
-      "authorId" -> collection.author.id, "children"->hasChildren,"type"->"collection", "data"->data)
+      "authorId" -> collection.author.id, "children"->hasChildren,"type"->"collection", "data"->data, "icon"->"glyphicon glyphicon-th-large")
   }
 
   private def datasetJson(dataset: Dataset) : JsValue = {
