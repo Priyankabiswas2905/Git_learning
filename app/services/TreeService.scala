@@ -126,12 +126,14 @@ class TreeService @Inject()(
   }
 
   def getOrphanCollectionsNotInSpace(user : User) : List[Collection] = {
-    var collectionsNotInSpace = collections.listUser(0,Some(user),false,user).filter((c: Collection) => (c.spaces.isEmpty && c.parent_collection_ids.isEmpty))
+    val numCollectionsUser = collections.countUser(Some(user), true, user)
+    var collectionsNotInSpace = collections.listUser(numCollectionsUser.toInt, Some(user),false,user).filter((c: Collection) => (c.spaces.isEmpty && c.parent_collection_ids.isEmpty))
     collectionsNotInSpace
   }
 
   def getOrphanDatasetsNotInSpace(user : User ) : List[Dataset] = {
-    var datasetsNotInSpace = datasets.listUser(0,Some(user),false,user).filter((d: Dataset) => (d.spaces.isEmpty && d.collections.isEmpty))
+    var numDatasetsUser = datasets.countUser(Some(user), true, user)
+    var datasetsNotInSpace = datasets.listUser(numDatasetsUser.toInt, Some(user),false,user).filter((d: Dataset) => (d.spaces.isEmpty && d.collections.isEmpty))
     datasetsNotInSpace
   }
 
@@ -228,8 +230,9 @@ class TreeService @Inject()(
   }
 
   def getDatasets(mine : Boolean, user: User) : List[JsValue] = {
+    val numDatasetsUser = datasets.countUser(Some(user), true, user).toInt
     var visibleDatasets : ListBuffer[JsValue] = ListBuffer.empty[JsValue]
-    var ds = datasets.listAccess(999,Set[Permission](Permission.ViewDataset),Some(user),true,true,false)
+    var ds = datasets.listAccess(numDatasetsUser, Set[Permission](Permission.ViewDataset),Some(user),true,true,false)
     // ds = ds.filter((d: Dataset) => (d.trash == false))
     if (mine){
       ds = ds.filter((d: Dataset) => (d.author.id == user.id))
@@ -242,7 +245,8 @@ class TreeService @Inject()(
   }
 
   def getCollections(mine: Boolean, user: User) : List[JsValue] = {
-    var cols = collections.listAccess(0,Set[Permission](Permission.ViewCollection),Some(user),true,true,false)
+    val numCollectionsUser = collections.countUser(Some(user), true, user).toInt
+    var cols = collections.listAccess(numCollectionsUser, Set[Permission](Permission.ViewCollection),Some(user),true,true,false)
     // cols = cols.filter((c : Collection) => (c.trash == false))
     if (mine) {
       cols = cols.filter((c: Collection) => (c.author.id == user.id))
