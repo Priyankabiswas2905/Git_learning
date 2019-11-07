@@ -1,6 +1,8 @@
 # Script to migrate all files on disk to AWS S3 buckets.
 
 
+The script will scan Clowder collections: 'logo', 'uploads', 'thumbnails', 'titles', 'textures', 'previews'. And then upload files on disk to AWS S3 buckets.
+
 ## build the docker image
 ```
 docker build -t migratefilestos3 .
