@@ -18,20 +18,29 @@ if __name__ == '__main__':
 
     parser.add_argument('--dbname', '-d', default=os.getenv("DBNAME", None),
                         help='Clowder databse name')
+
+    parser.add_argument('--hostfs', '-f', default=os.getenv("HOSTFILESYSTEM", None),
+                        help='the mount point of host filesystem')
+    parser.add_argument('--outputfolder', '-o', default=os.getenv("OUTPUTFOLDER", None),
+                        help='the output folder where a file contains the information'
+                             ' of a list of all files that have been migrated to S3')
+
     args = parser.parse_args()
 
     print('migrate disk storage files to s3')
     print('Clowder dburl: %s, dbname: %s' % (args.dburl, args.dbname))
     print('upload files to S3: region: %s, service endpoint: %s' % (config.REGION, config.SERVICE_ENDPOINT))
     print('S3 bucket: %s' % config.BUCKET)
-    hostfilesystem = "/host"
+    hostfilesystem = args.hostfs
+    if not hostfilesystem:
+        hostfilesystem = ""
     f = None
     total_bytes_uploaded = 0
     collections = ['logo', 'uploads', 'thumbnails', 'titles', 'textures', 'previews']
     try:
         now = datetime.now()
         dt_string = now.strftime("%d-%m-%YT%H:%M:%S")
-        file_path = "/output/migrates-filelist-%s.txt" % dt_string
+        file_path = "%s/migrates-filelist-%s.txt" % (args.outputfolder, dt_string)
         directory = os.path.dirname(file_path)
         if not os.path.exists(directory):
             os.mkdir(directory)

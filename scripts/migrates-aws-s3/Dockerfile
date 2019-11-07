@@ -8,7 +8,9 @@ ENV SERVICE_ENDPOINT='http://localhost:8000' \
     AWS_SECRET_ACCESS_KEY="" \
     REGION="us-east-1"\
     DBURL="mongodb://localhost:27017" \
-    DBNAME="clowder"
+    DBNAME="clowder" \
+    HOSTFILESYSTEM="/host" \
+    OUTPUTFOLDER="/output"
 
 
 COPY requirements.txt /
