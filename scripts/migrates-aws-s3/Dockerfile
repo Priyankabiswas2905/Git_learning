@@ -17,5 +17,5 @@ COPY requirements.txt /
 RUN pip install -r /requirements.txt
 
 # Copy files
-COPY main.py s3.py config.py /
+COPY main.py s3.py /
 CMD python /main.py --dburl $DBURL --dbname $DBNAME

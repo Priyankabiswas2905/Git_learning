@@ -6,7 +6,6 @@ from pymongo.mongo_client import MongoClient
 import traceback
 from datetime import datetime
 
-import config
 from s3 import S3Bucket
 
 
@@ -25,12 +24,27 @@ if __name__ == '__main__':
                         help='the output folder where a file contains the information'
                              ' of a list of all files that have been migrated to S3')
 
+    parser.add_argument('--s3endpoint', '-s', default=os.getenv("SERVICE_ENDPOINT", None),
+                        help='S3 service endpoint')
+
+    parser.add_argument('--s3bucket', '-b', default=os.getenv("BUCKET", None),
+                        help='S3 bucket name')
+
+    parser.add_argument('--s3ID', '-i', default=os.getenv("AWS_ACCESS_KEY_ID", None),
+                        help='S3 aws access key id')
+
+    parser.add_argument('--s3KEY', '-k', default=os.getenv("AWS_SECRET_ACCESS_KEY", None),
+                    help='S3 aws access secret key')
+
+    parser.add_argument('--s3REGION', '-r', default=os.getenv("REGION", None),
+                    help='S3 region')
+
     args = parser.parse_args()
 
     print('migrate disk storage files to s3')
     print('Clowder dburl: %s, dbname: %s' % (args.dburl, args.dbname))
-    print('upload files to S3: region: %s, service endpoint: %s' % (config.REGION, config.SERVICE_ENDPOINT))
-    print('S3 bucket: %s' % config.BUCKET)
+    print('upload files to S3: region: %s, service endpoint: %s' % (args.s3REGION, args.s3endpoint))
+    print('S3 bucket: %s' % args.s3bucket)
     hostfilesystem = args.hostfs
     if not hostfilesystem:
         hostfilesystem = ""
@@ -38,6 +52,7 @@ if __name__ == '__main__':
     total_bytes_uploaded = 0
     collections = ['logo', 'uploads', 'thumbnails', 'titles', 'textures', 'previews']
     try:
+        s3bucket = S3Bucket(args.s3bucket, args.s3endpoint, args.s3ID, args.s3KEY, args.s3REGION)
         now = datetime.now()
         dt_string = now.strftime("%d-%m-%YT%H:%M:%S")
         file_path = "%s/migrates-filelist-%s.txt" % (args.outputfolder, dt_string)
@@ -65,8 +80,7 @@ if __name__ == '__main__':
                             loader_id = data_tuple.get('loader_id')
                             statinfo = os.stat(hostfilesystem+loader_id)
                             file_bytes = statinfo.st_size
-                            print(statinfo.st_size)
-                            S3Bucket().upload(hostfilesystem+loader_id, loader_id)
+                            s3bucket.upload(hostfilesystem+loader_id, loader_id)
                             # MinioBucket().upload(loader_id)
                             # update record loader to 'services.s3.S3ByteStorageService'
                             update_data = dict()
