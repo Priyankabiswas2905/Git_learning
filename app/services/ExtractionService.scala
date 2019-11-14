@@ -5,6 +5,8 @@ import java.util.Date
 
 import org.bson.types.ObjectId
 
+import scala.collection.SortedMap
+
 
 /**
  * Track information about individual extractions.
@@ -28,5 +30,5 @@ trait ExtractionService {
   
   def getWebPageResource(id: UUID): Map[String,String]
 
-  def groupByType(extraction_list: List[Extraction]): Map[String, ExtractionGroup]
+  def groupByType(extraction_list: List[Extraction]): Map[String, SortedMap[String, ExtractionGroup]]
 }

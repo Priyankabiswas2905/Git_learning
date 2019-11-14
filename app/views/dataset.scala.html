@@ -14,7 +14,7 @@
   canAddDatasetToCollection: Boolean,
   stagingAreaDefined: Boolean,
   view: (Int, java.util.Date),
-  extractionsStatus: Map[String, ExtractionGroup]
+  extractionsStatus: Map[String, scala.collection.SortedMap[String, ExtractionGroup]]
 )(implicit flash: play.api.mvc.Flash, user: Option[models.User], request: RequestHeader)
 
 @import api.Permission

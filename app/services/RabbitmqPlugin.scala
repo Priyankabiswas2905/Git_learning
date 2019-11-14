@@ -436,7 +436,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     import java.text.SimpleDateFormat
     val dateFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX")
     val submittedDateConvert = Some(new java.util.Date())
-    extractions.insert(Extraction(UUID.generate(), file_id, extractor_id, "SUBMITTED", submittedDateConvert, None)) match {
+    extractions.insert(Extraction(UUID.generate(), file_id, extractor_id, "SUBMITTED", "", submittedDateConvert, None)) match {
       case Some(objectid) => UUID(objectid.toString)
       case None => UUID("")
     }
@@ -954,7 +954,7 @@ class PendingRequestCancellationActor(exchange: String, connection: Option[Conne
       val extractions: ExtractionService = DI.injector.getInstance(classOf[ExtractionService])
       val dateFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX")
       var startDate = Some(new java.util.Date())
-      extractions.insert(Extraction(UUID.generate(), id, queueName, "Cancel Requested", startDate, None))
+      extractions.insert(Extraction(UUID.generate(), id, queueName, "SUBMITTED", "Cancel Requested", startDate, None))
 
       val channel: Channel = connection.get.createChannel()
       //1. connect to the target rabbitmq queue
@@ -1022,9 +1022,9 @@ class PendingRequestCancellationActor(exchange: String, connection: Option[Conne
       // update extraction event
       startDate = Some(new java.util.Date())
       if(foundCancellationRequest) {
-        extractions.insert(Extraction(UUID.generate(), id, queueName, "Cancel Success", startDate, None))
+        extractions.insert(Extraction(UUID.generate(), id, queueName, "SUBMITTED", "Cancel Success", startDate, None))
       } else {
-        extractions.insert(Extraction(UUID.generate(), id, queueName, "Cancel Failed", startDate, None))
+        extractions.insert(Extraction(UUID.generate(), id, queueName, "SUBMITTED", "Cancel Failed", startDate, None))
       }
 
       try {
@@ -1170,24 +1170,34 @@ class EventFilter(channel: Channel, queue: String) extends Actor {
       val json = Json.parse(statusBody)
       val file_id = UUID((json \ "file_id").as[String])
       val extractor_id = (json \ "extractor_id").as[String]
-      val status = (json \ "status").as[String]
       val startDate = (json \ "start").asOpt[String].map(x =>
         Try(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX").parse(x)).getOrElse {
           new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse(x)
         })
-      val updatedStatus = status.toUpperCase()
+      val message_type = (json \ "message_type")
+      val message = (json \ "message")
+
       //TODO : Enforce consistent status updates: STARTED, DONE, ERROR and
-      //       other detailed status updates to logs when we start implementing
-      //       distributed logging
-      if (updatedStatus.contains("DONE")) {
-        extractions.insert(Extraction(UUID.generate(), file_id, extractor_id, "DONE", startDate, None))
+      //       other detailed status updates to logs when we start implementing distributed logging
+
+      val commKey = "key=" + play.Play.application().configuration().getString("commKey")
+      if (message_type.isInstanceOf[JsUndefined] || message.isInstanceOf[JsUndefined]) {
+        // TODO: remove support for combined 'status' messages in 2.0
+        val status = (json \ "status").as[String]
+        val updatedStatus = status.toUpperCase()
+        if (updatedStatus.contains("DONE")) {
+          extractions.insert(Extraction(UUID.generate(), file_id, extractor_id, "SUCCEEDED", "DONE", startDate, None))
+        } else {
+          val parsed_status = status.replace(commKey, "key=secretKey")
+          parsed_status.split(": ")
+          extractions.insert(Extraction(UUID.generate(), file_id, extractor_id, parsed_status, "", startDate, None))
+        }
+        Logger.debug("updatedStatus=" + updatedStatus + " status=" + status + " startDate=" + startDate)
+        models.ExtractionInfoSetUp.updateDTSRequests(file_id, extractor_id)
       } else {
-        val commKey = "key=" + play.Play.application().configuration().getString("commKey")
-        val parsed_status = status.replace(commKey, "key=secretKey")
-        extractions.insert(Extraction(UUID.generate(), file_id, extractor_id, parsed_status, startDate, None))
+        val parsed_message = message.as[String].replace(commKey, "key=secretKey")
       }
-      Logger.debug("updatedStatus=" + updatedStatus + " status=" + status + " startDate=" + startDate)
-      models.ExtractionInfoSetUp.updateDTSRequests(file_id, extractor_id)
+
   }
 }
 

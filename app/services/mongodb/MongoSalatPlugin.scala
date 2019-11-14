@@ -442,6 +442,8 @@ class MongoSalatPlugin(app: Application) extends Plugin {
 
     // Updates permissions for the admin Role
     updateMongo("update-admin-role", updateAdminRole)
+
+    updateMongo("migrate-extraction-status", migrateExtractionHistory)
   }
 
   private def updateMongo(updateKey: String, block: () => Unit): Unit = {
@@ -1638,7 +1640,6 @@ class MongoSalatPlugin(app: Application) extends Plugin {
     }
   }
 
-
   private def updateAdminRole(): Unit = {
     val query = MongoDBObject("name" -> "Admin")
     val operation = MongoDBObject("$addToSet" -> MongoDBObject("permissions" -> Permission.ArchiveFile.toString))
@@ -1665,4 +1666,41 @@ class MongoSalatPlugin(app: Application) extends Plugin {
     }
   }
 
+  /** Convert existing Extraction.status fields to a split message and message_type fields **/
+  private def migrateExtractionHistory(): Unit = {
+    collection("extractions").foreach{extraction =>
+      // Get substring of status up to the first :
+      val status = extraction.get("status").toString
+      val msg = status.substring(status.indexOf(':')+1).stripPrefix(" ")
+
+      val msg_type = if (status.contains(':')) {
+        val substatus = status.substring(0, status.indexOf(':')).stripSuffix(" ")
+        substatus.toUpperCase match {
+          case "STARTED PROCESSING FILE" => "STARTED"
+          case "ERROR PROCESSING FILE" => "ERROR"
+          case "STATUSMESSAGE.START" => "STARTED"
+          case "STATUSMESSAGE.ERROR" => "ERROR"
+          case "STATUSMESSAGE.PROCESSING" => {
+            if (msg.indexOf("Resubmitting message") == 0)
+              "RESUBMITTED"
+            else
+              "PROCESSING"
+          }
+          case "STATUSMESSAGE.RETRY" => "RESUBMITTED"
+          case "STARTED" | "PROCESSING" | "RESUBMITTED" | "ERROR" => substatus.toUpperCase
+          case _ => "PROCESSING"
+        }
+      } else {
+        status.toUpperCase match {
+          case "DONE" => "SUCCEEDED" // TODO: DONE could refer to SUCCEEDED or ERROR?
+          case "SUBMITTED" => status.toUpperCase
+          case _ => "PROCESSING"
+        }
+      }
+
+      extraction.put("message", msg)
+      extraction.put("message_type", msg_type)
+      collection("extractions").save(extraction, WriteConcern.Safe)
+    }
+  }
 }

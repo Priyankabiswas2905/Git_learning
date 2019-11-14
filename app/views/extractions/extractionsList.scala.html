@@ -1,4 +1,4 @@
-@(extractions: Map[String, ExtractionGroup], extractType: String)
+@(extractions: Map[String, scala.collection.SortedMap[String, ExtractionGroup]], extractType: String)
 <div class="well">
     @if(extractions.size == 0) {
         <p>No extraction events recorded.</p>
@@ -13,33 +13,47 @@
             <tbody>
             @for(e <- extractions.keysIterator) {
                 <tr>
-                    <td>
+                    <td colspan="4">
                         <a class="btn btn-link" data-toggle="collapse" data-target="#extractions-@e.replace('.','-')">
                             @e
                         </a>
                     </td>
-                    <td>@extractions(e).firstMsgTime</td>
-                    <td>@extractions(e).latestMsgTime</td>
-                    <td>@extractions(e).latestMsg.replace("StatusMessage.start", "START").replace("StatusMessage.processing", "PROCESS").replace("StatusMessage.error", "ERROR")</td>
-
                 </tr>
                 <tr class="collapse" id="extractions-@e.replace('.','-')">
                     <td colspan="4">
                         <table class="table">
                             <tbody>
-                                @for(e2 <- extractions(e).allMsgs) {
+                                @for(etime <- extractions(e).keysIterator) {
                                     <tr>
-                                        <td width="19%"></td>
-                                        <td width="81%"><b>@e2.start</b><br/>
-                                            @e2.status.replace("StatusMessage.start", "START").replace("StatusMessage.processing", "PROCESS").replace("StatusMessage.error", "ERROR")
-                                            @if(e2.status == "SUBMITTED") {
-                                                <a class="btn btn-link" id='@(e2.id)' onclick="cancelSubmission('@(e2.file_id)', '@(e2.id)', '@(e2.extractor_id)', '@(extractType)')">
-                                                    Cancel
-                                                </a>
-                                            }
+                                        <td>
+                                            <a class="btn btn-link" data-toggle="collapse" data-target="#extractions-@e.replace('.','-')-@etime.replace(' ','-').replace(':','-')">@etime</a>
+                                        </td>
+                                        <td>@extractions(e)(etime).firstMsgTime</td>
+                                        <td>@extractions(e)(etime).latestMsgTime</td>
+                                        <td>@extractions(e)(etime).latestMsg</td>
+                                    </tr>
+                                    <tr class="collapse" id="extractions-@e.replace('.','-')-@etime.replace(' ','-').replace(':','-')">
+                                        <td colspan="4">
+                                            <table class="table">
+                                                <tbody>
+                                                    @for(e2 <- extractions(e)(etime).allMsgs) {
+                                                        <tr>
+                                                            <td width="19%"></td>
+                                                            <td width="81%"><b>@e2.start</b><br/>
+                                                                @if(e2.message_type == "SUBMITTED") {
+                                                                    @e2.message_type
+                                                                    <a class="btn btn-link" id='@(e2.id)' onclick="cancelSubmission('@(e2.file_id)', '@(e2.id)', '@(e2.extractor_id)', '@(extractType)')">
+                                                                        Cancel
+                                                                    </a>
+                                                                } else {
+                                                                    @e2.message_type - @e2.message
+                                                                }
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
                                         </td>
                                     </tr>
-
                                 }
                             </tbody>
                         </table>

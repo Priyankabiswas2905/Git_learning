@@ -13,7 +13,8 @@ case class Extraction(
   id: UUID = UUID.generate,
   file_id: UUID,
   extractor_id: String,
-  status: String = "N/A",
+  message_type: String = "N/A",
+  message: String = "",
   start: Option[Date],
   end: Option[Date])
 
