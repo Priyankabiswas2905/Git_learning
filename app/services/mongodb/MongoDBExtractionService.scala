@@ -121,7 +121,7 @@ class MongoDBExtractionService extends ExtractionService {
                 var recent_start: Date = format.parse("Sun Jan 01 00:00:01 CST 1950")
                 start_time_map.keys.foreach(start_time => {
                   val start_dt = format.parse(start_time)
-                  if (start_dt.before(msg_time) && start_dt.after(recent_start)) {
+                  if ((start_dt.before(msg_time) || start_dt.equals(msg_time)) && start_dt.after(recent_start)) {
                     recent_start = start_dt
                   }
                 })
