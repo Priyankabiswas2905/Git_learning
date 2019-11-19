@@ -9,6 +9,21 @@ from datetime import datetime
 from s3 import S3Bucket
 
 
+def print_to_logfile(f, reason, collection_name, mongo_id, loader_id, s3_path):
+    f.write("%s\t%s\t%s\t%s\t%s\n" % (reason, collection_name, mongo_id, loader_id, s3_path))
+
+
+def get_s3_path(loader_id, clowder_upload_folder, clowder_prefix_folder):
+    s3_filepath = None
+    if clowder_upload_folder:
+        if loader_id.startswith(clowder_upload_folder):
+            s3_filepath = "/s3/uploads" + loader_id[len(clowder_upload_folder):]
+    if clowder_prefix_folder:
+        if loader_id.startswith(clowder_prefix_folder):
+            s3_filepath = loader_id[len(clowder_prefix_folder):]
+    return s3_filepath
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='migrate Clowder files to S3')
 
@@ -18,8 +33,12 @@ if __name__ == '__main__':
     parser.add_argument('--dbname', '-d', default=os.getenv("DBNAME", None),
                         help='Clowder databse name')
 
-    parser.add_argument('--hostfs', '-f', default=os.getenv("HOSTFILESYSTEM", None),
-                        help='the mount point of host filesystem')
+    parser.add_argument('--clowderupload', '-l', default=os.getenv("CLOWDER_UPLOAD", None),
+                    help='the mounted folder contains the uploaded files, e.g., /incoming')
+
+    parser.add_argument('--clowderprefix', '-e', default=os.getenv("CLOWDER_PREFIX", None),
+                    help='clowder disk space path, e.g., /generated/data')
+
     parser.add_argument('--outputfolder', '-o', default=os.getenv("OUTPUTFOLDER", None),
                         help='the output folder where a file contains the information'
                              ' of a list of all files that have been migrated to S3')
@@ -45,9 +64,7 @@ if __name__ == '__main__':
     print('Clowder dburl: %s, dbname: %s' % (args.dburl, args.dbname))
     print('upload files to S3: region: %s, service endpoint: %s' % (args.s3REGION, args.s3endpoint))
     print('S3 bucket: %s' % args.s3bucket)
-    hostfilesystem = args.hostfs
-    if not hostfilesystem:
-        hostfilesystem = ""
+    print("Clowder Upload folder: %s, diskstorage folder: %s" % (args.clowderupload, args.clowderprefix))
     f = None
     total_bytes_uploaded = 0
     collections = ['logo', 'uploads', 'thumbnails', 'titles', 'textures', 'previews']
@@ -66,11 +83,12 @@ if __name__ == '__main__':
         for collection in collections:
             try:
                 num = db[collection].count_documents({})
-                nuum_not_disk_storage = 0
+                num_not_disk_storage = 0
                 ndiskfiles = 0
                 nfails = 0
                 nsuccess = 0
                 for data_tuple in db[collection].find({}, {'_id': 1, 'loader_id': 1, 'loader': 1}):
+                    s3_path = ""
                     try:
                         record_id = str(data_tuple.get('_id'))
                         file_bytes = 0
@@ -78,33 +96,39 @@ if __name__ == '__main__':
                         if loader == 'services.filesystem.DiskByteStorageService':
                             ndiskfiles += 1
                             loader_id = data_tuple.get('loader_id')
-                            statinfo = os.stat(hostfilesystem+loader_id)
-                            file_bytes = statinfo.st_size
-                            s3bucket.upload(hostfilesystem+loader_id, loader_id)
-                            # MinioBucket().upload(loader_id)
+
+                            s3_path = get_s3_path(loader_id, args.clowderupload, args.clowderprefix)
+                            try:
+                                statinfo = os.stat(loader_id)
+                                file_bytes = statinfo.st_size
+                            except Exception as ex:
+                                # cannnot access the file by loader_id, either permission or not exist.
+                                print_to_logfile(f, "missing", collection, record_id, loader_id, "")
+                            s3bucket.upload(loader_id, s3_path)
                             # update record loader to 'services.s3.S3ByteStorageService'
                             update_data = dict()
                             update_data['loader'] = 'services.s3.S3ByteStorageService'
-                            # either the same loader_id or convert to UUID.
-                            # update_data['loader_id'] = loader_id
                             status = db[collection].update_one({'_id': ObjectId(record_id)}, {"$set": update_data})
                             if status.modified_count != 1:
                                 raise Exception("failed to update db %d" % record_id)
+
                             nsuccess += 1
-                            f.write(loader_id + "\n")
+                            print_to_logfile(f, "success", collection, record_id, loader_id, s3_path)
                         else:
-                            nuum_not_disk_storage += 1
+                            num_not_disk_storage += 1
                     except Exception as ex:
-                        traceback.print_exc()
-                        print("record: %s failed" % record_id)
+                        # failed, either failed to upload to S3 bucket or update local db
+                        print_to_logfile(f, "failed", collection, record_id, loader_id, s3_path)
                         nfails += 1
                     total_bytes_uploaded += file_bytes
             except Exception as ex:
-                traceback.print_exc()
-            print("working on collection: %s, total records: %d, total on disk files %d, success: %d, failed: %d" %
+                # traceback.print_exc()
+                pass
+            print("completed on collection: %s, total records: %d, total on disk files %d, success: %d, failed: %d" %
                   (collection, num, ndiskfiles, nsuccess, nfails))
     except Exception as ex:
-        traceback.print_exc()
+        # traceback.print_exc()
+        pass
     finally:
         if f:
             f.close()

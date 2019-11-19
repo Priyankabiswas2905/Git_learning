@@ -9,7 +9,6 @@ ENV SERVICE_ENDPOINT='http://localhost:8000' \
     REGION="us-east-1"\
     DBURL="mongodb://localhost:27017" \
     DBNAME="clowder" \
-    HOSTFILESYSTEM="/host" \
     OUTPUTFOLDER="/output"
 
 
