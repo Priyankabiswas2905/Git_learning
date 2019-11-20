@@ -14,7 +14,7 @@ docker build -t migratefilestos3 .
 
 ### Environment `CLOWDER_PREFIX` and `CLOWDER_UPLOAD`
 
-`CLOWDER_PREFIX` specifies the Clowder disk space path. which can be found inside Clowder configuration file. When `CLOWDER_PREFIX` is given, the script will truncate the loader_id which starts with `CLOWDER_PREFIX` and use the rest of suffix as the filepath on S3 bucket. For example, the filepath (loader_id) `/home/clowder/data/upload/38/5c/75/5dd4783d77c838271f755c38` will be uploaded to S3 bucket as `/upload/38/5c/75/5dd4783d77c838271f755c38`.
+`CLOWDER_PREFIX` specifies the Clowder disk space path, which can be found inside Clowder configuration file. When `CLOWDER_PREFIX` is given, the script will truncate the loader_id starting with `CLOWDER_PREFIX` and use the rest of suffix as the filepath on S3 bucket. For example, the filepath (loader_id) `/home/clowder/data/upload/38/5c/75/5dd4783d77c838271f755c38` will be uploaded to S3 bucket as `/upload/38/5c/75/5dd4783d77c838271f755c38`.
 
 
 
