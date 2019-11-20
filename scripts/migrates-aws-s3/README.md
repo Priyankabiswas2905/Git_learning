@@ -10,16 +10,24 @@ docker build -t migratefilestos3 .
 
 ## Run as docker
 
+
+
+### Environment `CLOWDER_PREFIX` and `CLOWDER_UPLOAD`
+
+`CLOWDER_PREFIX` specifies the Clowder disk space path. which can be found inside Clowder configuration file. When `CLOWDER_PREFIX` is given, the script will truncate the loader_id which starts with `CLOWDER_PREFIX` and use the rest of suffix as the filepath on S3 bucket. For example, the filepath (loader_id) `/home/clowder/data/upload/38/5c/75/5dd4783d77c838271f755c38` will be uploaded to S3 bucket as `/upload/38/5c/75/5dd4783d77c838271f755c38`.
+
+
+
+`CLOWDER_UPLOAD` specifies the Clowder mounting folder path, e.g., `/incoming`. When `CLOWDER_UPLOAD` is given, the script will truncate the loader_id which starts with `CLOWDER_UPLOAD` and use the concatenation of `/s3/uploads/` and the rest of suffix as the filepath on S3 bucket. For example, the filepath (loader_id) `/incoming/apple/image.jpg` will be uploaded to S3 bucket as `/s3/uploads/apple/image.jpg`.
+
+
 ### mounting path
-Users need to mount the Clowder disk storage folder from host filesystem into the running container. For example, this mount will let docker container to access the files specified by `loader_id` inside docker container. 
+
+Clowder disk files reside on the host filesystem, thus users need to mount the data folders from host filesystem into the running container. For example, this mount will let docker container to access the files under the folder `/home/clowder/data` inside docker container.
 
 `-v /home/clowder/data:/home/clowder/data`
 
-### Environment `CLOWDER_PREFIX` and `CLOWDER_UPLOAD`
-`CLOWDER_PREFIX` specifies the Clowder disk space path. which can be found inside Clowder configuration file. When `CLOWDER_PREFIX` is given, the script will truncate the loader_id which starts with `CLOWDER_PREFIX` and use the rest of suffix as the filepath on S3 bucket.
-
-`CLOWDER_UPLOAD` specifies the Clowder mounting folder path, e.g., `/incoming`. When `CLOWDER_UPLOAD` is given, the script will truncate the loader_id which starts with `CLOWDER_UPLOAD` and use the concatenation of `/s3/uploads/` and the rest of suffix as the filepath on S3 bucket.
-
+There is an example to migrate Clowder disk storage files to S3 bucket.
 ```
 docker run -it --rm --env SERVICE_ENDPOINT=http://s3service_endpoint --env BUCKET=localbucket --env AWS_ACCESS_KEY_ID=yourawsid --env AWS_SECRET_ACCESS_KEY=yourawssecretkey --env REGION=us-east-1 --env DBURL=mongodb://mongodbpublicip --env DBNAME=clowder --env OUTPUTFOLDER=/output -v /home/clowder/data:/home/clowder/data --env CLOWDER_PREFIX=/home/clowder/data -v ${PWD}/output:/output migratefilestos3
 ```
