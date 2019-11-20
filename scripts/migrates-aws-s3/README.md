@@ -23,9 +23,8 @@ docker build -t migratefilestos3 .
 
 ### mounting path
 
-Clowder disk files reside on the host filesystem, thus users need to mount the data folders from host filesystem into the running container. For example, this mount will let docker container to access the files under the folder `/home/clowder/data` inside docker container.
+Clowder disk files reside on the host filesystem, thus users need to mount the data folders from host filesystem into the running container. For example, this mount `-v /home/clowder/data:/home/clowder/data` will let docker container to access the files under the folder `/home/clowder/data` inside docker container.
 
-`-v /home/clowder/data:/home/clowder/data`
 
 There is an example to migrate Clowder disk storage files to S3 bucket.
 ```
