@@ -108,6 +108,7 @@ if __name__ == '__main__':
                             # update record loader to 'services.s3.S3ByteStorageService'
                             update_data = dict()
                             update_data['loader'] = 'services.s3.S3ByteStorageService'
+                            update_data['loader_id'] = s3_path
                             status = db[collection].update_one({'_id': ObjectId(record_id)}, {"$set": update_data})
                             if status.modified_count != 1:
                                 raise Exception("failed to update db %d" % record_id)
