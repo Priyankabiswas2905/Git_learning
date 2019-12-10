@@ -166,9 +166,9 @@
                 // Byte units following the IEC format
                 // http://en.wikipedia.org/wiki/Kilobyte
                 units: [
-                    {size: 1000000000, suffix: ' GB'},
-                    {size: 1000000, suffix: ' MB'},
-                    {size: 1000, suffix: ' KB'}
+                    {size: 1024*1024*1024, suffix: ' GB'},
+                    {size: 1024*1024, suffix: ' MB'},
+                    {size: 1024, suffix: ' KB'}
                 ]
             };
             this.defaults = $config;

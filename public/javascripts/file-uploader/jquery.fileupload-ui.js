@@ -420,27 +420,33 @@
             if (typeof bytes !== 'number') {
                 return '';
             }
-            if (bytes >= 1000000000) {
-                return (bytes / 1000000000).toFixed(2) + ' GB';
+            var kb = 1024;
+            var mb = 1024*1024;
+            var gb = 1024*1024*1024;
+            if (bytes >= gb) {
+                return (bytes / gb).toFixed(2) + ' GB';
             }
-            if (bytes >= 1000000) {
-                return (bytes / 1000000).toFixed(2) + ' MB';
+            if (bytes >= mb) {
+                return (bytes / mb).toFixed(2) + ' MB';
             }
-            return (bytes / 1000).toFixed(2) + ' KB';
+            return (bytes / kb).toFixed(2) + ' KB';
         },
 
         _formatBitrate: function (bits) {
             if (typeof bits !== 'number') {
                 return '';
             }
-            if (bits >= 1000000000) {
-                return (bits / 1000000000).toFixed(2) + ' Gbit/s';
+            var kb = 1024;
+            var mb = 1024*1024;
+            var gb = 1024*1024*1024;
+            if (bits >= gb) {
+                return (bits / gb).toFixed(2) + ' Gbit/s';
             }
-            if (bits >= 1000000) {
-                return (bits / 1000000).toFixed(2) + ' Mbit/s';
+            if (bits >= mb) {
+                return (bits / mb).toFixed(2) + ' Mbit/s';
             }
-            if (bits >= 1000) {
-                return (bits / 1000).toFixed(2) + ' kbit/s';
+            if (bits >= kb) {
+                return (bits / kb).toFixed(2) + ' kbit/s';
             }
             return bits.toFixed(2) + ' bit/s';
         },
