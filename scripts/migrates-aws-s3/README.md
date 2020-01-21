@@ -47,3 +47,16 @@ To start minIO, just run the below command to start the minIO docker container o
 ```
 docker run --name=minio -dit -p 8000:9000 -v $(pwd)/minio-buckets:/data minio/minio server /data --compat && docker logs -f minio
 ```
+
+## Copy Clowder Database
+It is safe to operate the script on the copy of database.
+First, dump the Clowder database `clowder` into a archive file.
+
+```
+mongodump --archive="clowder-migration-test-db" --db=clowder
+```
+Then, restore the archive file into a new database which is called `clowder-migration-test-db`.
+
+```
+mongorestore --archive="clowder-migration-test-db" --nsFrom='clowder.*' --nsTo='clowder-migration-test-db.*'
+```
