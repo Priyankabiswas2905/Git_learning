@@ -88,7 +88,6 @@ GET            /files/generalMetadataSearch                                     
 GET            /files/following                                                         @controllers.Files.followingFiles(index: Int ?= 0, size: Int ?= 12, mode: String ?= "")
 GET            /files/:id                                                               @controllers.Files.file(id: UUID, dataset: Option[String] ?= None, space: Option[String] ?= None, folder: Option[String] ?= None)
 GET            /files/:id/blob                                                          @controllers.Files.download(id: UUID)
-GET            /files/:id/download/:format                                              @controllers.Files.downloadAsFormat(id: UUID, format: String)
 #GET           /queries/:id/blob				                                        @controllers.Files.downloadquery(id: UUID)
 #GET           /files/:id/similar                                                       @controllers.Files.findSimilar(id: UUID)
 POST           /upload                                                                  @controllers.Files.upload

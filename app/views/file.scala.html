@@ -290,17 +290,6 @@
 									}
 								}
 							}
-							<!--  If outputFormats list is not empty, display downloadAs drop-down button with the list of available formats -->
-							@if(!outputFormats.isEmpty){
-								<div class="btn-group" role="group">
-									<button id="downloadAsButton" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-expanded="false"> <span class="glyphicon glyphicon-download-alt"></span> </button>
-									<ul class="dropdown-menu" role="menu">
-									@outputFormats.get.map { outputFrmt =>
-										<li id="doc" onclick="return downloadFileAs('@routes.Files.downloadAsFormat(UUID(id), outputFrmt)'  );" > <a href="#">@outputFrmt</a> </li>
-									}
-									</ul>
-								</div> <!-- end of class button-group -->
-								} <!-- end of    if(!outputFormats.isEmpty)-->
 						</div> <!-- end of class btn-group -->
 					@if(user.isDefined) {
 						<!-- If user can delete, the button is enabled, otherwise the button is present but disabled to provide consistent UE. -->
