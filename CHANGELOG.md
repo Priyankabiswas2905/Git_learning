@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## Unreleased
 
 ### Fixed
+- remove leading slash for s3 load_id in migration script.
 - docker-compose uses new monitor image from scripts folder
 - monitor will not print error, but just return 0 if queue is not found
 
