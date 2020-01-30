@@ -104,6 +104,7 @@ if __name__ == '__main__':
                             except Exception as ex:
                                 # cannnot access the file by loader_id, either permission or not exist.
                                 print_to_logfile(f, "missing", collection, record_id, loader_id, "")
+                                continue
                             uploadS3 = s3bucket.upload(loader_id, s3_path)
                             # update record loader to 'services.s3.S3ByteStorageService'
                             update_data = dict()

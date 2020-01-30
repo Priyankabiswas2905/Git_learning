@@ -17,7 +17,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
   [CATS-1038](https://opensource.ncsa.illinois.edu/jira/browse/CATS-1038)
 
 ### Fixed
-- remove leading slash for s3 load_id in migration script.
 - Calling api/Files.removeFile should no longer decrement related counters twice.
   [CATS-929](https://opensource.ncsa.illinois.edu/jira/browse/CATS-929)
 
