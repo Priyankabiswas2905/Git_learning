@@ -20,20 +20,14 @@ class S3Bucket:
         self.transfer.upload(file, self.bucket, file[1:], None, None)
 
     def upload(self, file, filekey):
-<<<<<<< HEAD
-
         exist = self.client.list_objects(Bucket=self.bucket, Prefix=filekey[1:])
         if exist:
             return False
-=======
->>>>>>> 811ebc47530ba271e28f23bea93700f2d462c891
         try:
             with open(file, 'rb') as f:
                 self.client.upload_fileobj(f, self.bucket, filekey[1:])
         except Exception as ex:
             traceback.print_exc()
             raise
-<<<<<<< HEAD
         return True
-=======
->>>>>>> 811ebc47530ba271e28f23bea93700f2d462c891
+
