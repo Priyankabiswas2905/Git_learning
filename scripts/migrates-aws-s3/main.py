@@ -67,7 +67,7 @@ if __name__ == '__main__':
     print("Clowder Upload folder: %s, diskstorage folder: %s" % (args.clowderupload, args.clowderprefix))
     f = None
     total_bytes_uploaded = 0
-    collections = ['logo', 'uploads', 'thumbnails', 'titles', 'textures', 'previews']
+    collections = ['logos', 'uploads', 'thumbnails', 'titles', 'textures', 'previews']
     try:
         s3bucket = S3Bucket(args.s3bucket, args.s3endpoint, args.s3ID, args.s3KEY, args.s3REGION)
         now = datetime.now()
@@ -87,7 +87,8 @@ if __name__ == '__main__':
                 ndiskfiles = 0
                 nfails = 0
                 nsuccess = 0
-                for data_tuple in db[collection].find({}, {'_id': 1, 'loader_id': 1, 'loader': 1}):
+                for data_tuple in db[collection].find({}, {'_id': 1, 'loader_id': 1, 'loader': 1},
+                                                      no_cursor_timeout=True):
                     s3_path = ""
                     try:
                         record_id = str(data_tuple.get('_id'))
@@ -129,12 +130,12 @@ if __name__ == '__main__':
                         nfails += 1
                     total_bytes_uploaded += file_bytes
             except Exception as ex:
-                # traceback.print_exc()
+                #traceback.print_exc()
                 pass
             print("completed on collection: %s, total records: %d, total on disk files %d, success: %d, failed: %d" %
                   (collection, num, ndiskfiles, nsuccess, nfails))
     except Exception as ex:
-        # traceback.print_exc()
+        #traceback.print_exc()
         pass
     finally:
         if f:

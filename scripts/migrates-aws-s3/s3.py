@@ -16,12 +16,17 @@ class S3Bucket:
                                    aws_secret_access_key=self.aws_secret_access_key, region_name=self.region_name)
         self.transfer = TransferManager(self.client, None, None, None)
 
+        get_folder_objects = self.client.list_objects_v2(Bucket=self.bucket, Prefix="s3/uploads/PlantVillage/PlantVillage Database Sample Folder_Syngenta/Tomato_RS_Late.B 5340.JPG")
+        if get_folder_objects.get('Contents'):
+            return False
+
+
     def manager_upload(self, file):
         self.transfer.upload(file, self.bucket, file[1:], None, None)
 
     def upload(self, file, filekey):
-        exist = self.client.list_objects(Bucket=self.bucket, Prefix=filekey[1:])
-        if exist:
+        get_folder_objects = self.client.list_objects_v2(Bucket=self.bucket, Prefix=filekey[1:])
+        if get_folder_objects.get('Contents'):
             return False
         try:
             with open(file, 'rb') as f:

@@ -1,4 +1,4 @@
-# Script to migrate all files on disk to AWS S3 buckets.
+__# Script to migrate all files on disk to AWS S3 buckets.
 
 
 The script will scan Clowder collections: 'logo', 'uploads', 'thumbnails', 'titles', 'textures', 'previews'. And then upload files on disk to AWS S3 buckets and update `loader` to `services.s3.S3ByteStorageService` in db. And this script can be rerun multiple times, all the successfully migrated disk files will not be migrated to S3 bucket again.
