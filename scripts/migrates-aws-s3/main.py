@@ -130,13 +130,13 @@ if __name__ == '__main__':
                         nfails += 1
                     total_bytes_uploaded += file_bytes
             except Exception as ex:
-                #traceback.print_exc()
-                pass
+                traceback.print_exc()
+                #pass
             print("completed on collection: %s, total records: %d, total on disk files %d, success: %d, failed: %d" %
                   (collection, num, ndiskfiles, nsuccess, nfails))
     except Exception as ex:
-        #traceback.print_exc()
-        pass
+        traceback.print_exc()
+        #pass
     finally:
         if f:
             f.close()
