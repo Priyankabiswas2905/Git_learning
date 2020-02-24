@@ -1,6 +1,9 @@
 @(newsfeed: List[models.Event])(implicit user: Option[models.User])
 @import _root_.util.Formatters
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
+
 @for(event <- newsfeed) {
   <div class="panel panel-default">
     <div class="panel-body">

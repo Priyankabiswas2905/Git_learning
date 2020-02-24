@@ -3,8 +3,8 @@ package controllers
 import models.UserStatus
 import play.api.Logger
 import play.api.mvc.Results
-import securesocial.core.IdentityProvider
-import securesocial.core.providers.utils.RoutesHelper
+
+
 
 /**
  * Utility controller to be called, typically as a redirect, from the client side when an AJAX error is received,
@@ -20,7 +20,9 @@ class Error extends SecuredController {
      * 
      */
     def authenticationRequired() = UserAction(needActive = false) { implicit request =>
-        Results.Redirect(RoutesHelper.login.absoluteURL(IdentityProvider.sslEnabled)).flashing("error" -> "You must be logged in to perform that action.")
+      // TODO redirect to login page
+//        Results.Redirect(RoutesHelper.login.absoluteURL(IdentityProvider.sslEnabled)).flashing("error" -> "You must be logged in to perform that action.")
+      Ok("Authentication required")
     }
     
     /**
@@ -49,10 +51,13 @@ class Error extends SecuredController {
         }
         
         if (origUrlPresent) {
-            Results.Redirect(RoutesHelper.login.absoluteURL(IdentityProvider.sslEnabled)).flashing("error" -> errMsg).withSession("original-url" -> url)
-        }
-        else {
-            Results.Redirect(RoutesHelper.login.absoluteURL(IdentityProvider.sslEnabled)).flashing("error" -> errMsg)
+            // TODO redirect to login page
+//            Results.Redirect(RoutesHelper.login.absoluteURL(IdentityProvider.sslEnabled)).flashing("error" -> errMsg).withSession("original-url" -> url)
+            Ok("Redirect to login page")
+        } else {
+            // TODO redirect to login page
+//            Results.Redirect(RoutesHelper.login.absoluteURL(IdentityProvider.sslEnabled)).flashing("error" -> errMsg)
+            Ok("Redirect to login page")
         }
     }
     

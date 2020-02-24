@@ -1,10 +1,22 @@
 package services.irods
 
-import play.api.{ Play, Plugin, Logger, Application }
+import javax.inject.Inject
 import org.irods.jargon.core.connection.IRODSAccount
 import org.irods.jargon.core.pub.IRODSFileSystem
 import org.irods.jargon.core.pub.io.IRODSFileFactory
-import org.irods.jargon.core.exception.JargonException
+import play.api.inject.ApplicationLifecycle
+import play.api.{Logger, Play}
+
+import scala.concurrent.Future
+
+trait IRODSService {
+  var userhome: String
+  def conn: Boolean
+  def openIRODSConnection()
+  def closeIRODSConnection()
+  def closeIRODSAccountConnection()
+  def getFileFactory(): IRODSFileFactory
+}
 
 /**
  * A concrete storage based on the iRODS file storage system. There are 7
@@ -13,11 +25,8 @@ import org.irods.jargon.core.exception.JargonException
  * name. 
  * 
  * Setup iRODS connection using Jargon.
- *
- * @date 2014-08-18
- * 
  */
-class IRODSPlugin(app: Application) extends Plugin {
+class IRODSServiceImpl @Inject() (lifecycle: ApplicationLifecycle)  extends IRODSService {
 
   var userhome: String = _
   
@@ -26,22 +35,16 @@ class IRODSPlugin(app: Application) extends Plugin {
   var irodsFileFactory: IRODSFileFactory = _
   private var _conn: Boolean = false 
 
-  override def onStart() {
-    Logger.info("Starting iRODS Plugin.")
-    openIRODSConnection()
-    Logger.info("irods: Connected. " + conn)
- }
-	
-  override def onStop() {
-	// close connection
-	closeIRODSConnection()
-	Logger.info("iRODSPlugin has stopped.")
+  Logger.info("Starting iRODS Plugin.")
+  openIRODSConnection()
+  Logger.info("irods: Connected. " + conn)
+
+  lifecycle.addStopHook { () =>
+    closeIRODSConnection()
+    Logger.info("iRODSPlugin has stopped.")
+    Future.successful(())
   }
 
-  //Is the plugin enabled? 
-  override def enabled = true
-  
-  
   def openIRODSConnection() = {
     lazy val configuration = Play.current.configuration
 	// you can now access the application.conf settings

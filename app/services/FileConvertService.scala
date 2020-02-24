@@ -1,19 +1,27 @@
 package services
 
-import play.libs.Akka
-import play.api.{ Plugin, Logger, Application }
 import java.io._
-import play.api.Play.{ current, configuration }
-import play.api.libs.iteratee._
+
+import akka.actor.ActorSystem
+import akka.stream.scaladsl.{FileIO, Sink, Source}
+import akka.util.ByteString
+import javax.inject.Inject
+import play.api.inject.ApplicationLifecycle
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.ws._
+import play.api.mvc.MultipartFormData.FilePart
+import play.api.{Configuration, Logger}
+import play.libs.Akka
+
 import scala.concurrent._
 import scala.concurrent.duration._
-import com.ning.http.multipart.{ ByteArrayPartSource, Part, FilePart, MultipartRequestEntity }
-import com.ning.http.client.FluentCaseInsensitiveStringsMap
-import play.api.http.{ Writeable, ContentTypeOf }
-import org.apache.commons.io.IOUtils
-import com.ning.http.client.Realm.AuthScheme
+
+trait PolyglotService {
+  def checkForFileAndDownload(triesLeft: Int, url: String, outputStream: OutputStream): Future[Unit]
+  def getConvertedFileURL(filename: String, inputStream: InputStream, outputFormat: String): Future[String]
+  def getOutputFormats(inputType: String): Future[Option[List[String]]]
+  def getOutputFormatsPolyglot(inputType: String): Future[Option[List[String]]]
+}
 
 /**
  * File Convert Service
@@ -69,17 +77,18 @@ class FileConvertService(application: Application) {
             .get { xx => fromStream(outputStream) }
            	.flatMap(_.run)
           //Returning result. When it is mapped in the controller, the successful future is AFTER file has been downloaded on the Clowder server.
-          result
+          futureResponse
         } else {
           Logger.debug("Checking if file exists on Polyglot, status = " + res.status + " " + res.statusText + ", call again in 3 sec")
-          akka.pattern.after(3 seconds, using = Akka.system.scheduler)(checkForFileAndDownload((triesLeft - 1), url, outputStream))
+          akka.pattern.after(3 seconds, using = actorSystem.scheduler)(checkForFileAndDownload((triesLeft - 1), url, outputStream))
+          Future.failed(throw new RuntimeException("Error connecting to Polyglot."))
         }
       }
-    }
+  }
 
-  /** 
-   *  Uploads to Polyglot the file to be converted. Returns url of the converted file.
-   */
+  /**
+    * Uploads to Polyglot the file to be converted. Returns url of the converted file.
+    */
   def getConvertedFileURL(filename: String, inputStream: java.io.InputStream, outputFormat: String): Future[String] = {
     //check that Polyglot credentials are defined
     if (!fileConvertConvertURL.isDefined || !fileConvertUser.isDefined || !fileConvertPassword.isDefined) {
@@ -106,24 +115,23 @@ class FileConvertService(application: Application) {
     //get the url for the converted file on Polyglot  
     val fileURLFut = response.map {
       res =>
+        //get the url for the converted file on Polyglot
         if (res.status != 200) {
           Logger.debug("Could not get url of converted file - status = " + res.status + "  " + res.statusText)
           throw new RuntimeException("Could not connect to Polyglot. " + res.statusText)
         }
-        //TODO: Find an easier way to get rid of html markup 
+        //TODO: Find an easier way to get rid of html markup
         //result is an html link
         //<a href=http://the_url_string>http://the_url_string</a>
         val fileURL = res.body.substring(res.body.indexOf("http"), res.body.indexOf(">"))
-        fileURL
+        Future.successful(fileURL)
     }
-    fileURLFut.map { url => Logger.debug("Converted file url =  " + url) }
-    fileURLFut
   }
-  
+
   /**
-   * Gets all output formats for the given input format. 
-   * If outputs are stored in memory, returns them. Otherwise, calls another method to fetch outputs from Polyglot.
-   */
+    * Gets all output formats for the given input format.
+    * If outputs are stored in memory, returns them. Otherwise, calls another method to fetch outputs from Polyglot.
+    */
   def getOutputFormats(inputType: String): Future[Option[List[String]]] = {
     for ((k, v) <- formatsTable) Logger.debug("key: " + k)
 
@@ -135,7 +143,7 @@ class FileConvertService(application: Application) {
       getOutputFormatsPolyglot(inputType)
     }
   }
-  
+
   /**
    * Goes to Polyglot and fetches all output formats for the input format given.
    */
@@ -161,11 +169,8 @@ class FileConvertService(application: Application) {
                 None
               }
             }
-            outputFormats
-        }
-    } else {
-      Logger.debug("Config params not defined")
-      Future(None)
-    }
+          }
+          outputFormats
+      }
   }
 }

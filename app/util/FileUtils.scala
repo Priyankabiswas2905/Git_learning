@@ -10,37 +10,38 @@ import controllers.Utils
 import fileutils.FilesUtils
 import models._
 import org.apache.commons.codec.digest.DigestUtils
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import play.api.Play._
 import play.api.libs.Files
 import play.api.libs.json._
 import play.api.mvc.MultipartFormData
 import play.libs.Akka
-import services._
+import services.{FileDumpService, _}
 
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
-
 import javax.mail.internet.MimeUtility
 import java.net.URLEncoder
 
 object FileUtils {
   val appConfig: AppConfigurationService = DI.injector.getInstance(classOf[AppConfigurationService])
 
-  lazy val files: FileService = DI.injector.getInstance(classOf[FileService])
-  lazy val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
-  lazy val dtsrequests:ExtractionRequestsService = DI.injector.getInstance(classOf[ExtractionRequestsService])
-  lazy val metadataService: MetadataService = DI.injector.getInstance(classOf[MetadataService])
-  lazy val contextService: ContextLDService = DI.injector.getInstance(classOf[ContextLDService])
-  lazy val events: EventService = DI.injector.getInstance(classOf[EventService])
-  lazy val userService: UserService = DI.injector.getInstance(classOf[UserService])
-  lazy val folders: FolderService = DI.injector.getInstance(classOf[FolderService])
-  lazy val previews : PreviewService = DI.injector.getInstance(classOf[PreviewService])
-  lazy val thumbnails : ThumbnailService = DI.injector.getInstance(classOf[ThumbnailService])
-  lazy val adminsNotifier: AdminsNotifierService = DI.injector.getInstance(classOf[AdminsNotifierService])
-  lazy val searches : SearchService = DI.injector.getInstance(classOf[SearchService])
-
+  lazy val files: FileService = DI.injector.instanceOf[FileService]
+  lazy val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
+  lazy val dtsrequests:ExtractionRequestsService = DI.injector.instanceOf[ExtractionRequestsService]
+  lazy val metadataService: MetadataService = DI.injector.instanceOf[MetadataService]
+  lazy val contextService: ContextLDService = DI.injector.instanceOf[ContextLDService]
+  lazy val events: EventService = DI.injector.instanceOf[EventService]
+  lazy val userService: UserService = DI.injector.instanceOf[UserService]
+  lazy val folders: FolderService = DI.injector.instanceOf[FolderService]
+  lazy val previews : PreviewService = DI.injector.instanceOf[PreviewService]
+  lazy val thumbnails : ThumbnailService = DI.injector.instanceOf[ThumbnailService]
+  lazy val adminsNotifier: AdminsNotifierService = DI.injector.instanceOf[AdminsNotifierService]
+  lazy val searches : SearchService = DI.injector.instanceOf[SearchService]
+  lazy val fileDumpService: FileDumpService = DI.injector.instanceOf[FileDumpServiceImpl]
+  lazy val actorSystem = DI.injector.instanceOf[ActorSystem]
+  lazy val configuration = DI.injector.instanceOf[Configuration]
 
   def getContentType(filename: Option[String], contentType: Option[String]): String = {
     getContentType(filename.getOrElse(""), contentType)
@@ -370,7 +371,7 @@ object FileUtils {
     associateDataset(file, dataset, folder, user, multipleFile)
 
     // process rest of file in background
-    val fileExecutionContext: ExecutionContext = Akka.system().dispatchers.lookup("akka.actor.contexts.file-processing")
+    val fileExecutionContext: ExecutionContext = actorSystem.dispatchers.lookup("akka.actor.contexts.file-processing")
     Future {
       try {
         saveFile(file, f.ref.file, originalZipFile, clowderurl, apiKey, Some(user)).foreach { fixedfile =>
@@ -413,20 +414,20 @@ object FileUtils {
     // TODO should really be using content not just the objects
 //    val source = s"""{ "@context": { "source": "http://purl.org/dc/terms/source" }, "content": { "source": "${url.toString}" } }"""
     val source = s"""{ "@context": { "source": "http://purl.org/dc/terms/source" }, "source": "${url.toString}" }"""
-    val metadata = jsv \ "md" match {
-      case x: JsUndefined => {
-        jsv \ "metadata" match {
-          case y: JsUndefined => Some(Seq(source))
+    val metadata = (jsv \ "md").get match {
+      case x => Some(Seq(Json.stringify(x), source))
+      case _ => {
+        (jsv \ "metadata").get match {
           case y => Some(Seq(Json.stringify(y), source))
+          case _ => Some(Seq(source))
         }
       }
-      case x => Some(Seq(Json.stringify(x), source))
     }
     associateMetaData(creator, file, metadata, clowderurl, apiKey, Some(user))
     associateDataset(file, fileds, folder, user)
 
     // process rest of file in background
-    val fileExecutionContext: ExecutionContext = Akka.system().dispatchers.lookup("akka.actor.contexts.file-processing")
+    val fileExecutionContext: ExecutionContext = actorSystem.dispatchers.lookup("akka.actor.contexts.file-processing")
     Future {
       saveURL(file, url, clowderurl, apiKey, Some(user)).foreach { fixedfile =>
         processFileBytes(fixedfile, new java.io.File(path), fileds)
@@ -453,7 +454,7 @@ object FileUtils {
     }
 
     // getStringList returns a java.util.List as opposed to the kind of List we want, thus the conversion
-    val sourcelist = play.api.Play.configuration.getStringList("filesystem.sourcepaths").map(_.toList).getOrElse(List.empty[String])
+    val sourcelist = configuration.get[List[String]]("filesystem.sourcepaths")
 
     // Is the current path included in the source whitelist?
     if (sourcelist.exists(s => path.startsWith(s))) {
@@ -470,14 +471,15 @@ object FileUtils {
       files.save(file)
 
       // extract metadata
-      val metadata = jsv \ "md" match {
-        case x: JsUndefined => {
-          jsv \ "metadata" match {
-            case y: JsUndefined => None
+      val metadata = (jsv \ "md").get match {
+        case x => Some(Seq(Json.stringify(x)))
+        case _ => {
+          (jsv \ "metadata").get match {
             case y => Some(Seq(Json.stringify(y)))
+            case _ => None
           }
         }
-        case x => Some(Seq(Json.stringify(x)))
+
       }
 
 
@@ -485,7 +487,7 @@ object FileUtils {
       associateDataset(file, fileds, folder, user)
 
       // process rest of file in background
-      val fileExecutionContext: ExecutionContext = Akka.system().dispatchers.lookup("akka.actor.contexts.file-processing")
+      val fileExecutionContext: ExecutionContext = actorSystem.dispatchers.lookup("akka.actor.contexts.file-processing")
       Future {
         savePath(file, path).foreach { fixedfile =>
           processFileBytes(fixedfile, new java.io.File(path), fileds)
@@ -510,7 +512,7 @@ object FileUtils {
       // TODO: should do a metadata validity check first
       // Extract context from metadata object and remove it so it isn't repeated twice
       val jsonmd = Json.parse(md)
-      val context: JsValue = jsonmd \ "@context"
+      val context: JsValue = (jsonmd \ "@context").get
       val content = jsonmd.as[JsObject] - "@context"
 
       // check if the context is a URL to external endpoint
@@ -690,9 +692,7 @@ object FileUtils {
   private def processFileBytes(file: File, fp: java.io.File, dataset: Option[Dataset]): Unit = {
     if (!file.isIntermediate) {
       // store the file
-      current.plugin[FileDumpService].foreach {
-        _.dump(DumpOfFile(fp, file.id.toString(), file.filename))
-      }
+      fileDumpService.dump(DumpOfFile(fp, file.id.toString(), file.filename))
 
       // for metadata files
       if (file.contentType.equals("application/xml") || file.contentType.equals("text/xml")) {

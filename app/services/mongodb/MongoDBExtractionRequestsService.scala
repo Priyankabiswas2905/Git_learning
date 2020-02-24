@@ -2,10 +2,12 @@ package services.mongodb
 
 import org.bson.types.ObjectId
 import java.util.Date
+
 import play.api.Play.current
-import com.novus.salat.dao.{ ModelCompanion, SalatDAO }
+import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import com.mongodb.casbah.commons.MongoDBObject
 import java.util.ArrayList
+
 import play.api.libs.concurrent
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json.JsObject
@@ -18,10 +20,10 @@ import com.mongodb.casbah.Imports._
 import com.mongodb.WriteConcern
 import services.mongodb.MongoContext.context
 import services.mongodb.MongoSalatPlugin
-import services.ExtractionService
+import services.{DI, ExtractionRequestsService, ExtractionService}
 import java.text.SimpleDateFormat
-import services.ExtractionRequestsService
-import javax.inject.{Singleton, Inject}
+
+import javax.inject.{Inject, Singleton}
 
 /**
  * MongoDB implementation for ExtractionRequestsService to keep track of extraction requests
@@ -97,9 +99,6 @@ class MongoDBExtractionRequestsService @Inject()(extractions: ExtractionService)
 
 object ExtractionRequests extends ModelCompanion[ExtractionRequests, ObjectId] {
   // TODO RK handle exception for instance if we switch to other DB
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[ExtractionRequests, ObjectId](collection = x.collection("dtsrequests")) {}
-  }
-
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[ExtractionRequests, ObjectId](collection = mongoService.collection("dtsrequests")) {}
 }  

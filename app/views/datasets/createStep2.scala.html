@@ -1,5 +1,7 @@
 @(dataset: Dataset, spaces: List[ProjectSpace])(implicit user: Option[models.User])
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @import _root_.util.Formatters._
 
 @main(Messages("add.to", Messages("dataset.title"))) {

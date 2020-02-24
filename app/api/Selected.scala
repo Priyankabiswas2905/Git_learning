@@ -34,10 +34,11 @@ class Selected @Inject()(selections: SelectionService,
     Logger.debug("Requesting Selected.get" + request.body)
     request.user match {
       case Some(user) => {
-        val sels = selections.get(user.email.get).map(d => {d.id.stringify})
+        val sels = selections.get(user.email.getOrElse("anonymous")).map(d => {d.id.stringify})
         Ok(toJson(sels))
       }
-      case None => Ok(toJson(Map("success"->"false", "msg"->"User not logged in")))
+      case None =>
+        Ok(toJson(Map("success"->"false", "msg"->"User not logged in")))
     }
   }
 

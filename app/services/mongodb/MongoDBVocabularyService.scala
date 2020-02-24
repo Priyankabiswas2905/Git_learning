@@ -1,19 +1,16 @@
 package services.mongodb
 
 import com.mongodb.casbah.Imports._
-import securesocial.core.Identity
 import services.mongodb.MongoContext.context
 import com.mongodb.casbah.commons.MongoDBObject
-
-import com.novus.salat.dao.{SalatMongoCursor, ModelCompanion, SalatDAO}
+import com.novus.salat.dao.{ModelCompanion, SalatDAO, SalatMongoCursor}
 import org.bson.types.ObjectId
 import models._
-import javax.inject.{Singleton, Inject}
-
-
+import javax.inject.{Inject, Singleton}
 import com.mongodb.casbah.WriteConcern
-import services.{VocabularyService, UserService}
+import services.{DI, UserService, VocabularyService}
 import play.api.Play._
+
 import scala.util.{Success, Try}
 
 
@@ -55,12 +52,12 @@ class MongoDBVocabularyService @Inject() (userService: UserService) extends Voca
     Vocabulary.dao.find(MongoDBObject("name"->name)).toList
   }
 
-  def getByAuthor(author: Identity) : List[Vocabulary] = {
+  def getByAuthor(author: User) : List[Vocabulary] = {
     Vocabulary.findAll().toList.filter(p => p.author.get.identityId == author.identityId)
   }
 
-  def getByAuthorAndName(author : Identity, name : String) : List[Vocabulary] = {
-    Vocabulary.findAll().toList.filter(p => (p.author.get.identityId == author.identityId ) && (p.name == name))
+  def getByAuthorAndName(user: User) : List[Vocabulary] = {
+    Vocabulary.findAll().toList.filter(p => (p.author.get.identityId == user.identityId ) && (p.name == user.fullName))
   }
 
   def delete(id : UUID) = Try {
@@ -119,8 +116,6 @@ class MongoDBVocabularyService @Inject() (userService: UserService) extends Voca
 }
 
 object Vocabulary extends ModelCompanion[Vocabulary, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Vocabulary, ObjectId](collection = x.collection("vocabularies")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Vocabulary, ObjectId](collection = mongoService.collection("vocabularies")) {}
 }

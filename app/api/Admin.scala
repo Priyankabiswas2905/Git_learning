@@ -1,17 +1,17 @@
 package api
 
 import java.util.Date
-
+import akka.actor.ActorSystem
 import javax.inject.Inject
-import models._
 import org.apache.commons.lang3.StringEscapeUtils
 import play.api.mvc.Controller
 import play.api.Play.current
 import play.api.libs.json.Json.toJson
-import play.api.templates.Html
+import play.twirl.api.Html
 import services._
-import services.mongodb.MongoSalatPlugin
-import play.api.Logger
+import models.{ClowderUser, Event, UUID}
+import services.mongodb.MongoService
+import play.api.{Configuration, Logger}
 import util.Mail
 
 import play.api.libs.json.{JsString, JsUndefined, JsValue}
@@ -24,15 +24,17 @@ class Admin @Inject() (userService: UserService,
     collections: CollectionService,
     files: FileService,
     events: EventService,
-    searches: SearchService) extends Controller with ApiController {
+    searches: SearchService,
+     mongoService: MongoService,
+     actorSystem: ActorSystem,
+     configuration: Configuration) extends Controller with ApiController {
 
   /**
    * DANGER: deletes all data, keep users.
    */
   def deleteAllData(resetAll: Boolean) = ServerAdminAction { implicit request =>
-    current.plugin[MongoSalatPlugin].map(_.dropAllData(resetAll))
+    mongoService.dropAllData(resetAll)
     searches.deleteAll
-
     Ok(toJson("done"))
   }
 

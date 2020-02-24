@@ -9,7 +9,7 @@ import javax.inject.Inject
 import play.api.Logger
 import play.api.data.Form
 import play.api.data.Forms._
-import securesocial.core.IdentityId
+
 import services.mongodb.{MongoDBInstitutionService, MongoDBProjectService}
 
 // TODO CATS-66 remove MongoDBInstitutionService, make part of UserService?

@@ -14,7 +14,9 @@ import services.{ExtractorMessage, _}
  * Index data.
  */
 @Inject
-class Indexes @Inject() (multimediaSearch: MultimediaQueryService, previews: PreviewService, versusService: VersusService) extends Controller with ApiController {
+class Indexes @Inject() (multimediaSearch: MultimediaQueryService,
+                         previews: PreviewService,
+                         versusService: VersusService) extends Controller with ApiController {
 
   /**
    * Submit section, preview, file for indexing.

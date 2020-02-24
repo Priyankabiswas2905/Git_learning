@@ -11,6 +11,7 @@ import models._
 import org.apache.commons.lang.StringEscapeUtils._
 import play.api.Logger
 import play.api.Play.{configuration, current}
+import play.api.{Configuration, Environment, Logger}
 import play.api.data.Form
 import play.api.data.Forms._
 import play.api.libs.iteratee._
@@ -25,9 +26,13 @@ import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import play.api.i18n.Messages
+import play.api.i18n.Messages.Implicits._
 import util.FileUtils
 import javax.mail.internet.MimeUtility
 import java.net.URLEncoder
+
+import akka.stream.scaladsl.{Source, StreamConverters}
+import play.api.http.HttpEntity
 
 /**
  * Manage files.
@@ -52,7 +57,9 @@ class Files @Inject() (
   versusService: VersusService,
   adminsNotifierService: AdminsNotifierService,
   appConfig: AppConfigurationService,
-  searches: SearchService) extends SecuredController {
+  searches: SearchService,
+  fileDumpService: FileDumpService,
+  conf: Configuration) extends SecuredController {
 
   /**
    * Upload form.
@@ -123,7 +130,7 @@ class Files @Inject() (
         val mds = metadata.getMetadataByAttachTo(ResourceRef(ResourceRef.file, file.id))
         // TODO use to provide contextual definitions directly in the GUI
         val contexts = (for (md <- mds;
-          cId <- md.contextId;
+                             cId <- md.contextId;
                              c <- contextLDService.getContextById(cId))
           yield cId -> c).toMap
 
@@ -190,7 +197,8 @@ class Files @Inject() (
           val dDataset = Utils.decodeDatasetElements(aDataset)
           allDecodedDatasets += dDataset
           aDataset.spaces.map {
-            sp => spaces.get(sp) match {
+            sp =>
+              spaces.get(sp) match {
                 case Some(s) => {
                   decodedSpacesContaining += Utils.decodeSpaceElements(s)
                 }
@@ -219,7 +227,6 @@ class Files @Inject() (
             }
           }
         }
-
 
         // Increment view count for file
         val (view_count, view_date) = files.incrementViews(id, user)
@@ -409,9 +416,7 @@ class Files @Inject() (
                   appConfig.incrementCount('files, 1)
                   appConfig.incrementCount('bytes, f.length)
 
-                  current.plugin[FileDumpService].foreach {
-                    _.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
-                  }
+                  fileDumpService.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
 
                 if (showPreviews.equals("FileLevel"))
                   flags = flags + "+filelevelshowpreviews"
@@ -425,6 +430,7 @@ class Files @Inject() (
                     InternalServerError(fileType.substring(7))
                   }
                 }
+
                 // submit for extraction
                 current.plugin[RabbitmqPlugin].foreach {
                   // FIXME dataset not available?
@@ -445,8 +451,10 @@ class Files @Inject() (
                 //for metadata files
                 if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
                   val xmlToJSON = FilesUtils.readXMLgetJSON(uploadedFile.ref.file)
+
                   files.addXMLMetadata(f.id, xmlToJSON)
                 }
+                versusService.index(f.id.toString, fileType)
 
                 searches.index(f)
 
@@ -543,7 +551,7 @@ class Files @Inject() (
                 }
               }
 
-              current.plugin[FileDumpService].foreach { _.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile)) }
+              fileDumpService.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
 
               /***** Inserting DTS Requests   **/
               val clientIP = request.remoteAddress
@@ -659,8 +667,10 @@ class Files @Inject() (
                           range match { case (start,end) =>
 
                         inputStream.skip(start)
-                        import play.api.mvc.{ ResponseHeader, SimpleResult }
-                        SimpleResult(
+                        import play.api.mvc.{ ResponseHeader, Result }
+                        val bodySource = StreamConverters.fromInputStream(() => inputStream)
+                        val entity: HttpEntity = HttpEntity.Streamed(bodySource, Some(end - start + 1), Some(contentType))
+                        Result(
                           header = ResponseHeader(PARTIAL_CONTENT,
                             Map(
                               CONNECTION -> "keep-alive",
@@ -670,7 +680,7 @@ class Files @Inject() (
                                                   CONTENT_TYPE -> contentType
                                                   )
                                           ),
-                                          body = Enumerator.fromStream(inputStream)
+                                          body = entity
                                   )
                     }
                   }
@@ -814,8 +824,10 @@ class Files @Inject() (
 
 
                 inputStream.skip(start)
-                import play.api.mvc.{ ResponseHeader, SimpleResult }
-                SimpleResult(
+                import play.api.mvc.{ ResponseHeader, Result }
+                val bodySource = StreamConverters.fromInputStream(() => inputStream)
+                val entity: HttpEntity = HttpEntity.Streamed(bodySource, Some(end - start + 1), Some(contentType))
+                Result(
                   header = ResponseHeader(PARTIAL_CONTENT,
                     Map(
                       CONNECTION -> "keep-alive",
@@ -825,12 +837,12 @@ class Files @Inject() (
 	                    CONTENT_TYPE -> contentType
 	                  )
 	                ),
-	                body = Enumerator.fromStream(inputStream)
+	                body = entity
 	              )
             }
           }
           case None => {
-            Ok.chunked(Enumerator.fromStream(inputStream))
+            Ok.chunked(Source.fromPublisher(play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(Enumerator.fromStream(inputStream))))
               .withHeaders(CONTENT_TYPE -> contentType)
               .withHeaders(CONTENT_DISPOSITION -> (FileUtils.encodeAttachment(filename, request.headers.get("user-agent").getOrElse(""))))
 
@@ -850,7 +862,7 @@ class Files @Inject() (
    * Gets type of index and list of sections, and passes on to the Search controller
    */
   def uploadSelectQuery() = PermissionAction(Permission.ViewDataset)(parse.multipartFormData) { implicit request =>
-    val nameOfIndex = play.api.Play.configuration.getString("elasticsearchSettings.indexNamePrefix").getOrElse("clowder")
+    val nameOfIndex = conf.get[String]("elasticsearchSettings.indexNamePrefix")
     //=== processing searching within files or sections of files or both ===
     //dataParts are from the seach form in view/multimediasearch
     //get type of index and list of sections, and pass on to the Search controller
@@ -912,9 +924,7 @@ class Files @Inject() (
               }
             }
 
-            current.plugin[FileDumpService].foreach {
-              _.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
-            }
+            fileDumpService.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
 
             current.plugin[RabbitmqPlugin].foreach {
               _.multimediaQuery(f.id, f.contentType, f.length.toString, Utils.baseUrl(request), request.apiKey)
@@ -995,9 +1005,7 @@ class Files @Inject() (
               }
             }
 
-            current.plugin[FileDumpService].foreach {
-              _.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
-            }
+            fileDumpService.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
 
             // TODO RK need to replace unknown with the server name
             val key = "unknown." + "file." + fileType.replace(".", "_").replace("/", ".")
@@ -1093,9 +1101,7 @@ class Files @Inject() (
                       }
                     }
 
-                    current.plugin[FileDumpService].foreach {
-                      _.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
-                    }
+                    fileDumpService.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
 
                     /** *** Inserting DTS Requests   **/
                     val clientIP = request.remoteAddress

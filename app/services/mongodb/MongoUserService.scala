@@ -1,19 +1,21 @@
 package services.mongodb
 
-import securesocial.core.UserServicePlugin
+
 import play.api.{Application, Logger}
-import securesocial.core.providers.Token
 import com.mongodb.casbah.Imports._
-import securesocial.core.Identity
 import org.joda.time.DateTime
 import java.util.Date
-import com.novus.salat.dao.{SalatDAO, ModelCompanion}
+
+import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import com.mongodb.casbah.commons.TypeImports.ObjectId
 import play.api.Play._
-import securesocial.core.IdentityId
+
 import scala.Some
 import MongoContext.context
-import models.UUID
+import models.{ClowderUser, IdentityId, MailToken, UUID}
+import services.DI
+
+import scala.concurrent.Future
 
 /**
  * SecureSocial implementation using MongoDB.
@@ -30,11 +32,8 @@ case class MongoToken(
 }
 
 object TokenDAO extends ModelCompanion[MongoToken, ObjectId] {
-
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[MongoToken, ObjectId](collection = x.collection("social.token")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[MongoToken, ObjectId](collection = mongoService.collection("social.token")) {}
 
   def findByUUID(uuid: String): Option[MongoToken] = {
     dao.findOne(MongoDBObject("uuid" -> uuid))
@@ -45,16 +44,17 @@ object TokenDAO extends ModelCompanion[MongoToken, ObjectId] {
   }
 }
 
-class MongoUserService(application: Application) extends UserServicePlugin(application) {
+class MongoUserService(application: Application) {
   /**
    * Finds a SocialUser that maches the specified id
    *
-   * @param id the user id
+   * @param providerId the provider id
+   * @param userId the user id
    * @return an optional user
    */
-  def find(id: IdentityId):Option[Identity] = {
-    Logger.trace("Searching for user " + id)
-    SocialUserDAO.findOne(MongoDBObject("identityId.userId"->id.userId, "identityId.providerId"->id.providerId))
+  def find(providerId: String, userId: String): Option[ClowderUser] = {
+    Logger.trace("Searching for user " + userId)
+    SocialUserDAO.findOne(MongoDBObject("identityId.userId"->userId, "identityId.providerId"->providerId))
   }
 
   /**
@@ -67,7 +67,7 @@ class MongoUserService(application: Application) extends UserServicePlugin(appli
    * @param providerId - the provider id
    * @return
    */  
-  def findByEmailAndProvider(email: String, providerId: String): Option[Identity] = {
+  def findByEmailAndProvider(email: String, providerId: String): Option[ClowderUser] = {
     Logger.trace("Searching for user " + email + " " + providerId)
     SocialUserDAO.findOne(MongoDBObject("email"->email, "identityId.providerId"->providerId))
   }
@@ -75,14 +75,14 @@ class MongoUserService(application: Application) extends UserServicePlugin(appli
   /**
    * Saves the user.  This method gets called when a user logs in.
    * This is your chance to save the user information in your backing store.
-   * @param user
+   * @param profile
    */
-  def save(user: Identity): Identity = {
-    Logger.trace("Saving user " + user)
-    val query = MongoDBObject("identityId.userId"->user.identityId.userId, "identityId.providerId"->user.identityId.providerId)
-    val dbobj = MongoDBObject("$set" -> SocialUserDAO.toDBObject(user))
+  def save(profile: ClowderUser): ClowderUser = {
+    Logger.trace("Saving user " + profile.fullName)
+    val query = MongoDBObject("identityId.userId"->profile.identityId.userId, "identityId.providerId"->profile.identityId.providerId)
+    val dbobj = MongoDBObject("$set" -> SocialUserDAO.toDBObject(profile))
     SocialUserDAO.update(query, dbobj, upsert=true, multi=false, WriteConcern.Safe)
-    user
+    profile
   }
 
   /**
@@ -95,9 +95,10 @@ class MongoUserService(application: Application) extends UserServicePlugin(appli
    * @param token The token to save
    * @return A string with a uuid that will be embedded in the welcome email.
    */
-  def save(token: Token) {
+  def saveToken(token: MailToken): Future[MailToken] = {
     Logger.trace("Saving token " + token)
     TokenDAO.save(MongoToken(new ObjectId, token.uuid, token.email, token.creationTime.toDate, token.expirationTime.toDate, token.isSignUp))
+    Future.successful(token)
   }
 
 
@@ -110,10 +111,10 @@ class MongoUserService(application: Application) extends UserServicePlugin(appli
    * @param token the token id
    * @return
    */
-  def findToken(token: String): Option[Token] = {
+  def findToken(token: String): Option[MailToken] = {
     Logger.trace("Searching for token " + token)
     TokenDAO.findByUUID(token) match {
-      case Some(t) => Some(Token(t.id.toString, t.email, new DateTime(t.creationTime), new DateTime(t.expirationTime), t.isSignUp))
+      case Some(t) => Some(MailToken(t.id.toString, t.email, new DateTime(t.creationTime), new DateTime(t.expirationTime), t.isSignUp))
       case None => None
     }
   }

@@ -9,9 +9,16 @@ import util.SearchResult
 import play.api.libs.json.{JsObject, Json, JsValue}
 import play.api.libs.json.Json.toJson
 import javax.inject.{Inject, Singleton}
-import play.api.Play.current
-import play.api.Play.configuration
 import models._
+import play.Logger
+import play.api.Configuration
+import play.api.libs.json.Json.toJson
+import play.api.libs.json.{JsObject, JsValue, Json}
+import play.api.mvc.AnyContent
+import services._
+import util.SearchResult
+
+import scala.collection.mutable.{HashMap, ListBuffer}
 
 @Singleton
 class Search @Inject() (
@@ -53,6 +60,9 @@ class Search @Inject() (
   def searchJson(query: String, grouping: String, from: Option[Int], size: Option[Int]) = PermissionAction(Permission.ViewDataset) {
     implicit request =>
       implicit val user = request.user
+      if (config.get[Boolean]("elasticsearchSettings.enabled")) {
+        val queryList = Json.parse(query).as[List[JsValue]]
+        val results = elasticsearchService.search(queryList, grouping)
 
       if (searches.isEnabled) {
         val queryList = Json.parse(query).as[List[JsValue]]
@@ -61,12 +71,11 @@ class Search @Inject() (
       } else {
         BadRequest("Elasticsearch plugin could not be reached")
       }
-
   }
 
   /**
    * Search MultimediaFeatures.
-   */
+   */?
   def searchMultimediaIndex(section_id: UUID) = PermissionAction(Permission.ViewSection, Some(ResourceRef(ResourceRef.section, section_id))) {
     implicit request =>
 

@@ -1,7 +1,7 @@
 package services.mongodb
 
 import models.{DBResult, UUID, Comment}
-import services.CommentService
+import services.{CommentService, DI}
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
 import play.api.Play.current
@@ -100,9 +100,7 @@ class MongoDBCommentService extends CommentService {
 
 
 object Comment extends ModelCompanion[Comment, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Comment, ObjectId](collection = x.collection("comments")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Comment, ObjectId](collection = mongoService.collection("comments")) {}
 }
 

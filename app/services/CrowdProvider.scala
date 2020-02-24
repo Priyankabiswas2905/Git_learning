@@ -6,6 +6,7 @@ import play.api.Application
 import play.api.Play.current
 import play.api.libs.json.Json
 import play.api.mvc._
+
 import securesocial.controllers.ProviderController._
 import securesocial.core._
 import securesocial.core.providers.Token
@@ -70,7 +71,7 @@ class CrowdProvider(application: Application) extends IdentityProvider(applicati
 
 object CrowdProvider {
   val crowd = "crowd"
-  val authMethod = AuthenticationMethod("crowd")
+//  val authMethod = AuthenticationMethod("crowd")
 
   lazy val crowdServerURL = current.configuration.getString(CrowdServerURL).getOrElse("http://localhost/clowder.php")
   lazy val crowdServerTimeOut = current.configuration.getInt(CrowdServerTimeOut).getOrElse(5)

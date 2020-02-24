@@ -19,7 +19,7 @@ import scala.io.Source
 //@DoNotDiscover
 class DatasetsAPIAppSpec extends PlaySpec with ConfiguredApp with FakeMultipartUpload {
 
-  lazy val secretKey = play.api.Play.configuration.getString("commKey").getOrElse("")
+  lazy val secretKey = configuration.get[String]("commKey").getOrElse("")
   lazy val workingDir = System.getProperty("user.dir")
 
   var datasetId: String = ""
@@ -322,7 +322,7 @@ class DatasetsAPIAppSpec extends PlaySpec with ConfiguredApp with FakeMultipartU
     //       list
     //     case e: JsError => {
     //       info("Mapping dataset model to Json failed")
-    //       info("Errors: " + JsError.toFlatJson(e).toString)
+    //       info("Errors: " + JsError.toFlatForm(e).toString)
     //     }
     //   }
     // }
@@ -363,7 +363,7 @@ class DatasetsAPIAppSpec extends PlaySpec with ConfiguredApp with FakeMultipartU
 //           info("Pretty JSON format")
 //           info(readableString)
 //         case e: JsError => {
-//           info("Errors: " + JsError.toFlatJson(e).toString)
+//           info("Errors: " + JsError.toFlatForm(e).toString)
 //         }
 //       }
 //     }
@@ -537,7 +537,7 @@ class DatasetsAPIAppSpec extends PlaySpec with ConfiguredApp with FakeMultipartU
     //       info("Pretty JSON format")
     //       info(readableString)
     //     case e: JsError => {
-    //       info("Errors: " + JsError.toFlatJson(e).toString)
+    //       info("Errors: " + JsError.toFlatForm(e).toString)
     //     }
     //   }
     // }

@@ -19,7 +19,7 @@ import scala.io.Source
 //@DoNotDiscover
 class FilesAPIAppSpec extends PlaySpec with ConfiguredApp with FakeMultipartUpload {
 
-  lazy val secretKey = play.api.Play.configuration.getString("commKey").getOrElse("")
+  lazy val secretKey = configuration.get[String]("commKey").getOrElse("")
   lazy val workingDir = System.getProperty("user.dir")
 
   var morrowPlotFileId: String = ""

@@ -13,6 +13,9 @@
 @import models.UUID
 @import api.Permission
 @import _root_.util.Formatters._
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 
 @showPreview(name: String, url: String, collection_id: String) = {
 <script>

@@ -4,14 +4,11 @@ import api.Permission.Permission
 import api.{Permission, UserRequest}
 import models.{ClowderUser, RequestResource, ResourceRef, User, UserStatus}
 import org.apache.commons.lang.StringEscapeUtils._
-import play.api.i18n.Messages
+import play.api.i18n.{I18nSupport, Messages}
 import play.api.mvc._
-import securesocial.core.{Authenticator, SecureSocial, UserService}
 import services._
-import securesocial.core.IdentityProvider
-import securesocial.core.providers.utils.RoutesHelper
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
  * Action builders check permissions in controller calls. When creating a new endpoint, pick one of the actions defined below.
@@ -24,13 +21,15 @@ import scala.concurrent.Future
  * PermissionAction: call the wrapped code iff the user has the right permission on the reference object.
  *
  */
-trait SecuredController extends Controller {
+trait SecuredController extends BaseController with I18nSupport {
 
   val userservice = DI.injector.getInstance(classOf[services.UserService])
 
   /** get user if logged in */
-  def UserAction(needActive: Boolean) = new ActionBuilder[UserRequest] {
-    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[SimpleResult]) = {
+  def UserAction(needActive: Boolean) = new ActionBuilder[UserRequest, String] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[String] = controllerComponents.parsers.text
+    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
         case Some(u) if !AppConfiguration.acceptedTermsOfServices(u.termsOfServices) => {
@@ -49,24 +48,28 @@ trait SecuredController extends Controller {
   /**
    * Use when you want to require the user to be logged in on a private server or the server is public.
    */
-  def PrivateServerAction = new ActionBuilder[UserRequest] {
-    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[SimpleResult]) = {
+  def PrivateServerAction = new ActionBuilder[UserRequest, String] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[String] = controllerComponents.parsers.text
+    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
         case Some(u) if !AppConfiguration.acceptedTermsOfServices(u.termsOfServices) => Future.successful(Results.Redirect(routes.Application.tos(Some(request.uri))))
         case Some(u) if (u.status==UserStatus.Inactive) => Future.successful(Results.Redirect(routes.Error.notActivated()))
         case Some(u) if u.superAdminMode || Permission.checkPrivateServer(userRequest.user) => block(userRequest)
         case None if Permission.checkPrivateServer(userRequest.user) => block(userRequest)
-        case _ => Future.successful(Results.Redirect(securesocial.controllers.routes.LoginPage.login)
+        case _ => Future.successful(Ok("Must login")
           .flashing("error" -> "You must be logged in to access this page.")
-          .withSession(request.session + (SecureSocial.OriginalUrlKey -> request.uri)))
+          .withSession(request.session + ("original-url" -> request.uri)))
       }
     }
   }
 
   /** call code iff user is logged in */
-  def AuthenticatedAction = new ActionBuilder[UserRequest] {
-    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[SimpleResult]) = {
+  def AuthenticatedAction = new ActionBuilder[UserRequest, AnyContent] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[AnyContent] = controllerComponents.parsers.anyContent
+    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
         case Some(u) if !AppConfiguration.acceptedTermsOfServices(u.termsOfServices) => {
@@ -78,31 +81,36 @@ trait SecuredController extends Controller {
         }
         case Some(u) if (u.status==UserStatus.Inactive) => Future.successful(Unauthorized("Account is not activated"))
         case Some(u) => block(userRequest)
-        case None => Future.successful(Results.Redirect(securesocial.controllers.routes.LoginPage.login)
+        case None => Future.successful(Ok("Must login")
           .flashing("error" -> "You must be logged in to access this page.")
-          .withSession(request.session + (SecureSocial.OriginalUrlKey -> request.uri)))
+          .withSession(request.session + ("original-url" -> request.uri)))
       }
     }
   }
 
   /** call code if user is a server admin */
-  def ServerAdminAction = new ActionBuilder[UserRequest] {
-    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[SimpleResult]) = {
+  def ServerAdminAction = new ActionBuilder[UserRequest, String] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[String] = controllerComponents.parsers.text
+    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
         case Some(u) if !AppConfiguration.acceptedTermsOfServices(u.termsOfServices) => Future.successful(Results.Redirect(routes.Application.tos(Some(request.uri))))
         case Some(u) if (u.status==UserStatus.Inactive) => Future.successful(Results.Redirect(routes.Error.notActivated()))
+
         case Some(u) if u.superAdminMode || Permission.checkServerAdmin(userRequest.user) => block(userRequest)
-        case _ => Future.successful(Results.Redirect(securesocial.controllers.routes.LoginPage.login)
+        case _ => Future.successful(Ok("Must login")
           .flashing("error" -> "You must be logged in as an administrator to access this page.")
-          .withSession(request.session + (SecureSocial.OriginalUrlKey -> request.uri)))
+          .withSession(request.session + ("OriginalUrlKey" -> request.uri)))
       }
     }
   }
 
   /** call code if user has right permission for resource */
-  def PermissionAction(permission: Permission, resourceRef: Option[ResourceRef] = None) = new ActionBuilder[UserRequest] {
-    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[SimpleResult]) = {
+  def PermissionAction(permission: Permission, resourceRef: Option[ResourceRef] = None) = new ActionBuilder[UserRequest, String] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[String] = controllerComponents.parsers.text
+    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
         case Some(u) if !AppConfiguration.acceptedTermsOfServices(u.termsOfServices) => Future.successful(Results.Redirect(routes.Application.tos(Some(request.uri))))
@@ -112,21 +120,21 @@ trait SecuredController extends Controller {
         case None if Permission.checkPermission(userRequest.user, permission, resourceRef) => block(userRequest)
         // Anonymous user access to a private space
         case None if permission == Permission.ViewSpace => notAuthorizedMessage(userRequest.user, resourceRef)
-        case None => Future.successful(Results.Redirect(securesocial.controllers.routes.LoginPage.login)
+        case None => Future.successful(Ok("Must login")
           .flashing("error" -> "You must be logged in to perform that action.")
-          .withSession(request.session + (SecureSocial.OriginalUrlKey -> request.uri)))
+          .withSession(request.session + ("OriginalUrlKey" -> request.uri)))
       }
     }
   }
 
-  private def notAuthorizedMessage(user: Option[User], resourceRef: Option[ResourceRef]): Future[SimpleResult] = {
+  private def notAuthorizedMessage(user: Option[User], resourceRef: Option[ResourceRef]): Future[Result] = {
     val messageNoPermission = "You are not authorized to access "
 
     resourceRef match {
       case None => Future.successful(Results.Redirect(routes.Error.notAuthorized("Unknown resource", "Unknown id", "no resource")))
 
       case Some(ResourceRef(ResourceRef.file, id)) => {
-        val files: FileService = DI.injector.getInstance(classOf[FileService])
+        val files: FileService = DI.injector.instanceOf[FileService]
         files.get(id) match {
           case None => Future.successful(BadRequest(views.html.notFound("File does not exist.")(user)))
           case Some(file) => Future.successful(Results.Redirect(routes.Error.notAuthorized(messageNoPermission + "file \"" + file.filename + "\"", id.toString, "file")))
@@ -134,7 +142,7 @@ trait SecuredController extends Controller {
       }
 
       case Some(ResourceRef(ResourceRef.dataset, id)) => {
-        val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
+        val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
         datasets.get(id) match {
           case None => Future.successful(BadRequest(views.html.notFound("Dataset does not exist.")(user)))
           case Some(dataset) => Future.successful(Results.Redirect(routes.Error.notAuthorized(messageNoPermission
@@ -143,7 +151,7 @@ trait SecuredController extends Controller {
       }
 
       case Some(ResourceRef(ResourceRef.collection, id)) => {
-        val collections: CollectionService = DI.injector.getInstance(classOf[CollectionService])
+        val collections: CollectionService = DI.injector.instanceOf[CollectionService]
         collections.get(id) match {
           case None => Future.successful(BadRequest(views.html.notFound("Collection does not exist.")(user)))
           case Some(collection) => Future.successful(Results.Redirect(routes.Error.notAuthorized(messageNoPermission
@@ -153,7 +161,7 @@ trait SecuredController extends Controller {
 
       case Some(ResourceRef(ResourceRef.space, id)) => {
         val spaceTitle: String = Messages("space.title")
-        val spaces: SpaceService = DI.injector.getInstance(classOf[SpaceService])
+        val spaces: SpaceService = DI.injector.instanceOf[SpaceService]
         spaces.get(id) match {
           case None => Future.successful(BadRequest(views.html.notFound(spaceTitle + " does not exist.")(user)))
           case Some(space) => Future.successful(Forbidden(views.html.spaces.space(space,List(),List(),List(),List(),"", Map(),List())(user)))
@@ -161,7 +169,7 @@ trait SecuredController extends Controller {
       }
 
       case Some(ResourceRef(ResourceRef.curationObject, id)) =>{
-        val curations: CurationService = DI.injector.getInstance(classOf[CurationService])
+        val curations: CurationService = DI.injector.instanceOf[CurationService]
         curations.get(id) match {
           case None =>  Future.successful(BadRequest(views.html.notFound("Publication Request does not exist.")(user)))
           case Some(curation) => Future.successful(Results.Redirect(routes.Error.notAuthorized(messageNoPermission
@@ -170,7 +178,7 @@ trait SecuredController extends Controller {
       }
 
       case Some(ResourceRef(ResourceRef.section, id)) =>{
-        val sections: SectionService = DI.injector.getInstance(classOf[SectionService])
+        val sections: SectionService = DI.injector.instanceOf[SectionService]
         sections.get(id) match {
           case None => Future.successful(BadRequest(views.html.notFound("Section does not exist.")(user)))
           case Some(section) => Future.successful(Results.Redirect(routes.Error.notAuthorized(messageNoPermission
@@ -188,8 +196,10 @@ trait SecuredController extends Controller {
    * Disable a route without having to comment out the entry in the routes file. Useful for when we want to keep the
    * code around but we don't want users to have access to it.
    */
-  def DisabledAction = new ActionBuilder[UserRequest] {
-    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[SimpleResult]) = {
+  def DisabledAction = new ActionBuilder[UserRequest, String] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[String] = controllerComponents.parsers.text
+    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       Future.successful(Results.Redirect(routes.Error.notAuthorized("", null, null)))
     }
   }

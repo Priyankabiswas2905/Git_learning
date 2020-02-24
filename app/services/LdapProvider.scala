@@ -1,9 +1,9 @@
 package services
 
-import models.UUID
-import javax.net.ssl.SSLSocketFactory
-import org.joda.time.DateTime
-import play.api.Application
+//import models.UUID
+//import javax.net.ssl.SSLSocketFactory
+//import org.joda.time.DateTime
+//import play.api.Application
 import play.api.Play.current
 import play.api.libs.json.Json
 import play.api.mvc._
@@ -15,6 +15,7 @@ import com.unboundid.ldap.sdk._
 import com.unboundid.util.ssl.{JVMDefaultTrustManager, SSLUtil, TrustAllTrustManager}
 import util.GravatarUtils
 
+// TODO: 2018 2.0 branch had this entire thing commented out
 class LdapProvider(application: Application) extends IdentityProvider(application) {
   override def id: String = LdapProvider.ldap
 
@@ -69,7 +70,7 @@ class LdapProvider(application: Application) extends IdentityProvider(applicatio
 
 object LdapProvider {
   val ldap = "ldap"
-  val authMethod = AuthenticationMethod("ldap")
+  val authMethod = "ldap"
 
   // Get LDAP configuration details
   private val conf = current.configuration

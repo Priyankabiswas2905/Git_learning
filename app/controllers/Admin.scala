@@ -20,7 +20,8 @@ import scala.concurrent.Future
  * Administration pages.
  */
 @Singleton
-class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: UserService, metadataService: MetadataService, versusService: VersusService) extends SecuredController {
+class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: UserService,
+                       metadataService: MetadataService, versusService: VersusService) extends SecuredController {
 
   def customize = ServerAdminAction { implicit request =>
     val theme = AppConfiguration.getTheme
@@ -157,6 +158,7 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
      }
    }
 
+
   /**
    * Gets indexes from Versus, using VersusPlugin. Checks in mongo on clowder side if these indexes
    * have type and/or name. Adds type and/or name to json object and calls view template to display.
@@ -225,7 +227,6 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
     } else {
       Future(Ok("VersusService not enabled, index not built."))
     }
-  }
 
   /**
    * Deletes a specific index in Versus
@@ -242,7 +243,6 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
     } else {
       Future(Ok("VersusService not enabled, index not deleted."))
     }
-
   }
 
   /**
@@ -390,10 +390,10 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
       )
   }
 
-  def users() = ServerAdminAction { implicit request =>
+  def users() = ServerAdminAction { implicit request: UserRequest[AnyContent] =>
     implicit val user = request.user
 
-    val configAdmins = play.Play.application().configuration().getString("initialAdmins").trim.split("\\s*,\\s*").filter(_ != "").toList
+    val configAdmins = configuration.get[String]("initialAdmins").trim.split("\\s*,\\s*").filter(_ != "").toList
     val users = userService.list.sortWith(_.lastName.toLowerCase() < _.lastName.toLowerCase())
     Ok(views.html.admin.users(configAdmins, users))
   }

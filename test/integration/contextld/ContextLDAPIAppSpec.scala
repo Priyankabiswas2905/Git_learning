@@ -94,7 +94,7 @@ class ContextLDAPIAppSpec extends PlaySpec with ConfiguredApp with FakeMultipart
  	
   "The Context-LD API Spec" must {
     "respond to the createContext() function routed by POST /api/contexts" in {
-      val secretKey = play.api.Play.configuration.getString("commKey").getOrElse("")
+      val secretKey = configuration.get[String]("commKey").getOrElse("")
 
       //link up json file here before fake request.
       val workingDir = System.getProperty("user.dir")
@@ -138,7 +138,7 @@ class ContextLDAPIAppSpec extends PlaySpec with ConfiguredApp with FakeMultipart
 
 
   "respond to the getContextById(id: UUID) and removeContextById(id: UUID) functions routed by GET/DELETE /api/contexts/:id" in {
-      val secretKey = play.api.Play.configuration.getString("commKey").getOrElse("")
+      val secretKey = configuration.get[String]("commKey").getOrElse("")
 
       //link up json file here before fake request.
       val workingDir = System.getProperty("user.dir")

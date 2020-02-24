@@ -1,5 +1,8 @@
 @(resourceId: UUID, resourceType: Symbol, selectId: String, onClick:String, buttonText: String, buttonTitle: String, divId: String)
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
+
 <div class="row bottom-padding" id="@divId">
     <div class="col-xs-12">
         <div class="form-inline">

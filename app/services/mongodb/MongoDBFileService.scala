@@ -25,7 +25,7 @@ import collection.JavaConverters._
 import scala.collection.JavaConversions._
 import javax.inject.{Inject, Singleton}
 import com.mongodb.casbah.WriteConcern
-import play.api.Logger
+import play.api.{Configuration, Logger}
 
 import scala.util.parsing.json.JSONArray
 import play.api.libs.json.JsArray
@@ -35,6 +35,7 @@ import java.util.Date
 
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
+import com.google.inject.Provider
 import play.api.Play._
 import com.mongodb.casbah.Imports._
 import models.FileStatus.FileStatus
@@ -60,7 +61,8 @@ class MongoDBFileService @Inject() (
   metadatas: MetadataService,
   events: EventService,
   appConfig: AppConfigurationService,
-  searches: SearchService) extends FileService {
+  searches: SearchService,
+  configuration: Configuration) extends FileService {
 
   object MustBreak extends Exception {}
 
@@ -470,7 +472,7 @@ class MongoDBFileService @Inject() (
   }
 
   def listOutsideDataset(dataset_id: UUID): List[File] = {
-    datasets.get(dataset_id) match{
+    datasets.get.get(dataset_id) match{
       case Some(dataset) => {
         val list = for (file <- FileDAO.findAll(); if(!isInDataset(file,dataset) && !file.isIntermediate)) yield file
         return list.toList
@@ -705,13 +707,13 @@ class MongoDBFileService @Inject() (
         if(!file.isIntermediate){
           val fileDatasets = datasets.findByFileIdDirectlyContain(file.id)
           for(fileDataset <- fileDatasets){
-            datasets.removeFile(fileDataset.id, id)
+            datasets.get().removeFile(fileDataset.id, id)
             if(!file.xmlMetadata.isEmpty){
-              datasets.index(fileDataset.id)
+              datasets.get().index(fileDataset.id)
             }
 
             if(!file.thumbnail_id.isEmpty && !fileDataset.thumbnail_id.isEmpty){            
-              if(file.thumbnail_id.get.equals(fileDataset.thumbnail_id.get)){ 
+              if(file.thumbnail_id.get.equals(fileDataset.thumbnail_id.get)){
                 datasets.newThumbnail(fileDataset.id)
                 collections.get(fileDataset.collections).found.foreach(collection => {
                   if(!collection.thumbnail_id.isEmpty){
@@ -725,9 +727,9 @@ class MongoDBFileService @Inject() (
                      
           }
 
-          val fileFolders = folders.findByFileId(file.id)
+          val fileFolders = folders.get().findByFileId(file.id)
           for(fileFolder <- fileFolders) {
-            folders.removeFile(fileFolder.id, file.id)
+            folders.get().removeFile(fileFolder.id, file.id)
           }
           for(section <- sections.findByFileId(file.id)){
             sections.removeSection(section)
@@ -736,7 +738,7 @@ class MongoDBFileService @Inject() (
             comments.removeComment(comment)
           }
           for (follower <- file.followers) {
-            userService.unfollowFile(follower, id)
+            userService.get().unfollowFile(follower, id)
           }
         }
 
@@ -770,7 +772,7 @@ class MongoDBFileService @Inject() (
   }
   def removeTemporaries(){
     val cal = Calendar.getInstance()
-    val timeDiff = play.Play.application().configuration().getInt("rdfTempCleanup.removeAfter")
+    val timeDiff = configuration.get[Int]("rdfTempCleanup.removeAfter")
     cal.add(Calendar.MINUTE, -timeDiff)
     val oldDate = cal.getTime()
 
@@ -955,7 +957,7 @@ class MongoDBFileService @Inject() (
 
   def removeOldIntermediates(apiKey: Option[String], user: Option[User]){
     val cal = Calendar.getInstance()
-    val timeDiff = play.Play.application().configuration().getInt("intermediateCleanup.removeAfter")
+    val timeDiff = configuration.get[Int]("intermediateCleanup.removeAfter")
     cal.add(Calendar.HOUR, -timeDiff)
     val oldDate = cal.getTime()
     val fileList = FileDAO.find($and("isIntermediate" $eq true, "uploadDate" $lt oldDate)).toList
@@ -976,10 +978,10 @@ class MongoDBFileService @Inject() (
 
 		    val fileSep = System.getProperty("file.separator")
 		    val lineSep = System.getProperty("line.separator")
-		    var fileMdDumpDir = play.api.Play.configuration.getString("filedump.dir").getOrElse("")
+		    var fileMdDumpDir = configuration.get[String]("filedump.dir").getOrElse("")
 			if(!fileMdDumpDir.endsWith(fileSep))
 				fileMdDumpDir = fileMdDumpDir + fileSep
-			var fileMdDumpMoveDir = play.api.Play.configuration.getString("filedumpmove.dir").getOrElse("")
+			var fileMdDumpMoveDir = configuration.get[String]("filedumpmove.dir").getOrElse("")
 			if(fileMdDumpMoveDir.equals("")){
 				Logger.warn("Will not move dumped files metadata to staging directory. No staging directory set.")
 			}
@@ -1106,18 +1108,13 @@ class MongoDBFileService @Inject() (
 
 object FileDAO extends ModelCompanion[File, ObjectId] {
   val COLLECTION = "uploads"
-
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[File, ObjectId](collection = x.collection(COLLECTION)) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[File, ObjectId](collection = mongoService.collection(COLLECTION)) {}
 }
 
 object VersusDAO extends ModelCompanion[Versus,ObjectId]{
-    val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Versus, ObjectId](collection = x.collection("versus.descriptors")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Versus, ObjectId](collection = mongoService.collection("versus.descriptors")) {}
 }
 
 object FileStats extends ModelCompanion[StatisticUser, ObjectId] {

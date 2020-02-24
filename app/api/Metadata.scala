@@ -3,24 +3,20 @@ package api
 import api.Permission.Permission
 import java.net.{URL, URLEncoder}
 import java.util.Date
-
 import controllers.Utils
 import javax.inject.{Inject, Singleton}
 import models.{ResourceRef, UUID, UserAgent, _}
 import org.elasticsearch.action.search.SearchResponse
 import org.apache.commons.lang.WordUtils
-import play.api.Play.current
-import play.api.Logger
-import play.api.Play._
 import play.api.libs.json.Json._
-import play.api.libs.json._
-import play.api.libs.ws.WS
+import play.api.libs.json.{JsValue, _}
+import play.api.libs.ws.WSClient
 import play.api.mvc.Result
+import play.api.{Configuration, Logger}
 import services._
 import play.api.i18n.Messages
 import play.api.libs.json.JsValue
 
-import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
@@ -40,7 +36,9 @@ class Metadata @Inject() (
   vocabs: StandardVocabularyService,
   events: EventService,
   spaceService: SpaceService,
-  searches: SearchService) extends ApiController {
+  searches: SearchService,
+  wsClient: WSClient,
+  configuration: Configuration) extends ApiController {
 
   def getDefinitions() = PermissionAction(Permission.ViewDataset) {
     implicit request =>
@@ -114,7 +112,7 @@ class Metadata @Inject() (
     }
   }
 
-  def getDefinition(id: UUID) = PermissionAction(Permission.AddMetadata).async { implicit request =>
+  def getDefinition(id: UUID) = PermissionAction(Permission.AddMetadata).async { implicit request: UserRequest[JsValue] =>
     implicit val context = scala.concurrent.ExecutionContext.Implicits.global
     val foo = for {
       md <- metadataService.getDefinition(id)
@@ -122,14 +120,15 @@ class Metadata @Inject() (
       // If original request had a Cookie header, copy it to the proxied request
       cookies <- request.headers.get("Cookie")
     } yield {
-      WS.url(url).withHeaders(COOKIE -> cookies).get().map(response => (Status(response.status))(response.body.trim))
+      wsClient.url(url).get().map(response => Ok(response.body.trim))
     }
     foo.getOrElse {
       Future(InternalServerError)
     }
   }
 
-  def getUrl(inUrl: String) = PermissionAction(Permission.AddMetadata).async { implicit request =>
+  def getUrl(inUrl: String) = PermissionAction(Permission.AddMetadata).async {
+    implicit request: UserRequest[JsValue] =>
     // Use java.net.URI instead of URLDecoder.decode to decode the path.
     import java.net.URI
     Logger.debug("Metadata getUrl: inUrl = '" + inUrl + "'.")
@@ -137,7 +136,7 @@ class Metadata @Inject() (
     val url = new URI(inUrl).getPath().replaceAll(" ", "+")
     Logger.debug("Metadata getUrl decoded: url = '" + url + "'.")
     implicit val context = scala.concurrent.ExecutionContext.Implicits.global
-    WS.url(url).get().map {
+    wsClient.url(url).get().map {
       response => Ok(response.body.trim)
     }
   }
@@ -154,7 +153,7 @@ class Metadata @Inject() (
               // assign a default uri if not specified
               if (uri == "") {
                 // http://clowder.ncsa.illinois.edu/metadata/{uuid}#CamelCase
-                uri = play.Play.application().configuration().getString("metadata.uri.prefix") + "/" + space.id.stringify + "#" + WordUtils.capitalize((body \ "label").as[String]).replaceAll("\\s", "")
+                uri = configuration.get[String]("metadata.uri.prefix") + "/" + space.id.stringify + "#" + WordUtils.capitalize((body \ "label").as[String]).replaceAll("\\s", "")
                 body = body.as[JsObject] + ("uri" -> Json.toJson(uri))
               }
               addDefinitionHelper(uri, body, Some(space.id), u, Some(space))
@@ -180,7 +179,7 @@ class Metadata @Inject() (
             // assign a default uri if not specified
             if (uri == "") {
               // http://clowder.ncsa.illinois.edu/metadata#CamelCase
-              uri = play.Play.application().configuration().getString("metadata.uri.prefix") + "#" + WordUtils.capitalize((body \ "label").as[String]).replaceAll("\\s", "")
+              uri = configuration.get[String]("metadata.uri.prefix") + "#" + WordUtils.capitalize((body \ "label").as[String]).replaceAll("\\s", "")
               body = body.as[JsObject] + ("uri" -> Json.toJson(uri))
             }
             addDefinitionHelper(uri, body, None, user, None)
@@ -580,13 +579,13 @@ class Metadata @Inject() (
     }
   }
 
-  def getPerson(pid: String) = PermissionAction(Permission.ViewMetadata).async { implicit request =>
+  def getPerson(pid: String) = PermissionAction(Permission.ViewMetadata).async { implicit request: UserRequest[JsValue] =>
 
     implicit val context = scala.concurrent.ExecutionContext.Implicits.global
-    val peopleEndpoint = (play.Play.application().configuration().getString("people.uri"))
+    val peopleEndpoint = (configuration.get[String]("people.uri"))
     if (peopleEndpoint != null) {
       val endpoint = (peopleEndpoint + "/" + URLEncoder.encode(pid, "UTF-8"))
-      val futureResponse = WS.url(endpoint).get()
+      val futureResponse = wsClient.url(endpoint).get()
       var jsonResponse: play.api.libs.json.JsValue = new JsArray()
       var success = false
       val result = futureResponse.map {
@@ -610,29 +609,30 @@ class Metadata @Inject() (
     }
   }
 
-  def listPeople(term: String, limit: Int) = PermissionAction(Permission.ViewMetadata).async { implicit request =>
+  def listPeople(term: String, limit: Int) = PermissionAction(Permission.ViewMetadata).async {
+    implicit request: UserRequest[JsValue] =>
 
     implicit val context = scala.concurrent.ExecutionContext.Implicits.global
     val endpoint = (play.Play.application().configuration().getString("people.uri"))
     if (play.api.Play.current.configuration.getBoolean("stagingArea").getOrElse(false) && endpoint != null) {
 
-      val futureResponse = WS.url(endpoint).get()
+      val futureResponse = wsClient.url(endpoint).get()
       var jsonResponse: play.api.libs.json.JsValue = new JsArray()
       var success = false
       val lcTerm = term.toLowerCase()
       val result = futureResponse.map {
         case response =>
           if (response.status >= 200 && response.status < 300 || response.status == 304) {
-            val people = (response.json \ ("persons")).as[List[JsObject]]
+            val people = ((response.json \ "persons").get).as[List[JsObject]]
             Ok(Json.toJson(people.map { t =>
-              val fName = t \ ("givenName")
-              val lName = t \ ("familyName")
+              val fName = (t \ "givenName").get
+              val lName = (t \ "familyName").get
               val name = JsString(fName.as[String] + " " + lName.as[String])
-              val email = t \ ("email") match {
-                case JsString(_) => t \ ("email")
+              val email = (t \ "email").get match {
+                case JsString(_) => (t \ "email").get
                 case _ => JsString("")
               }
-              Map("name" -> name, "@id" -> t \ ("@id"), "email" -> email)
+              Map("name" -> name, "@id" -> (t \ "@id").get, "email" -> email)
 
             }.filter((x) => {
               if (term.length == 0) {

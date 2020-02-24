@@ -8,10 +8,11 @@ import play.api.libs.json.Json.toJson
 import javax.inject.Inject
 
 import util.Mail
-import play.api.templates.Html
+import play.twirl.api.Html
 
 import scala.util.{Failure, Success, Try}
 import controllers.Utils
+import play.twirl.api.Html
 
 
 class Events @Inject() (events: EventService,

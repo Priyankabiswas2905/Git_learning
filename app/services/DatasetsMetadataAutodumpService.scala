@@ -1,33 +1,42 @@
 package services
 
-import play.api.{ Plugin, Logger, Application }
+import akka.actor.ActorSystem
+import javax.inject.Inject
+import play.api.inject.ApplicationLifecycle
+import play.api.{Application, Logger}
 import play.libs.Akka
+
 import scala.concurrent.duration._
 import play.api.libs.concurrent.Execution.Implicits._
+
+import scala.concurrent.Future
+
+trait DatasetsMetadataAutodumpService
 
 /**
  * Dataset metadata automatic dump service.
  *
  */
-class DatasetsMetadataAutodumpService (application: Application) extends Plugin {
+class DatasetsMetadataAutodumpServiceImpl @Inject() (lifecycle: ApplicationLifecycle,
+  actorSystem: ActorSystem) extends DatasetsMetadataAutodumpService {
 
-  val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
-  
-  override def onStart() {
-    Logger.debug("Starting dataset metadata autodumper Plugin")
-    //Dump metadata of all datasets periodically
-    val timeInterval = play.Play.application().configuration().getInt("datasetmetadatadump.dumpEvery") 
-	    Akka.system().scheduler.schedule(0.days, timeInterval.intValue().days){
-	      dumpAllDatasetMetadata
-	    }
+  val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
+
+  Logger.debug("Starting dataset metadata autodumper Plugin")
+  //Dump metadata of all datasets periodically
+  val timeInterval = configuration.get[Int]("datasetmetadatadump.dumpEvery")
+  actorSystem.scheduler.schedule(0.days, timeInterval.intValue().days){
+    dumpAllDatasetMetadata
   }
-  
-  override def onStop() {
+
+  lifecycle.addStopHook { () =>
     Logger.debug("Shutting down dataset metadata autodumper Plugin")
+    Future.successful(())
   }
 
-  override lazy val enabled = {
-    !application.configuration.getString("datasetmetadatadumpservice").filter(_ == "disabled").isDefined
+  lazy val enabled = {
+    import play.api.Play.current
+    !current.configuration.getString("datasetmetadatadumpservice").filter(_ == "disabled").isDefined
   }
   
   def dumpAllDatasetMetadata() = {

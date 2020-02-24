@@ -1,5 +1,7 @@
 @(curationObject: models.CurationObject, space: Option[String])(implicit user: Option[models.User])
-
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 <div class = "panel panel-default dataset-panel" id="@curationObject.id-listitem">
     <div class="panel-body">
         <div class="row">
@@ -23,7 +25,7 @@
                             </div>
                         </div>
                         <div class="row">
-                            <div class="col-xs-12">Created on: @curationObject.created.date.format("MMM dd, yyyy")</div>
+                            <div class="col-xs-12">Created on: @curationObject.created</div>
                         </div>
                         <div class="row">
                             <div class="col-xs-12">Repository: @curationObject.repository.getOrElse("")</div>

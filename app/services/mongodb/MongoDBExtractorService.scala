@@ -130,16 +130,11 @@ class MongoDBExtractorService extends ExtractorService {
  * Data Access Object for ExtractorDetail
  */
 object ExtractorInfoDAO extends ModelCompanion[ExtractorInfo, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[ExtractorInfo, ObjectId](collection = x.collection("extractors.info")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[ExtractorInfo, ObjectId](collection = mongoService.collection("extractors.info")) {}
 }
 
 object ExtractorsForInstanceDAO extends ModelCompanion[ExtractorsForInstance, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[ExtractorsForInstance, ObjectId](collection = x.collection("extractors.global")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[ExtractorInfo, ObjectId](collection = mongoService.collection("extractors.global")) {}
 }
-

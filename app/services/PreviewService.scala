@@ -1,7 +1,8 @@
 package services
 
-import models.{UUID, ThreeDAnnotation, Preview, DBResult}
+import models.{Preview, Previewer, DBResult, UUID}
 import java.io.InputStream
+
 import play.api.libs.json.JsValue
 
 /**

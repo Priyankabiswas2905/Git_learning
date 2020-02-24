@@ -4,6 +4,10 @@
         userSelections: List[String], showTrash: Boolean = false)(implicit flash: play.api.mvc.Flash, user: Option[models.User])
 
 @import api.Permission
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
+
 @main(Messages("datasets.title")) {
 
 @util.masonry()

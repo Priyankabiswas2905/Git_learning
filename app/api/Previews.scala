@@ -1,8 +1,8 @@
 package api
 
 import java.io.{BufferedReader, FileInputStream, FileReader}
-import javax.inject.{Inject, Singleton}
 
+import javax.inject.{Inject, Singleton}
 import models.{ResourceRef, ThreeDAnnotation, UUID}
 import play.api.Logger
 import play.api.libs.concurrent.Execution.Implicits._
@@ -13,13 +13,16 @@ import com.mongodb.casbah.Imports._
 import org.bson.types.ObjectId
 import play.api.libs.json.JsObject
 import com.mongodb.WriteConcern
-import models.{Preview, UUID, ThreeDAnnotation}
+import models.{Preview, ThreeDAnnotation, UUID}
 import play.api.libs.json.JsValue
 import play.api.libs.concurrent.Execution.Implicits._
 import java.io.BufferedReader
 import java.io.FileReader
+
+import akka.stream.scaladsl.StreamConverters
 import javax.inject.{Inject, Singleton}
-import services.{TileService, PreviewService}
+import play.api.http.HttpEntity
+import services.{PreviewService, TileService}
 import util.FileUtils
 
 /**
@@ -68,8 +71,10 @@ class Previews @Inject()(previews: PreviewService, tiles: TileService) extends A
                   case (start, end) =>
 
                     inputStream.skip(start)
-                    import play.api.mvc.{ResponseHeader, SimpleResult}
-                    SimpleResult(
+                    import play.api.mvc.{ResponseHeader, Result}
+                    val bodySource = StreamConverters.fromInputStream(() => inputStream)
+                    val entity: HttpEntity = HttpEntity.Streamed(bodySource, Some(end - start + 1), Some(contentType))
+                    Result(
                       header = ResponseHeader(PARTIAL_CONTENT,
                         Map(
                           CONNECTION -> "keep-alive",
@@ -79,7 +84,7 @@ class Previews @Inject()(previews: PreviewService, tiles: TileService) extends A
                           CONTENT_TYPE -> contentType
                         )
                       ),
-                      body = Enumerator.fromStream(inputStream)
+                      body = entity
                     )
                 }
               }
@@ -209,8 +214,10 @@ class Previews @Inject()(previews: PreviewService, tiles: TileService) extends A
                       case (start, end) =>
 
                         inputStream.skip(start)
-                        import play.api.mvc.{ResponseHeader, SimpleResult}
-                        SimpleResult(
+                        import play.api.mvc.{ResponseHeader, Result}
+                        val bodySource = StreamConverters.fromInputStream(() => inputStream)
+                        val entity: HttpEntity = HttpEntity.Streamed(bodySource, Some(end - start + 1), Some(contentType))
+                        Result(
                           header = ResponseHeader(PARTIAL_CONTENT,
                             Map(
                               CONNECTION -> "keep-alive",
@@ -220,7 +227,7 @@ class Previews @Inject()(previews: PreviewService, tiles: TileService) extends A
                               CONTENT_TYPE -> contentType
                             )
                           ),
-                          body = Enumerator.fromStream(inputStream)
+                          body = entity
                         )
                     }
                   }

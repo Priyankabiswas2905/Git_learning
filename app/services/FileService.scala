@@ -124,7 +124,7 @@ trait FileService {
   def first(): Option[File]
 
   def indexAll()
-  
+
   def index(id: UUID)
 
   /**

@@ -9,8 +9,8 @@ import services.ExtractionRequestsService
  */
 
 object ExtractionInfoSetUp {
-  val extractors: ExtractorService =  DI.injector.getInstance(classOf[ExtractorService])
-  val dtsrequests:ExtractionRequestsService=DI.injector.getInstance(classOf[ExtractionRequestsService])
+  val extractors: ExtractorService =  DI.injector.instanceOf[ExtractorService]
+  val dtsrequests: ExtractionRequestsService = DI.injector.instanceOf[ExtractionRequestsService]
 
   /*
    * Updates DTS extraction request

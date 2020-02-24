@@ -1,5 +1,8 @@
 @(curationObject: models.CurationObject, editCurationObject: Boolean)(implicit user: Option[models.User])
 @import api.Permission
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
     <div class="panel panel-default">
         <div class="panel-body break-word">
             <h4>@curationObject.name <h4>

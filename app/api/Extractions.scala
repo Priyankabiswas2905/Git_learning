@@ -1,26 +1,28 @@
 package api
 
-import java.io.{FileInputStream, InputStream}
-import java.net.URL
+import java.io.InputStream
 import java.util.Calendar
-import javax.inject.Inject
+import java.util.concurrent.TimeUnit
 
+import akka.NotUsed
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{Source, StreamConverters}
+import akka.util.ByteString
 import controllers.Utils
-import fileutils.FilesUtils
+import javax.inject.Inject
 import models._
 import play.api.Logger
-import play.api.Play.{configuration, current}
-import play.api.http.ContentTypes
-import play.api.libs.{Files, MimeTypes}
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json.Json._
 import play.api.libs.json._
-import play.api.libs.ws.{Response, WS}
-import play.api.mvc.MultipartFormData
+import play.api.libs.ws.{WSClient, WSResponse}
+import play.api.libs.ws.ahc.AhcWSResponse
+import play.libs.ws.WS
 import services._
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 
 
 /**
@@ -34,7 +36,8 @@ class Extractions @Inject()(
   extractors: ExtractorService,
   previews: PreviewService,
   thumbnails: ThumbnailService,
-  appConfig: AppConfigurationService) extends ApiController {
+  appConfig: AppConfigurationService,
+  ws: WSClient) extends ApiController {
 
   /**
    * Uploads file for extraction and returns a file id ; It does not index the file.
@@ -80,10 +83,13 @@ class Extractions @Inject()(
           val listIds = for {fileurl <- listURLs} yield {
             val urlsplit = fileurl.split("/")
             val filename = urlsplit(urlsplit.length - 1)
-            val futureResponse = WS.url(fileurl).get()
+            val futureResponse = ws.url(fileurl).get()
             val fid = for {response <- futureResponse} yield {
               if (response.status == 200) {
-                val inputStream: InputStream = response.ahcResponse.getResponseBodyAsStream()
+                implicit val materializer = ActorMaterializer()
+                val inputStream: InputStream = response.bodyAsSource.runWith(
+                  StreamConverters.asInputStream(FiniteDuration(3, TimeUnit.SECONDS))
+                )
                 val contentLengthStr = response.header("Content-Length").getOrElse("-1")
                 val contentLength = Integer.parseInt(contentLengthStr).toLong
                 val file = files.save(inputStream, filename, contentLength, response.header("Content-Type"), user, null)
@@ -92,11 +98,13 @@ class Extractions @Inject()(
                     // Add new file & byte count to appConfig
                     appConfig.incrementCount('files, 1)
                     appConfig.incrementCount('bytes, f.length)
+
                     // notify extractors
                     current.plugin[RabbitmqPlugin].foreach {
                       // FIXME dataset not available?
                       _.fileCreated(f, None, Utils.baseUrl(request), request.apiKey)
                     }
+
                     /*--- Insert DTS Requests  ---*/
                     val clientIP = request.remoteAddress
                     val serverIP = request.host
@@ -156,11 +164,14 @@ class Extractions @Inject()(
         else {
           BadRequest("Not valid id")
         }
-      } //case plugin  
-      case None => {
-        BadRequest("No Service")
-      }
-    } //plugin match         
+        case None =>
+          Logger.error("Could not retrieve file that was just saved.")
+          InternalServerError("Error uploading file")
+      } //file match
+    } // if Object id
+    else {
+      BadRequest("Not valid id")
+    }
   }
 
   /**
@@ -170,38 +181,28 @@ class Extractions @Inject()(
    * returns: a list of status of all extractors responsible for extractions on the file and the final status of extraction job
    */
   def checkExtractorsStatus(id: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, id))).async { implicit request =>
-      current.plugin[RabbitmqPlugin] match {
-
-        case Some(plugin) => {
-          files.get(id) match {
-            case Some(file) => {
-              //Get the list of extractors processing the file 
-              val l = extractions.getExtractorList(file.id) map {
-                elist =>
-                  (elist._1, elist._2)
-              }
-              //Get the bindings
-              var blist = plugin.getBindings
-              for {
-                rkeyResponse <- blist
-              } yield {
-                val status = computeStatus(rkeyResponse, file, l)
-                l += "Status" -> status
-                Logger.debug(" CheckStatus: l.toString : " + l.toString)
-                Ok(toJson(l.toMap))
-              } //end of yield
-
-            } //end of some file
-            case None => {
-              Future(Ok("no file"))
-            }
-          } //end of match file
+    files.get(id) match {
+      case Some(file) => {
+        //Get the list of extractors processing the file
+        val l = extractions.getExtractorList(file.id) map {
+          elist =>
+            (elist._1, elist._2)
         }
-
-        case None => {
-          Future(Ok("No Rabbitmq Service"))
-        }
+        //Get the bindings
+        var blist = rabbitMQService.getBindings
+        for {
+          rkeyResponse <- blist
+        } yield {
+          val status = computeStatus(rkeyResponse, file, l)
+          l += "Status" -> status
+          Logger.debug(" CheckStatus: l.toString : " + l.toString)
+          Ok(toJson(l.toMap))
+        } //end of yield
+      } //end of some file
+      case None => {
+        Future(Ok("no file"))
       }
+    } //end of match file
   }
 
   /**
@@ -212,105 +213,88 @@ class Extractions @Inject()(
    *
    */
   def fetch(id: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, id))).async { implicit request =>
-      current.plugin[RabbitmqPlugin] match {
+    if (UUID.isValid(id.stringify)) {
+      files.get(id) match {
+        case Some(file) => {
+          Logger.debug("Getting extract info for file with id " + id)
 
-        case Some(plugin) => {
-          if (UUID.isValid(id.stringify)) {
-            files.get(id) match {
-              case Some(file) => {
-                Logger.debug("Getting extract info for file with id " + id)
-
-                val l = extractions.getExtractorList(file.id) map {
-                  elist => (elist._1, elist._2)
-                }
-
-                var blist = plugin.getBindings
-
-                for {
-                  rkeyResponse <- blist
-                } yield {
-
-                  val status = computeStatus(rkeyResponse, file, l)
-                  val jtags = FileOP.extractTags(file)
-                  val jpreviews = FileOP.extractPreviews(id)
-                  val vdescriptors = files.getVersusMetadata(id) match {
-                    case Some(vd) => api.routes.Files.getVersusMetadataJSON(id).toString
-                    case None => ""
-                  }
-
-                  Logger.debug("jtags: " + jtags.toString)
-                  Logger.debug("jpreviews: " + jpreviews.toString)
-
-                  Ok(Json.obj("file_id" -> id.stringify, "filename" -> file.filename, "Status" -> status, "tags" -> jtags, "previews" -> jpreviews, "versus descriptors url" -> vdescriptors))
-                } //end of yield
-
-              } //end of some file
-              case None => {
-                val error_str = "The file with id " + id + " is not found."
-                Logger.error(error_str)
-                Future(NotFound(toJson(error_str)))
-              }
-            } //end of match file
-          } else {
-            val error_str = "The given id " + id + " is not a valid ObjectId."
-            Logger.error(error_str)
-            Future(BadRequest(Json.toJson(error_str)))
+          val l = extractions.getExtractorList(file.id) map {
+            elist => (elist._1, elist._2)
           }
 
-        }
+          var blist = rabbitMQService.getBindings
 
+          for {
+            rkeyResponse <- blist
+          } yield {
+
+            val status = computeStatus(rkeyResponse, file, l)
+            val jtags = FileOP.extractTags(file)
+            val jpreviews = FileOP.extractPreviews(id)
+            val vdescriptors = files.getVersusMetadata(id) match {
+              case Some(vd) => api.routes.Files.getVersusMetadataJSON(id).toString
+              case None => ""
+            }
+
+            Logger.debug("jtags: " + jtags.toString)
+            Logger.debug("jpreviews: " + jpreviews.toString)
+
+            Ok(Json.obj("file_id" -> id.stringify, "filename" -> file.filename, "Status" -> status, "tags" -> jtags, "previews" -> jpreviews, "versus descriptors url" -> vdescriptors))
+          } //end of yield
+
+        } //end of some file
         case None => {
-          Future(Ok("No Rabbitmq Service"))
+          val error_str = "The file with id " + id + " is not found."
+          Logger.error(error_str)
+          Future(NotFound(toJson(error_str)))
         }
-      }
+      } //end of match file
+    } else {
+      val error_str = "The given id " + id + " is not a valid ObjectId."
+      Logger.error(error_str)
+      Future(BadRequest(Json.toJson(error_str)))
+    }
   }
 
   def checkExtractionsStatuses(id: models.UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, id))).async { implicit request =>
-      request.user match {
-        case Some(user) => {
-          current.plugin[RabbitmqPlugin] match {
-            case Some(plugin) => {
-              Logger.debug("Inside Extraction Checkstatuses")
-              val mapIdUrl = extractions.getWebPageResource(id)
-              val listStatus = for {
-                (fid, url) <- mapIdUrl
+    request.user match {
+      case Some(user) => {
+        Logger.debug("Inside Extraction Checkstatuses")
+        val mapIdUrl = extractions.getWebPageResource(id)
+        val listStatus = for {
+          (fid, url) <- mapIdUrl
+        } yield {
+          Logger.debug("[checkExtractionsStatuses]---fid---" + fid)
+          val statuses = files.get(UUID(fid)) match {
+            case Some(file) => {
+              //Get the list of extractors processing the file
+              val l = extractions.getExtractorList(file.id)
+              //Get the bindings
+              val blist = rabbitMQService.getBindings
+              val fstatus = for {
+                rkeyResponse <- blist
               } yield {
-                  Logger.debug("[checkExtractionsStatuses]---fid---" + fid)
-                  val statuses = files.get(UUID(fid)) match {
-                    case Some(file) => {
-                      //Get the list of extractors processing the file
-                      val l = extractions.getExtractorList(file.id)
-                      //Get the bindings
-                      val blist = plugin.getBindings
-                      val fstatus = for {
-                        rkeyResponse <- blist
-                      } yield {
-                          val status = computeStatus(rkeyResponse, file, l)
-                          Logger.debug(" [checkExtractionsStatuses]: l.toString : " + l.toString)
-                          Map("id" -> file.id.toString, "status" -> status)
-                        } //end of yield
-                      fstatus
-                    } //end of some file
-                    case None => {
-                      Future((Map("id" -> id.toString, "status" -> "No File Id found")))
-                    }
-                  } //end of match file
-                  statuses
-                } //end of outer yield
-              for {
-                ls <- scala.concurrent.Future.sequence(listStatus)
-              } yield {
-                Logger.debug("[checkExtractionsStatuses]: list statuses" + ls)
-                Ok(toJson(ls))
-              }
-            } //rabbitmq plugin
+                  val status = computeStatus(rkeyResponse, file, l)
+                  Logger.debug(" [checkExtractionsStatuses]: l.toString : " + l.toString)
+                  Map("id" -> file.id.toString, "status" -> status)
+                } //end of yield
+              fstatus
+            } //end of some file
             case None => {
-              Future(Ok(toJson(Map("No Rabbitmq Service" -> ""))))
+              Future((Map("id" -> id.toString, "status" -> "No File Id found")))
             }
-          }
-        } //end of match user
-        case None => Future(BadRequest(toJson(Map("request" -> "Not authorized."))))
-      } //user
+          } //end of match file
+          statuses
+          } //end of outer yield
+        for {
+          ls <- scala.concurrent.Future.sequence(listStatus)
+        } yield {
+          Logger.debug("[checkExtractionsStatuses]: list statuses" + ls)
+          Ok(toJson(ls))
+        }
+      } //end of match user
+      case None => Future(BadRequest(toJson(Map("request" -> "Not authorized."))))
+    } //user
   }
 
   def computeStatus(response: Response, file: models.File, l: scala.collection.mutable.Map[String, String]): String = {
@@ -447,7 +431,7 @@ class Extractions @Inject()(
     // Update database
     extractionInfoResult.fold(
       errors => {
-        BadRequest(Json.obj("status" -> "KO", "message" -> JsError.toFlatJson(errors)))
+        BadRequest(Json.obj("status" -> "KO", "message" -> JsError.toJson(errors)))
       },
       info => {
         extractors.updateExtractorInfo(info) match {
@@ -518,11 +502,20 @@ class Extractions @Inject()(
               Conflict(toJson(Map("status" -> "error", "msg" -> "File is not ready. Please wait and try again.")))
             }
           }
-          case None =>
-            BadRequest(toJson(Map("request" -> "File not found")))
+
+          var datasetId: UUID = null
+          datasets.findByFileId(file_id).map(ds => {
+            datasetId = ds.id
+          })
+          rabbitMQService.extract(ExtractorMessage(new UUID(originalId), file.id, host, key, extra, file.length.toString,
+            datasetId, newFlags))
+          Ok(Json.obj("status" -> "OK"))
+        } else {
+          Conflict(toJson(Map("status" -> "error", "msg" -> "File is not ready. Please wait and try again.")))
         }
+      }
       case None =>
-        Ok(Json.obj("status" -> "error", "msg"-> "RabbitmqPlugin disabled"))
+        BadRequest(toJson(Map("request" -> "File not found")))
     }
   }
 
@@ -542,6 +535,7 @@ class Extractions @Inject()(
               case Some(extractorId) => extractorId
               case None => "unknown." + "dataset"
             }
+
             // parameters for execution
             val parameters = (request.body \ "parameters").asOpt[JsObject].getOrElse(JsObject(Seq.empty[(String, JsValue)]))
 
@@ -556,7 +550,7 @@ class Extractions @Inject()(
             BadRequest(toJson(Map("request" -> "Dataset not found")))
         }
       case None =>
-        Ok(Json.obj("status" -> "error", "msg"-> "RabbitmqPlugin disabled"))
+        BadRequest(toJson(Map("request" -> "File not found")))
     }
   }
 

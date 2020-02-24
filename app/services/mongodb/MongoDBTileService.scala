@@ -1,15 +1,17 @@
 package services.mongodb
 
 import com.mongodb.casbah.WriteConcern
-import services.{ByteStorageService, PreviewService, TileService}
+import services.{ByteStorageService, DI, PreviewService, TileService}
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import org.bson.types.ObjectId
 import MongoContext.context
 import play.api.Play.current
 import java.io.InputStream
+
+import com.google.inject.Provider
 import com.mongodb.casbah.commons.MongoDBObject
-import models.{UUID, Tile}
-import play.api.libs.json.{JsValue, JsObject}
+import models.{Tile, UUID}
+import play.api.libs.json.{JsObject, JsValue}
 import com.mongodb.casbah.Imports._
 import play.api.Logger
 import javax.inject.{Inject, Singleton}
@@ -19,7 +21,7 @@ import util.FileUtils
  * Use mongodb to mange tiles.
  */
 @Singleton
-class MongoDBTileService @Inject() (previews: PreviewService, storage: ByteStorageService) extends TileService {
+class MongoDBTileService @Inject() (previews: Provider[PreviewService], storage: ByteStorageService) extends TileService {
 
   def get(tileId: UUID): Option[Tile] = {
     TileDAO.findOneById(new ObjectId(tileId.stringify))
@@ -28,7 +30,7 @@ class MongoDBTileService @Inject() (previews: PreviewService, storage: ByteStora
   def updateMetadata(tileId: UUID, previewId: UUID, level: String, json: JsValue) {
     json match {
     case JsObject(fields) => {
-      previews.get(previewId) match {
+      previews.get().get(previewId) match {
         case Some(preview) => {
           get(tileId) match {
             case Some(tile) =>
@@ -90,9 +92,6 @@ class MongoDBTileService @Inject() (previews: PreviewService, storage: ByteStora
 
 object TileDAO extends ModelCompanion[Tile, ObjectId] {
   val COLLECTION = "tiles"
-
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Tile, ObjectId](collection = x.collection(COLLECTION)) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Tile, ObjectId](collection = mongoService.collection(COLLECTION)) {}
 }

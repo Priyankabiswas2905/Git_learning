@@ -5,16 +5,17 @@ import java.net.URL
 import java.security.{DigestInputStream, MessageDigest}
 import java.text.SimpleDateFormat
 import java.util.{Calendar, Date}
+
 import api.Permission.Permission
 import java.util.zip._
+
 import javax.inject.{Inject, Singleton}
 import controllers.{Previewers, Utils}
 import jsonutils.JsonUtil
 import models._
 import org.apache.commons.codec.binary.Hex
 import org.json.JSONObject
-import play.api.Logger
-import play.api.Play.{configuration, current}
+import play.api.{Configuration, Logger}
 import play.api.i18n.Messages
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.iteratee.Enumerator
@@ -23,8 +24,11 @@ import play.api.libs.json.Json._
 import play.api.mvc.AnyContent
 import services._
 import _root_.util._
+import akka.stream.scaladsl.Source
+
 import scala.concurrent.{ExecutionContext, Future}
 import scala.collection.mutable.ListBuffer
+import play.api.i18n.Messages.Implicits._
 
 /**
  * Dataset API.
@@ -225,7 +229,6 @@ class  Datasets @Inject()(
                     datasets.addXMLMetadata(UUID(id), UUID(file_id), xmlToJSON)
                   }
                   searches.index(d, true)
-
 
                   adminsNotifierService.sendAdminsNotification(Utils.baseUrl(request), "Dataset", "added", id, name)
 
@@ -922,7 +925,7 @@ class  Datasets @Inject()(
           description = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"description data is missing."))
         }
       }
@@ -935,7 +938,7 @@ class  Datasets @Inject()(
           name = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"name data is missing."))
         }
       }
@@ -971,7 +974,7 @@ class  Datasets @Inject()(
           name = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"name data is missing."))
         }
       }
@@ -1010,7 +1013,7 @@ class  Datasets @Inject()(
           description = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"description data is missing."))
         }
       }
@@ -1047,7 +1050,7 @@ class  Datasets @Inject()(
           creator = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"creator data is missing."))
         }
       }
@@ -1163,7 +1166,7 @@ class  Datasets @Inject()(
           licenseType = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"licenseType data is missing."))
         }
       }
@@ -1176,7 +1179,7 @@ class  Datasets @Inject()(
           rightsHolder = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"rightsHolder data is missing."))
         }
       }
@@ -1209,7 +1212,7 @@ class  Datasets @Inject()(
           }
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"licenseText data is missing."))
         }
       }
@@ -1222,7 +1225,7 @@ class  Datasets @Inject()(
           licenseUrl = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"licenseUrl data is missing."))
         }
       }
@@ -1235,7 +1238,7 @@ class  Datasets @Inject()(
           allowDownload = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"allowDownload data is missing."))
         }
       }
@@ -1313,7 +1316,7 @@ class  Datasets @Inject()(
  *      id:       the id in the original addTags call
  *      request:  the request in the original addTags call
  *  Return type:
- *      play.api.mvc.SimpleResult[JsValue]
+ *      play.api.mvc.Result[JsValue]
  *      in the form of Ok, NotFound and BadRequest
  *      where: Ok contains the JsObject: "status" -> "success", the other two contain a JsString,
  *      which contains the cause of the error, such as "No 'tags' specified", and
@@ -1626,6 +1629,7 @@ class  Datasets @Inject()(
         val datasetWithFiles = dataset.copy(files = dataset.files)
         val datasetFiles = files.get(datasetWithFiles.files).found
         val previewers = Previewers.findDatasetPreviewers()
+
         //NOTE Should the following code be unified somewhere since it is duplicated in Datasets and Files for both api and controllers
         val previewslist = for (f <- datasetFiles; if (f.showPreviews.equals("DatasetLevel"))) yield {
           val pvf = for (p <- previewers; pv <- f.previews; if (p.contentType.contains(pv.contentType))) yield {
@@ -1694,13 +1698,14 @@ class  Datasets @Inject()(
     * @param request The implicit request parameter which is part of the REST API call
     *
     */
-  def deleteDatasetHelper(id: UUID, request: UserRequest[AnyContent]) = {
+  def deleteDatasetHelper(id: UUID, request: UserRequest[JsValue]) = {
     datasets.get(id) match {
       case Some(dataset) => {
         events.addObjectEvent(request.user, dataset.id, dataset.name, EventType.DELETE_DATASET.toString)
         datasets.removeDataset(id, Utils.baseUrl(request), request.apiKey, request.user)
 
         adminsNotifierService.sendAdminsNotification(Utils.baseUrl(request), "Dataset","removed",dataset.id.stringify, dataset.name)
+
         Ok(toJson(Map("status"->"success")))
       }
       case None => Ok(toJson(Map("status" -> "success")))
@@ -1810,13 +1815,13 @@ class  Datasets @Inject()(
     return xmlFile
   }
 
-
   def getTechnicalMetadataJSON(id: UUID) = PermissionAction(Permission.ViewMetadata, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     datasets.get(id) match {
       case Some(dataset) => {
         val listOfMetadata = metadataService.getMetadataByAttachTo(ResourceRef(ResourceRef.dataset, id))
           .filter(metadata => metadata.creator.typeOfAgent == "extractor" || metadata.creator.typeOfAgent == "cat:extractor")
           .map(JSONLD.jsonMetadataWithContext(_) \ "content")
+          .map(_.get)
         Ok(toJson(listOfMetadata))
       }
       case None => Logger.error("Error finding dataset" + id); InternalServerError
@@ -1933,7 +1938,7 @@ class  Datasets @Inject()(
       case Some(followeeModel) => {
         val sourceFollowerIDs = followeeModel.followers
         val excludeIDs = follower.followedEntities.map(typedId => typedId.id) ::: List(followeeUUID, follower.id)
-        val num = play.api.Play.configuration.getInt("number_of_recommendations").getOrElse(10)
+        val num = config.get[Int]("number_of_recommendations")
         userService.getTopRecommendations(sourceFollowerIDs, excludeIDs, num)
       }
       case None => {

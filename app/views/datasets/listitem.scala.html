@@ -1,5 +1,8 @@
 @(dataset: models.Dataset, collectionId: Option[String], redirect: Call, selected: Boolean)(implicit  flash: play.api.mvc.Flash, user: Option[models.User])
 @import api.Permission
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 
 <div class = "panel panel-default dataset-panel" id="@dataset.id-listitem">
     <div class="panel-body">

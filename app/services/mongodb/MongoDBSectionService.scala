@@ -2,11 +2,13 @@ package services.mongodb
 
 import org.bson.types.ObjectId
 import services.{PreviewService, SectionService, CommentService, FileService, DatasetService, FolderService}
-import models._
+import models.{Comment, Section, Tag, UUID, User}
 import javax.inject.{Inject, Singleton}
 import java.util.Date
+
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
+import com.google.inject.Provider
 import play.api.Play._
 import play.api.Logger
 import com.mongodb.casbah.commons.MongoDBObject
@@ -20,7 +22,11 @@ import scala.collection.mutable.ArrayBuffer
  * USe MongoDB to store sections
  */
 @Singleton
-class MongoDBSectionService @Inject() (comments: CommentService, previews: PreviewService, files: FileService, datasets: DatasetService, folders: FolderService) extends SectionService {
+class MongoDBSectionService @Inject() (
+  comments: CommentService,
+  previews: PreviewService,
+  datasets: DatasetService,
+  folders: Provider[FolderService]) extends SectionService {
   
   def listSections(): List[Section] = {
     SectionDAO.findAll.toList
@@ -144,7 +150,7 @@ class MongoDBSectionService @Inject() (comments: CommentService, previews: Previ
 
     // Get all sections in all files in all datasets you have access to.
     val datasetsList = datasets.listUser(user)
-    val foldersList = folders.findByParentDatasetIds(datasetsList.map(x => x.id))
+    val foldersList = folders.get().findByParentDatasetIds(datasetsList.map(x => x.id))
     val fileIds = datasetsList.map(x => x.files) ++ foldersList.map(x => x.files)
     orlist += ("file_id" $in fileIds.flatten.map(x => new ObjectId(x.stringify)))
 
@@ -197,8 +203,6 @@ class MongoDBSectionService @Inject() (comments: CommentService, previews: Previ
 }
 
 object SectionDAO extends ModelCompanion[Section, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Section, ObjectId](collection = x.collection("sections")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Section, ObjectId](collection = mongoService.collection("sections")) {}
 }

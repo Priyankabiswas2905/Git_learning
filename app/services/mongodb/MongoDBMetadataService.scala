@@ -11,6 +11,7 @@ import play.api.Play.current
 import com.mongodb.casbah.Imports._
 import play.api.libs.json.JsValue
 import javax.inject.{Inject, Singleton}
+
 import com.mongodb.casbah.commons.TypeImports.ObjectId
 import com.mongodb.casbah.WriteConcern
 import services.{ContextLDService, CurationService, DatasetService, SearchService, ExtractorMessage, FileService,
@@ -27,7 +28,8 @@ class MongoDBMetadataService @Inject() (contextService: ContextLDService,
                                         files: FileService,
                                         folders: FolderService,
                                         curations: CurationService,
-                                        searches: SearchService) extends MetadataService {
+                                        searches: SearchService,
+                                        mongoService: MongoService) extends MetadataService {
 
   /**
    * Add metadata to the metadata collection and attach to a section /file/dataset/collection
@@ -35,15 +37,13 @@ class MongoDBMetadataService @Inject() (contextService: ContextLDService,
   def addMetadata(metadata: Metadata): UUID = {
     // TODO: Update context
     val mid = MetadataDAO.insert(metadata, WriteConcern.Safe)
-    current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("No MongoSalatPlugin")
-      case Some(x) => x.collection(metadata.attachedTo) match {
-        case Some(c) => {
-          c.update(MongoDBObject("_id" -> new ObjectId(metadata.attachedTo.id.stringify)), $inc("metadataCount" -> +1))
-        }
-        case None => {
-          Logger.error(s"Could not increase counter for ${metadata.attachedTo}")
-        }
+    val mongoService = DI.injector.instanceOf[MongoService]
+    mongoService.collection(metadata.attachedTo) match {
+      case Some(c) => {
+        c.update(MongoDBObject("_id" -> new ObjectId(metadata.attachedTo.id.stringify)), $inc("metadataCount" -> +1))
+      }
+      case None => {
+        Logger.error(s"Could not increase counter for ${metadata.attachedTo}")
       }
     }
     UUID(mid.get.toString())
@@ -114,15 +114,12 @@ class MongoDBMetadataService @Inject() (contextService: ContextLDService,
           "resourceId" -> md.attachedTo.id.toString)
 
         //update metadata count for resource
-        current.plugin[MongoSalatPlugin] match {
-          case None => throw new RuntimeException("No MongoSalatPlugin")
-          case Some(x) => x.collection(md.attachedTo) match {
-            case Some(c) => {
-              c.update(MongoDBObject("_id" -> new ObjectId(md.attachedTo.id.stringify)), $inc("metadataCount" -> -1))
-            }
-            case None => {
-              Logger.error(s"Could not decrease counter for ${md.attachedTo}")
-            }
+        mongoService.collection(md.attachedTo) match {
+          case Some(c) => {
+            c.update(MongoDBObject("_id" -> new ObjectId(md.attachedTo.id.stringify)), $inc("metadataCount" -> -1))
+          }
+          case None => {
+            Logger.error(s"Could not decrease counter for ${md.attachedTo}")
           }
         }
       }
@@ -296,15 +293,11 @@ class MongoDBMetadataService @Inject() (contextService: ContextLDService,
 }
 
 object MetadataDAO extends ModelCompanion[Metadata, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin")
-    case Some(x) => new SalatDAO[Metadata, ObjectId](collection = x.collection("metadata")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Metadata, ObjectId](collection = mongoService.collection("metadata")) {}
 }
 
 object MetadataDefinitionDAO extends ModelCompanion[MetadataDefinition, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin")
-    case Some(x) => new SalatDAO[MetadataDefinition, ObjectId](collection = x.collection("metadata.definitions")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[MetadataDefinition, ObjectId](collection = mongoService.collection("metadata.definitions")) {}
 }

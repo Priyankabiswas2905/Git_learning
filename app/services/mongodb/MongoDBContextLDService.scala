@@ -1,6 +1,6 @@
 package services.mongodb
 
-import services.ContextLDService
+import services.{ContextLDService, DI, MetadataService}
 import org.bson.types.ObjectId
 import com.mongodb.casbah.commons.MongoDBObject
 import play.api.Logger
@@ -12,11 +12,11 @@ import com.mongodb.casbah.Imports._
 import play.api.libs.json.JsValue
 import javax.inject.{Inject, Singleton}
 import models.Preview
+
 import scala.Some
 import com.mongodb.casbah.commons.TypeImports.ObjectId
 import com.mongodb.casbah.WriteConcern
 import play.api.libs.json.Json
-import services.MetadataService
 import play.api.libs.json.JsString
 /**
  * MongoDB implementation of ContextLD service
@@ -56,8 +56,6 @@ class MongoDBContextLDService extends ContextLDService{
 
 object ContextLDDAO extends ModelCompanion[ContextLD, ObjectId] {
   // TODO RK handle exception for instance if we switch to other DB
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin")
-    case Some(x) => new SalatDAO[ContextLD, ObjectId](collection = x.collection("contextld")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[ContextLD, ObjectId](collection = mongoService.collection("contextld")) {}
 }

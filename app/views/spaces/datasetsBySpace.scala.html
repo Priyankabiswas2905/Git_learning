@@ -1,5 +1,7 @@
 @(datasets: List[models.Dataset], space: ProjectSpace, isPublic: Option[Boolean], userSelections: List[String])(implicit user: Option[models.User])
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @import api.Permission
 @isPublic match {
     case Some(b) => {<h3>@Messages("datasets.title")</h3>}

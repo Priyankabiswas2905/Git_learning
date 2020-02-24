@@ -1,9 +1,8 @@
+package util
+
 import models.UUID
-import play.api.mvc._
-import com.mongodb.casbah.Imports._
 import org.bson.types.ObjectId
-import play.api.libs.json._
-import play.api.data.validation.ValidationError
+import play.api.mvc._
 
 object Binders {
 
@@ -38,7 +37,7 @@ object Binders {
   /**
    * Convert a ObjectId to a Javascript String
    */
-  implicit def objectIdJavascriptLitteral = new JavascriptLitteral[ObjectId] {
+  implicit def objectIdJavascriptLiteral = new JavascriptLiteral[ObjectId] {
     def to(value: ObjectId) = value.toString
   }
 

@@ -1,38 +1,39 @@
 package services.mongodb
 
 import java.util.Date
-
 import org.bson.types.ObjectId
 import services.{ByteStorageService, TileService, FileService, PreviewService}
 import com.mongodb.casbah.commons.MongoDBObject
-import java.io.{InputStreamReader, BufferedReader, InputStream}
-import play.api.Logger
+import java.io.{BufferedReader, InputStream, InputStreamReader}
+import play.api.{Environment, Logger}
 import models._
 import org.apache.http.impl.client.DefaultHttpClient
 import org.apache.http.client.methods.HttpPost
 import org.apache.http.entity.mime.{HttpMultipartMode, MultipartEntity}
 import org.apache.http.entity.mime.content.StringBody
 import java.nio.charset.Charset
+
 import org.apache.http.util.EntityUtils
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
+import com.google.inject.Provider
 import play.api.Play.current
 import com.mongodb.casbah.Imports._
-import play.api.libs.json.JsValue
+import play.api.libs.json.{JsObject, JsValue, Json}
 import javax.inject.{Inject, Singleton}
 import models.Preview
-import play.api.libs.json.JsObject
 import com.mongodb.casbah.commons.TypeImports.ObjectId
 import com.mongodb.casbah.WriteConcern
-import util.FileUtils
+import util.{FileUtils, ResourceLister}
+
 import collection.JavaConverters._
+import scala.io.Source
 
 /**
  * Use MongoDB to store previews
  */
 @Singleton
-class MongoDBPreviewService @Inject()(files: FileService, tiles: TileService, storage: ByteStorageService) extends PreviewService {
-
+class MongoDBPreviewService @Inject()(tiles: TileService, storage: ByteStorageService, env: Environment) extends PreviewService {
 
   /**
    * Count all files
@@ -110,7 +111,6 @@ class MongoDBPreviewService @Inject()(files: FileService, tiles: TileService, st
       PreviewDAO.remove(x)
     }
   }
-
 
   def removePreview(p: Preview) {
     for (tile <- tiles.get(p.id)) {
@@ -227,7 +227,7 @@ class MongoDBPreviewService @Inject()(files: FileService, tiles: TileService, st
    * Get metadata from the mongo db as a map. 
    * 
    */
-   def getMetadata(id: UUID): scala.collection.immutable.Map[String,Any] = {
+  def getMetadata(id: UUID): scala.collection.immutable.Map[String,Any] = {
     PreviewDAO.dao.collection.findOneByID(new ObjectId(id.stringify)) match {
       case None => new scala.collection.immutable.HashMap[String,Any]
       case Some(x) => {
@@ -237,19 +237,15 @@ class MongoDBPreviewService @Inject()(files: FileService, tiles: TileService, st
     }
   }
   
-    def getExtractorId(id: UUID):String = {     
+  def getExtractorId(id: UUID):String = {
       val extractor_id = getMetadata(id)("extractor_id").toString    
       extractor_id
    }
-    
 }
 
 object PreviewDAO extends ModelCompanion[Preview, ObjectId] {
   val COLLECTION = "previews"
-
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Preview, ObjectId](collection = x.collection(COLLECTION)) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Preview, ObjectId](collection = mongoService.collection(COLLECTION)) {}
 }
 

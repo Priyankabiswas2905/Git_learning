@@ -2,7 +2,7 @@ package api
 
 import api.Permission.getUserByIdentity
 import models.{UUID, ResourceRef, User, UserStatus}
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import play.api.mvc._
 import play.api.Play.configuration
 import services._
@@ -123,20 +123,20 @@ object Permission extends Enumeration {
     CreateVocabularyTerm, DeleteVocabularyTerm, EditVocabularyTerm
   )
 
-  lazy val files: FileService = DI.injector.getInstance(classOf[FileService])
-  lazy val previews: PreviewService = DI.injector.getInstance(classOf[PreviewService])
-  lazy val relations: RelationService = DI.injector.getInstance(classOf[RelationService])
-  lazy val collections: CollectionService = DI.injector.getInstance(classOf[CollectionService])
-  lazy val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
-  lazy val spaces: SpaceService = DI.injector.getInstance(classOf[SpaceService])
-  lazy val folders: FolderService = DI.injector.getInstance(classOf[FolderService])
-  lazy val users: services.UserService = DI.injector.getInstance(classOf[services.UserService])
-  lazy val comments: services.CommentService = DI.injector.getInstance(classOf[services.CommentService])
-  lazy val curations: services.CurationService = DI.injector.getInstance(classOf[services.CurationService])
-  lazy val sections: SectionService = DI.injector.getInstance(classOf[SectionService])
-  lazy val metadatas: MetadataService = DI.injector.getInstance(classOf[MetadataService])
-  lazy val vocabularies: VocabularyService = DI.injector.getInstance(classOf[VocabularyService])
-  lazy val vocabularyterms: VocabularyTermService = DI.injector.getInstance(classOf[VocabularyTermService])
+  lazy val files: FileService = DI.injector.instanceOf[FileService]
+  lazy val previews: PreviewService = DI.injector.instanceOf[PreviewService]
+  lazy val relations: RelationService = DI.injector.instanceOf[RelationService]
+  lazy val collections: CollectionService = DI.injector.instanceOf[CollectionService]
+  lazy val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
+  lazy val spaces: SpaceService = DI.injector.instanceOf[SpaceService]
+  lazy val folders: FolderService = DI.injector.instanceOf[FolderService]
+  lazy val users: services.UserService = DI.injector.instanceOf[services.UserService]
+  lazy val comments: services.CommentService = DI.injector.instanceOf[services.CommentService]
+  lazy val curations: services.CurationService = DI.injector.instanceOf[services.CurationService]
+  lazy val sections: SectionService = DI.injector.instanceOf[SectionService]
+  lazy val metadatas: MetadataService = DI.injector.instanceOf[MetadataService]
+  lazy val vocabularies: VocabularyService = DI.injector.instanceOf[VocabularyService]
+  lazy val vocabularyterms: VocabularyTermService = DI.injector.instanceOf[VocabularyTermService]
 
   /** Returns true if the user is listed as a server admin */
 	def checkServerAdmin(user: Option[User]): Boolean = {
@@ -159,7 +159,7 @@ object Permission extends Enumeration {
       case ResourceRef(ResourceRef.curationObject, id) => curations.get(id).exists(x => users.findById(x.author.id).exists(_.id == user.id))
       case ResourceRef(ResourceRef.curationFile, id) => curations.getCurationFiles(List(id)).exists(x => users.findById(x.author.id).exists(_.id == user.id))
       case ResourceRef(ResourceRef.metadata, id) => metadatas.getMetadataById(id).exists(_.creator.id == user.id)
-      case ResourceRef(ResourceRef.vocabulary, id) => vocabularies.get(id).exists(x => users.findByIdentity(x.author.get).exists(_.id == user.id))
+      case ResourceRef(ResourceRef.vocabulary, id) => vocabularies.get(id).exists(vocab => users.findByIdentity(vocab.author.get).exists(_.id == user.id))
       case ResourceRef(_, _) => false
     }
   }
@@ -248,7 +248,8 @@ object Permission extends Enumeration {
   }
 
   def checkPermission(user: Option[User], permission: Permission, resourceRef: Option[ResourceRef] = None): Boolean = {
-    (user, configuration(play.api.Play.current).getString("permissions").getOrElse("public"), resourceRef) match {
+    val config: Configuration = DI.injector.instanceOf[Configuration]
+    (user, config.get[String]("permissions"), resourceRef) match {
       case (Some(u), "public", Some(r)) => {
         if (READONLY.contains(permission))
           true
@@ -256,7 +257,7 @@ object Permission extends Enumeration {
           checkPermission(u, permission, r)
       }
       case (Some(u), "private", Some(r)) => {
-        if (configuration(play.api.Play.current).getBoolean("makeGeostreamsPublicReadable").getOrElse(true) && permission == Permission.ViewGeoStream)
+        if (config.get[Boolean]("makeGeostreamsPublicReadable") && permission == Permission.ViewGeoStream)
           true
         else
           checkPermission(u, permission, r)
@@ -265,7 +266,7 @@ object Permission extends Enumeration {
       case (None, "private", Some(res)) => checkAnonymousPrivatePermissions(permission, res)
       case (None, "public", _) => READONLY.contains(permission)
       case (None, "private", None) => {
-        if (configuration(play.api.Play.current).getBoolean("makeGeostreamsPublicReadable").getOrElse(true) && permission == Permission.ViewGeoStream)
+        if (config.get[Boolean]("makeGeostreamsPublicReadable") && permission == Permission.ViewGeoStream)
           true
         else {
           Logger.debug(s"Private, no user, no resourceRef, permission=${permission}", new Exception())
@@ -423,6 +424,7 @@ object Permission extends Enumeration {
 
   def checkPermission(user: User, permission: Permission, resourceRef: ResourceRef): Boolean = {
     // check if user is owner, in that case they can do what they want.
+    if (checkOwner(users.findByIdentity("userId", "providerId"), resourceRef)) return true
     if (user.superAdminMode) return true
     if (checkOwner(users.findByIdentity(user), resourceRef)) return true
 
@@ -925,7 +927,8 @@ object Permission extends Enumeration {
 
   /** on a private server this will return true iff user logged in, on public server this will always be true */
   def checkPrivateServer(user: Option[User]): Boolean = {
-    configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public" || user.isDefined
+    val config: Configuration = DI.injector.instanceOf[Configuration]
+    config.get[String]("permissions") == "public" || user.isDefined
   }
 
   // Shortcut for changing Map to a PermissionsList object

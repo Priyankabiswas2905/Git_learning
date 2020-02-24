@@ -1,32 +1,39 @@
 package services
 
-import play.api.{Logger, Plugin, Application}
+import akka.actor.ActorSystem
+import javax.inject.Inject
+import play.api.inject.ApplicationLifecycle
+import play.api.{Application, Logger}
 import play.libs.Akka
+
 import scala.concurrent.duration._
 import play.api.libs.concurrent.Execution.Implicits._
+
+import scala.concurrent.Future
+
+trait TempFilesService
 
 /**
  * Plugin for TempFiles.
  */
-class TempFilesPlugin(application: Application) extends Plugin {
+class TempFilesServiceImpl @Inject() (lifecycle: ApplicationLifecycle, actorSystem: ActorSystem) extends TempFilesService {
 
-  val files: FileService =  DI.injector.getInstance(classOf[FileService])
+  val files: FileService =  DI.injector.instanceOf[FileService]
 
-  override def onStart() {
-    Logger.debug("Starting up Temp Files Plugin")
-    //Delete garbage files (ie past intermediate extractor results files) from DB
-    var timeInterval = play.Play.application().configuration().getInt("intermediateCleanup.checkEvery")
-    Akka.system().scheduler.schedule(0.hours, timeInterval.intValue().hours) {
-      files.removeOldIntermediates(None, None)
-    }
+  Logger.debug("Starting up Temp Files Plugin")
+  //Delete garbage files (ie past intermediate extractor results files) from DB
+  var timeInterval = configuration.get[Int]("intermediateCleanup.checkEvery")
+  actorSystem.scheduler.schedule(0.hours, timeInterval.intValue().hours) {
+    files.removeOldIntermediates(None, None)
   }
 
-  override def onStop() {
+  lifecycle.addStopHook { () =>
     Logger.debug("Shutting down Temp Files Plugin")
+    Future.successful(())
   }
 
-  override lazy val enabled = {
-    !application.configuration.getString("filedumpservice").filter(_ == "no").isDefined
+  lazy val enabled = {
+    import play.api.Play.current
+    !current.configuration.getString("filedumpservice").filter(_ == "no").isDefined
   }
-
 }

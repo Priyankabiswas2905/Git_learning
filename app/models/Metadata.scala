@@ -65,7 +65,7 @@ object Agent {
 
   implicit object AgentReads extends Reads[Agent] {
 
-    val userService: UserService = DI.injector.getInstance(classOf[UserService])
+    val userService: UserService = DI.injector.instanceOf[UserService]
 
     def reads(json: JsValue) = {
       //creator(agent) may be User or Extractor depending on the json 
@@ -108,7 +108,7 @@ object Agent {
       //if creator is still None - wrong user input
       creator match {
         case Some(c) => JsSuccess(c)
-        case None => JsError(ValidationError("could not get creator"))
+        case None => JsError("could not get creator")
       }
     }
   }
@@ -145,5 +145,4 @@ object Metadata {
 				"content" -> metadata.content
 				)
 	}
-
 }

@@ -112,8 +112,8 @@ class Vocabularies @Inject() (vocabularyService: VocabularyService, vocabularyTe
     val user = request.user
 
     user match {
-      case Some(identity) => {
-        val result = vocabularyService.getByAuthorAndName(identity, name)
+      case Some(user) => {
+        val result = vocabularyService.getByAuthorAndName(user)
         Ok(toJson(result))
       }
       case None => BadRequest("No user matches that user")
@@ -198,7 +198,8 @@ class Vocabularies @Inject() (vocabularyService: VocabularyService, vocabularyTe
           val units = (each_term \ "units").asOpt[String].getOrElse("")
           val default_value = (each_term \ "default_value").asOpt[String].getOrElse("")
           val description = (each_term \ "description").asOpt[String].getOrElse("")
-          val current_vocabterm: VocabularyTerm = VocabularyTerm(key = key, author = Option(identity), created = new Date(), units = units, default_value = default_value, description = description)
+          val current_vocabterm: VocabularyTerm = VocabularyTerm(key = key, author = Option(identity),
+            created = new Date(), units = units, default_value = default_value, description = description)
 
           vocabularyTermService.insert(current_vocabterm) match {
             case Some(id) => {

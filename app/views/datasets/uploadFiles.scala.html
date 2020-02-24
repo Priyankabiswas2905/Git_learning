@@ -1,5 +1,7 @@
 @(dataset: Dataset, folderId: Option[String])(implicit user: Option[models.User])
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 <!--
 The sections of this file dealing with the multi file uploader library are loosely based on the demo
 of the blueimp jQuery File Upload library. An open source project located here: http://blueimp.github.io/jQuery-File-Upload/

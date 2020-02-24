@@ -1,3 +1,4 @@
+@import services.ToolManagerService
 @(dataset: models.Dataset,
   comments: List[Comment],
   previewers : List[Previewer],
@@ -19,6 +20,8 @@
 @import api.Permission
 @import play.api.Play.current
 @import _root_.util.Formatters._
+@import play.api.i18n.Messages
+@import play.api.i18n.Messages.Implicits._
 
 @main(dataset.name) {
     <link rel="stylesheet" href="@routes.Assets.at("stylesheets/glyphicon-animations.css")">
@@ -205,6 +208,7 @@
                     @if(user.isDefined) {
                         @datasets.userLink(dataset)
                     }
+
                     @if(user.isDefined && play.api.Play.current.configuration.getBoolean("stagingArea").getOrElse(false) && !dataset.trash) {
                         @if(toPublish && currentSpace.isDefined && Permission.checkPermission(Permission.EditStagingArea, ResourceRef(ResourceRef.space, UUID(currentSpace.getOrElse(""))))) {
                             <a id='publish' href="@(routes.CurationObjects.newCO(dataset.id, currentSpace.get))" class="btn btn-link">

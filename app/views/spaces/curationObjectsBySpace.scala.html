@@ -1,5 +1,7 @@
 @(curationObjects: List[models.CurationObject], space: ProjectSpace, isPublic: Option[Boolean])(implicit user: Option[models.User])
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @import api.Permission
 <h3>Published Datasets</h3>
 @if(curationObjects.size == 0) {

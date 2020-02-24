@@ -4,31 +4,23 @@ import javax.net.ssl.SSLSocketFactory
 import play.api.Logger
 import play.api.mvc.{Action}
 import play.api.Play.current
-import securesocial.core.{SecureSocial, UserService}
+
 import services.LdapProvider
 import com.unboundid.ldap.sdk._
 import com.unboundid.util.ssl.{JVMDefaultTrustManager, SSLUtil, TrustAllTrustManager}
+
 import models.UUID
-import securesocial.core._
+
 import play.api.libs.json._
 
 /**
   * Login class for checking if User is still logged through the LDAP.
   */
 class Login extends SecuredController {
-  def isLoggedIn() = Action { implicit request =>
-    val result = for (
-      authenticator <- SecureSocial.authenticatorFromRequest(request);
-      identity <- UserService.find(authenticator.identityId)
-    ) yield {
-      // we should be able to use the authenticator.timedOut directly but it never returns true
-      identity
-    }
 
-    result match {
-      case Some(a) => Ok("yes")
-      case None => Ok("no")
-    }
+  def isLoggedIn() = Action { implicit request =>
+    // TODO check if user is logged in
+    Ok("yes")
   }
 
   def ldap(redirecturl: String, token: String) = Action{ implicit request =>

@@ -104,7 +104,7 @@ class SpacesAPIAppSpec extends PlaySpec with ConfiguredApp with FakeMultipartUpl
  	
  "The Space API Spec must" must {
     "respond to the createSpace() function routed by POST /api/spaces" in {
-      val secretKey = play.api.Play.configuration.getString("commKey").getOrElse("")
+      val secretKey = configuration.get[String]("commKey").getOrElse("")
 
       //link up json file here before fake request.
       val workingDir = System.getProperty("user.dir")
@@ -147,7 +147,7 @@ class SpacesAPIAppSpec extends PlaySpec with ConfiguredApp with FakeMultipartUpl
     }
 
     "respond to the get(id:UUID) function routed by GET /api/spaces/:id  " in {
-      val secretKey = play.api.Play.configuration.getString("commKey").getOrElse("")
+      val secretKey = configuration.get[String]("commKey").getOrElse("")
       val Some(result) = route(FakeRequest(GET, "/api/spaces"))
       info("Status="+status(result))
       status(result) mustEqual OK
@@ -182,14 +182,14 @@ class SpacesAPIAppSpec extends PlaySpec with ConfiguredApp with FakeMultipartUpl
           info("Pretty JSON format")
           info(readableString)
         case e: JsError => {
-          info("Errors: " + JsError.toFlatJson(e).toString())
+          info("Errors: " + JsError.toFlatForm(e).toString())
         }
       }
     }
 
 
     "respond to the removeSpace(id:UUID) function routed by DELETE /api/spaces/:id  " in {
-      val secretKey = play.api.Play.configuration.getString("commKey").getOrElse("")
+      val secretKey = configuration.get[String]("commKey").getOrElse("")
       val Some(result) = route(FakeRequest(GET, "/api/spaces"))
       info("Status="+status(result))
       status(result) mustEqual OK
@@ -224,7 +224,7 @@ class SpacesAPIAppSpec extends PlaySpec with ConfiguredApp with FakeMultipartUpl
           info("Pretty JSON format")
           info(readableString)
         case e: JsError => {
-          info("Errors: " + JsError.toFlatJson(e).toString())
+          info("Errors: " + JsError.toFlatForm(e).toString())
         }
       }
     }

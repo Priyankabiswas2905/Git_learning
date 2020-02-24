@@ -1,5 +1,7 @@
 @(myForm: Form[controllers.spaceInviteData], space: ProjectSpace, creator: Option[User], userRoleMap: Map[User, String], externalUsers: List[User], roleList: List[String], invite:List[SpaceInvite], roleDescription:Map[String, String])(implicit flash: play.api.mvc.Flash, user: Option[models.User])
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @import api.Permission
 @import _root_.util.Formatters._
 

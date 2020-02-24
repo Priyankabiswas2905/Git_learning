@@ -1,18 +1,20 @@
 package services.mongodb
 
 import java.net.URI
-import javax.inject.{Inject, Singleton}
 
+import javax.inject.{Inject, Singleton}
 import api.Permission
 import api.Permission._
-import com.novus.salat.dao.{SalatDAO, ModelCompanion}
+import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import models._
 import org.bson.types.ObjectId
 import play.api.Play._
 import MongoContext.context
-import services.{EventService, MetadataService, CurationService, SpaceService}
+import services._
 import util.Direction._
 import java.util.Date
+
+import com.google.inject.Provider
 import play.api.Logger
 import com.mongodb.casbah.commons.MongoDBObject
 import com.mongodb.casbah.WriteConcern
@@ -21,7 +23,7 @@ import util.Formatters
 
 
 @Singleton
-class MongoDBCurationService  @Inject() (metadatas: MetadataService, spaces: SpaceService, events: EventService)  extends CurationService {
+class MongoDBCurationService  @Inject() (metadatas: Provider[MetadataService], spaces: SpaceService, events: EventService)  extends CurationService {
 
   def insert(curation: CurationObject) = {
 
@@ -238,7 +240,7 @@ class MongoDBCurationService  @Inject() (metadatas: MetadataService, spaces: Spa
   }
 
   def deleteCurationFile(curationFileId: UUID, host: String, apiKey: Option[String], user: Option[User]) : Unit = {
-    metadatas.removeMetadataByAttachTo(ResourceRef(ResourceRef.curationFile, curationFileId), host: String, apiKey, user)
+    metadatas.get().removeMetadataByAttachTo(ResourceRef(ResourceRef.curationFile, curationFileId), host: String, apiKey, user)
     CurationFileDAO.remove(MongoDBObject("_id" ->new ObjectId(curationFileId.stringify)))
   }
 
@@ -319,10 +321,8 @@ class MongoDBCurationService  @Inject() (metadatas: MetadataService, spaces: Spa
  * Salat CurationObject model companion.
  */
 object CurationDAO extends ModelCompanion[CurationObject, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[CurationObject, ObjectId](collection = x.collection("curationObjects")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[CurationObject, ObjectId](collection = mongoService.collection("curationObjects")) {}
 }
 
 
@@ -330,10 +330,8 @@ object CurationDAO extends ModelCompanion[CurationObject, ObjectId] {
  * Salat CurationObjectMetadata model companion.
  */
 object CurationFileDAO extends ModelCompanion[CurationFile, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[CurationFile, ObjectId](collection = x.collection("curationFiles")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[CurationFile, ObjectId](collection = mongoService.collection("curationFiles")) {}
 }
 
 
@@ -341,8 +339,6 @@ object CurationFileDAO extends ModelCompanion[CurationFile, ObjectId] {
  * Salat CurationObjectMetadata model companion.
  */
 object CurationFolderDAO extends ModelCompanion[CurationFolder, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[CurationFolder, ObjectId](collection = x.collection("curationFolders")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[CurationFolder, ObjectId](collection = mongoService.collection("curationFolders")) {}
 }

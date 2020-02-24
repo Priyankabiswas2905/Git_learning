@@ -1,5 +1,7 @@
 @(curationObject: models.CurationObject, repository: String, success: Boolean)(implicit user: Option[models.User] )
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 
 @main("Submitted"){
     <div class="row">

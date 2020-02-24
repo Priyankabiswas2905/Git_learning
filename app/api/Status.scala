@@ -1,13 +1,12 @@
 package api
 
 import javax.inject.Inject
-
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import models.User
 import play.api.Play._
 import play.api.libs.json.{JsValue, Json}
 import services._
-import services.mongodb.MongoSalatPlugin
+import services.mongodb.{MongoSalatPlugin, MongoService}
 
 import scala.collection.mutable
 
@@ -22,7 +21,8 @@ class Status @Inject()(spaces: SpaceService,
                        appConfig: AppConfigurationService,
                        extractors: ExtractorService,
                        versusService: VersusService,
-                       searches: SearchService) extends ApiController {
+                       searches: SearchService,
+                       mongoService: MongoService) extends ApiController {
   val jsontrue = Json.toJson(true)
   val jsonfalse = Json.toJson(false)
 
@@ -59,17 +59,34 @@ class Status @Inject()(spaces: SpaceService,
               jsontrue
             })
       }
+      result.put("postgres", if (Permission.checkServerAdmin(user)) {
+        Json.obj("catalog" -> conn.getCatalog,
+          "schema" -> conn.getSchema,
+          "updates" -> appConfig.getProperty[List[String]]("postgres.updates", List.empty[String]),
+          "status" -> status)
+      } else {
+        Json.obj("status" -> status)
+      })
+    }
+
+      // mongo
+      result.put("mongo", if (Permission.checkServerAdmin(user)) {
+        Json.obj("uri" -> mongoService.mongoURI.toString(),
+          "updates" -> appConfig.getProperty[List[String]]("mongodb.updates", List.empty[String]))
+      } else {
+        jsontrue
+      })
 
       // rabbitmq
-      case p: RabbitmqPlugin => {
-        val status = if (p.connect) {
+    if (current.configuration.getBoolean("clowder.rabbitmq.enabled").getOrElse(false)) {
+        val status = if (rabbitMQService.connect) {
           "connected"
         } else {
           "disconnected"
         }
         result.put("rabbitmq", if (Permission.checkServerAdmin(user)) {
-          Json.obj("uri" -> p.rabbitmquri,
-            "exchange" -> p.exchange,
+          Json.obj("uri" -> rabbitMQService.rabbitmquri,
+            "exchange" -> rabbitMQService.exchange,
             "status" -> status)
         } else {
           Json.obj("status" -> status)

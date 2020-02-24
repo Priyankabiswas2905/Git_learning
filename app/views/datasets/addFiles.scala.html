@@ -1,6 +1,10 @@
 @(dataset: Dataset, folder: Option[Folder], spaces: List[ProjectSpace], folderHierarchy: List[Folder])(implicit user: Option[models.User])
 
 @import _root_.util.Formatters._
+@import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
+
 @main("Add Files") {
     <!-- Custom items for the create dataset workflow -->
     <script src="@routes.Assets.at("javascripts/dataset-attach-fileuploader.js")" type="text/javascript"></script>

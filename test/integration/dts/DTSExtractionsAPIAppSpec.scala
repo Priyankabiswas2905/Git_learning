@@ -55,7 +55,7 @@ class DTSExtractionsAPIAppSpec extends PlaySpec with OneServerPerSuite with Give
     }
     "provide an actual running server for DTS functional test" in {
 
-      val secretKey = play.api.Play.configuration.getString("commKey").getOrElse("")
+      val secretKey = configuration.get[String]("commKey").getOrElse("")
       val client = new DefaultHttpClient()
       val requestUrl = "http://localhost:" + port + "/api/extractions/upload_url?key=" + secretKey
       val httpPost = new HttpPost(requestUrl)

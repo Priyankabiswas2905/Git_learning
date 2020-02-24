@@ -12,6 +12,7 @@ import util.{FileUtils, Formatters, RequiredFieldsConfig, SortingUtils }
 import scala.collection.immutable._
 import scala.collection.mutable.ListBuffer
 import play.api.i18n.Messages
+import play.api.i18n.Messages.Implicits._
 
 /**
  * A dataset is a collection of files and streams.
@@ -32,7 +33,9 @@ class Datasets @Inject() (
     folders: FolderService,
     metadata: MetadataService,
     events: EventService,
-    selections: SelectionService) extends SecuredController {
+    selections: SelectionService,
+    toolService: ToolManagerService,
+    geostreamsService: GeostreamsService) extends SecuredController {
 
   object ActivityFound extends Exception {}
 
@@ -582,7 +585,6 @@ class Datasets @Inject() (
           val parent_space_refs = datasetSpaces.map(space => ResourceRef(ResourceRef.space, space.id))
           canAddDatasetToCollection = !Permission.checkPermissions(Permission.AddResourceToCollection, parent_space_refs).approved.isEmpty
         }
-
         // staging area
         val stagingAreaDefined = play.api.Play.current.configuration.getBoolean("stagingArea").getOrElse(false)
 

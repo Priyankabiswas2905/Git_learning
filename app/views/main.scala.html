@@ -3,6 +3,7 @@
 @import services.AppConfiguration
 @import play.api.i18n.Messages
 @import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 <!DOCTYPE html>
 
 <html lang="en">
@@ -53,7 +54,7 @@
                   <span class="glyphicon-bar"></span>
                   <span class="glyphicon-bar"></span>
                 </button>
-                @services.DI.injector.getInstance(classOf[services.LogoService]).get("GLOBAL", "logo") match {
+                @services.DI.injector.instanceOf[services.LogoService].get("GLOBAL", "logo") match {
                     case Some(logo) => {
                         <a class="navbar-brand" style="padding-top: 5px; padding-bottom: 5px" href="@routes.Application.index">
                             <img class="pull-left" style="height: 100%" src="@api.routes.Logos.downloadPath("GLOBAL", "logo")" alt="LOGO">
@@ -187,7 +188,7 @@
                 </ul>
 
                 <ul class="nav navbar-nav navbar-right">
-                    @if(services.DI.injector.getInstance(classOf[services.SearchService]).isEnabled) {
+                    @if(services.DI.injector.instanceOf[services.SearchService].isEnabled) {
                         <li>
                             <form class="navbar-form" role="search" action="@routes.Search.search("")">
                                 <div class="input-group">
@@ -238,7 +239,7 @@
                                         <a href="@routes.Profile.viewProfileUUID(x.id)">View Profile</a>
                                     </li>
                                     <li>
-                                        <a href="@securesocial.controllers.routes.LoginPage.logout" title="Logout from the system">
+                                        <a href="" title="Logout from the system">
                                             <span class="glyphicon glyphicon-log-out"></span> Logout </a>
                                     </li>
                                 </ul>
@@ -251,7 +252,7 @@
                                 </li>
                             }
                             <li>
-                                <a href="@securesocial.controllers.routes.LoginPage.login" title="Login to the system"><span class="glyphicon glyphicon-log-in"></span> Login</a>
+                                <a href="" title="Login to the system"><span class="glyphicon glyphicon-log-in"></span> Login</a>
                             </li>
                         }
                     }
@@ -339,7 +340,7 @@
                 modalHTML += '<p>Your session has expired as of ' + nowTime.toTimeString() + '.<br />Press OK to log in again.</p>';
                 modalHTML += '</div>';
                 modalHTML += '<div class="modal-footer">';
-                modalHTML += '<a type="button" class="btn btn-primary" href="@securesocial.controllers.routes.LoginPage.logout"><span class="glyphicon glyphicon-ok"></span> OK</a>';
+                modalHTML += '<a type="button" class="btn btn-primary" href=""><span class="glyphicon glyphicon-ok"></span> OK</a>';
                 modalHTML += '</div>';
                 modalHTML += '</div>';
                 modalHTML += '</div>';

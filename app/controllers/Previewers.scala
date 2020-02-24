@@ -1,6 +1,6 @@
 package controllers
 
-import api.Permission
+import api.{Permission, UserRequest}
 import models.Previewer
 import play.api.Play.current
 import play.api.libs.json.Json
@@ -10,6 +10,8 @@ import util.ResourceLister
 
 import scala.collection.mutable.ListBuffer
 import scala.io.Source
+import javax.inject.Inject
+import services.PreviewService
 
 /**
  * Previewers are a way to visualize information about the file, dataset or collection in the web frontend.

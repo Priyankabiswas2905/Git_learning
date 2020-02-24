@@ -1,11 +1,11 @@
 package controllers
 
 import java.net.URL
-import javax.inject.{Inject, Singleton}
 
-import api.Permission
-import api.Permission._
-import play.api.{Logger, Play, Routes}
+import javax.inject.{Inject, Singleton}
+import models.{Event, UUID}
+import play.api.{Environment, Logger, Play}
+import play.api.Play.current
 import play.api.mvc.Action
 import services._
 import models.{Event, UUID, User, UserStatus}
@@ -22,7 +22,7 @@ import scala.collection.mutable.ListBuffer
 @Singleton
 class Application @Inject() (files: FileService, collections: CollectionService, datasets: DatasetService,
                              spaces: SpaceService, events: EventService, comments: CommentService,
-                             sections: SectionService, users: UserService, selections: SelectionService) extends SecuredController {
+                             sections: SectionService, users: UserService, selections: SelectionService, env: Environment) extends SecuredController {
   /**
    * Redirect any url's that have a trailing /
    *
@@ -42,7 +42,7 @@ class Application @Inject() (files: FileService, collections: CollectionService,
     * Returns the swagger documentation customized for this site.
     */
   def swagger = Action  { implicit request =>
-    Play.resource("/public/swagger.yml") match {
+    env.resource("/public/swagger.yml") match {
       case Some(resource) => {
         val https = Utils.https(request)
         val clowderurl = new URL(Utils.baseUrl(request))
@@ -96,7 +96,7 @@ class Application @Inject() (files: FileService, collections: CollectionService,
    * Main page.
    */
   def index = UserAction(needActive = false) { implicit request =>
-    val appConfig: AppConfigurationService = DI.injector.getInstance(classOf[AppConfigurationService])
+    val appConfig: AppConfigurationService = DI.injector.instanceOf[AppConfigurationService]
 
   	implicit val user = request.user
 
@@ -274,7 +274,7 @@ class Application @Inject() (files: FileService, collections: CollectionService,
    */
   def javascriptRoutes = Action { implicit request =>
     Ok(
-      Routes.javascriptRouter("jsRoutes")(
+      play.routing.JavaScriptReverseRouter.create("jsRoutes",
         routes.javascript.Admin.reindexFiles,
         routes.javascript.Admin.createIndex,
         routes.javascript.Admin.buildIndex,

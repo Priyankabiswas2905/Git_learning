@@ -2,8 +2,8 @@ package controllers
 
 import java.util.Date
 import java.net.URLDecoder
-
 import javax.inject.Inject
+
 import api.Permission._
 import api.{ UserRequest, Permission }
 import com.fasterxml.jackson.annotation.JsonValue
@@ -17,12 +17,16 @@ import play.api.libs.json.JsArray
 import services._
 import _root_.util.{ Formatters, RequiredFieldsConfig, Publications }
 import play.api.Play._
+
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ Future, Await }
 import play.api.mvc.{ MultipartFormData, Request, Action, Results }
 import play.api.libs.ws._
+
 import scala.concurrent.duration._
 import play.api.libs.json.Reads._
+import play.api.libs.ws.ahc.AhcWSResponse
+import play.api.i18n.Messages.Implicits._
 
 /**
  * Methods for interacting with the Curation Objects (now referred to as Publication Requests) in the staging area.
@@ -39,7 +43,8 @@ class CurationObjects @Inject() (
   events: EventService,
   userService: UserService,
   metadatas: MetadataService,
-  contextService: ContextLDService) extends SecuredController {
+  contextService: ContextLDService,
+  rabbitMQService: RabbitMQService) extends SecuredController {
 
   /**
    * String name of the Space such as 'Project space' etc., parsed from conf/messages
@@ -662,7 +667,7 @@ class CurationObjects @Inject() (
             case Some(s) => repository = s
             case None => Ok(views.html.spaces.curationSubmitted(c, "No Repository Provided", success))
           }
-          val key = play.api.Play.configuration.getString("commKey").getOrElse("")
+          val key = configuration.get[String]("commKey").getOrElse("")
           val https = controllers.Utils.https(request)
           val hostUrl = api.routes.CurationObjects.getCurationObjectOre(c.id).absoluteURL(https) + "?key=" + key
           val dsLicense = c.datasets(0).licenseData.m_licenseType match {
@@ -814,7 +819,7 @@ class CurationObjects @Inject() (
                 success = true
               } else {
 
-                Logger.error("Error Submitting to Repository: " + response.getAHCResponse.getResponseBody())
+                Logger.error("Error Submitting to Repository: " + response.underlying[AhcWSResponse].ahcResponse.getResponseBody())
               }
           }
 
@@ -833,7 +838,7 @@ class CurationObjects @Inject() (
 
       case Some(c) => {
 
-        val endpoint = play.Play.application().configuration().getString("stagingarea.uri").replaceAll("/$", "") + "/urn:uuid:" + id.toString()
+        val endpoint = configuration.get[String]("stagingarea.uri").replaceAll("/$", "") + "/urn:uuid:" +id.toString()
         Logger.debug(endpoint)
         val futureResponse = WS.url(endpoint).get()
 
@@ -843,7 +848,7 @@ class CurationObjects @Inject() (
               (response.json \ "Status").asOpt[JsValue]
               Ok(response.json)
             } else {
-              Logger.error("Error Getting Status: " + response.getAHCResponse.getResponseBody)
+              Logger.error("Error Getting Status: " + response.underlying[AhcWSResponse].ahcResponse.getResponseBody)
               InternalServerError(toJson("Status object not found."))
             }
         }
@@ -890,8 +895,7 @@ class CurationObjects @Inject() (
   def getPublishedData(space: String) = UserAction(needActive = false) { implicit request =>
     implicit val user = request.user
     implicit val context = scala.concurrent.ExecutionContext.Implicits.global
-
-    val endpoint = play.Play.application().configuration().getString("publishData.list.uri").replaceAll("/$", "")
+    val endpoint = configuration.get[String]("publishData.list.uri").replaceAll("/$", "")
     Logger.debug(endpoint)
     val futureResponse = WS.url(endpoint).get()
     var publishDataList: List[Map[String, String]] = List.empty
@@ -902,7 +906,7 @@ class CurationObjects @Inject() (
           val rawDataList = response.json.as[List[JsValue]]
           rawDataList.reverse
         } else {
-          Logger.error("Error Getting published data: " + response.getAHCResponse.getResponseBody)
+          Logger.error("Error Getting published data: " + response.underlying[AhcWSResponse].ahcResponse.getResponseBody)
           List.empty
         }
     }

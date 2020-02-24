@@ -8,7 +8,7 @@ import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.WriteConcern
 import com.mongodb.casbah.commons.MongoDBObject
 import com.mongodb.DBObject
-import com.novus.salat.dao.{SalatDAO, ModelCompanion}
+import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import models._
 import org.bson.types.ObjectId
 import play.api.Logger
@@ -20,6 +20,7 @@ import securesocial.controllers.Registration._
 import securesocial.core.providers.utils.RoutesHelper
 import services._
 import MongoContext.context
+import com.google.inject.Provider
 import models.Collection
 import models.Dataset
 import models.Role
@@ -34,9 +35,9 @@ class MongoDBSpaceService @Inject() (
   collections: CollectionService,
   files: FileService,
   datasets: DatasetService,
-  users: UserService,
-  curations: CurationService,
-  metadatas: MetadataService,
+  users: Provider[UserService],
+  curations: Provider[CurationService],
+  metadatas: Provider[MetadataService],
   events: EventService) extends SpaceService {
 
   def get(id: UUID): Option[ProjectSpace] = {
@@ -320,16 +321,16 @@ class MongoDBSpaceService @Inject() (
     // only curation objects in this space are removed, since dataset & collection don't need to belong to a space.
     get(id) match {
       case Some(s) => {
-        s.curationObjects.map(c => curations.remove(c, host, apiKey, user))
+        s.curationObjects.map(c => curations.get().remove(c, host, apiKey, user))
         for(follower <- s.followers) {
-          users.unfollowResource(follower, ResourceRef(ResourceRef.space, id))
+          users.get().unfollowResource(follower, ResourceRef(ResourceRef.space, id))
         }
         //Remove all users from the space.
         val spaceUsers = getUsersInSpace(id)
         for(usr <- spaceUsers){
           removeUser(usr.id, id)
         }
-        metadatas.removeDefinitionsBySpace(id)
+        metadatas.get().removeDefinitionsBySpace(id)
       }
       case None =>
     }
@@ -534,7 +535,7 @@ class MongoDBSpaceService @Inject() (
    *
    */
   def addUser(userId: UUID, role: Role, spaceId: UUID): Unit = {
-    users.addUserToSpace(userId, role, spaceId)
+    users.get().addUserToSpace(userId, role, spaceId)
     removeRequest(spaceId, userId)
     ProjectSpaceDAO.update(MongoDBObject("_id" -> new ObjectId(spaceId.stringify)), $inc("userCount" -> 1), upsert=false, multi=false, WriteConcern.Safe)
   }
@@ -546,7 +547,7 @@ class MongoDBSpaceService @Inject() (
    *
    */
   def removeUser(userId: UUID, space: UUID): Unit = {
-    users.removeUserFromSpace(userId, space)
+    users.get().removeUserFromSpace(userId, space)
     ProjectSpaceDAO.update(MongoDBObject("_id" -> new ObjectId(space.stringify)), $inc("userCount" -> -1), upsert=false, multi=false, WriteConcern.Safe)
   }
 
@@ -557,7 +558,7 @@ class MongoDBSpaceService @Inject() (
    *
    */
   def getUsersInSpace(spaceId: UUID): List[User] = {
-      val retList = users.listUsersInSpace(spaceId)
+      val retList = users.get().listUsersInSpace(spaceId)
       retList
   }
 
@@ -568,7 +569,7 @@ class MongoDBSpaceService @Inject() (
    *
    */
   def getRoleForUserInSpace(spaceId: UUID, userId: UUID): Option[Role] = {
-      val retRole = users.getUserRoleInSpace(userId, spaceId)
+      val retRole = users.get().getUserRoleInSpace(userId, spaceId)
       retRole
   }
 
@@ -579,7 +580,7 @@ class MongoDBSpaceService @Inject() (
    *
    */
   def changeUserRole(userId: UUID, role: Role, space: UUID): Unit = {
-      users.changeUserRoleInSpace(userId, role, space)
+      users.get().changeUserRoleInSpace(userId, role, space)
   }
 
   def addCurationObject(spaceId: UUID, curationObjectId: UUID) {
@@ -699,36 +700,28 @@ class MongoDBSpaceService @Inject() (
 
 }
 /**
-   * Salat ProjectSpace model companion.
-   */
-  object ProjectSpaceDAO extends ModelCompanion[ProjectSpace, ObjectId] {
-    val dao = current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("No MongoSalatPlugin");
-      case Some(x) => new SalatDAO[ProjectSpace, ObjectId](collection = x.collection("spaces.projects")) {}
-    }
-  }
+ * Salat ProjectSpace model companion.
+ */
+object ProjectSpaceDAO extends ModelCompanion[ProjectSpace, ObjectId] {
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[ProjectSpace, ObjectId](collection = mongoService.collection("spaces.projects")) {}
+}
 
-  /**
-   * Salat UserSpace model companion.
-   */
-  object UserSpaceDAO extends ModelCompanion[UserSpace, ObjectId] {
-    val dao = current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("No MongoSalatPlugin");
-      case Some(x) => new SalatDAO[UserSpace, ObjectId](collection = x.collection("spaces.users")) {}
-    }
-  }
+/**
+ * Salat UserSpace model companion.
+ */
+object UserSpaceDAO extends ModelCompanion[UserSpace, ObjectId] {
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[UserSpace, ObjectId](collection = mongoService.collection("spaces.users")) {}
+}
 
 
-  object SpaceInviteDAO extends ModelCompanion[SpaceInvite, ObjectId] {
-    val dao = current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("No mongoSalatPlugin");
-      case Some(x) => new SalatDAO[SpaceInvite, ObjectId](collection = x.collection("spaces.invites")) {}
-    }
-  }
+object SpaceInviteDAO extends ModelCompanion[SpaceInvite, ObjectId] {
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[SpaceInvite, ObjectId](collection = mongoService.collection("spaces.invites")) {}
+}
 
-  object ExtractorsForSpaceDAO extends ModelCompanion[ExtractorsForSpace, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[ExtractorsForSpace, ObjectId](collection = x.collection("spaces.extractors")) {}
-  }
+object ExtractorsForSpaceDAO extends ModelCompanion[ExtractorsForSpace, ObjectId] {
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[ExtractorsForSpace, ObjectId](collection = mongoService.collection("spaces.extractors")) {}
 }

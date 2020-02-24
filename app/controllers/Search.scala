@@ -33,6 +33,7 @@ class Search @Inject() (
   /** Search using a simple text string */
   def search(query: String) = PermissionAction(Permission.ViewDataset) { implicit request =>
     implicit val user = request.user
+
     if (searches.isEnabled) {
       Ok(views.html.searchResults(query))
     } else {
@@ -73,29 +74,30 @@ class Search @Inject() (
    * GET the query file from a URL and compare within the database and show the result   
    * */
   def searchbyURL(queryURL: String) = PermissionAction(Permission.ViewDataset).async { implicit request =>
-      implicit val user = request.user
-      val futureFutureListResults = for {
-        indexList <- versusService.getIndexesAsFutureList()
-      } yield {
-        val resultListOfFutures = indexList.map {
-          index =>
-            versusService.queryIndexForURL(queryURL, index.id).map {
-              queryResult =>
-                (index, queryResult)
-            }
-        }
-        //convert list of futures into a Future[list]
-        scala.concurrent.Future.sequence(resultListOfFutures)
-      } //End yield- outer for
-      for {
-        futureListResults <- futureFutureListResults
-        listOfResults <- futureListResults
-      } yield {
-        //get the last part of the image url, send it to the view
-        val lastSlash = queryURL.lastIndexOf("/")
-        val fileName = queryURL.substring(lastSlash + 1)
-        Ok(views.html.multimediaSearchResults(fileName, None, None, listOfResults))
+    implicit val user = request.user
+
+    val futureFutureListResults = for {
+      indexList <- versusService.getIndexesAsFutureList()
+    } yield {
+      val resultListOfFutures = indexList.map {
+        index =>
+          versusService.queryIndexForURL(queryURL, index.id).map {
+            queryResult =>
+              (index, queryResult)
+          }
       }
+      //convert list of futures into a Future[list]
+      scala.concurrent.Future.sequence(resultListOfFutures)
+    } //End yield- outer for
+    for {
+      futureListResults <- futureFutureListResults
+      listOfResults <- futureListResults
+    } yield {
+      //get the last part of the image url, send it to the view
+      val lastSlash = queryURL.lastIndexOf("/")
+      val fileName = queryURL.substring(lastSlash + 1)
+      Ok(views.html.multimediaSearchResults(fileName, None, None, listOfResults))
+    }
   }
 
   /**
@@ -166,7 +168,7 @@ class Search @Inject() (
             //get  string thumbnail id for this file and pass on to view
           val thumb_id = files.get(inputFileId).flatMap(_.thumbnail_id).getOrElse("")
           Ok(views.html.multimediaSearchResults(filename, Some(inputFileId), Some(thumb_id), listOfResults))
-          } //current.plugin[VersusPlugin] match  
+          } //current.plugin[VersusPlugin] match
         } //case Some((inputStream...
 
         case None => {

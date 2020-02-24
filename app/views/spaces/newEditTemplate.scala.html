@@ -1,5 +1,5 @@
 @(myForm: Form[controllers.spaceFormData], title:String, submitButton: Html, spaceId: Option[UUID], spaceName: Option[String])(implicit flash: play.api.mvc.Flash, user: Option[models.User])
-@import play.api.i18n.Messages
+@import play.api.i18n.Messages.Implicits._
 @import helper._
 @import play.api.Play.current
 @import models.SpaceStatus

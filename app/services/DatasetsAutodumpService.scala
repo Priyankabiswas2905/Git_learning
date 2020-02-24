@@ -1,32 +1,40 @@
 package services
 
-import play.api.{ Plugin, Logger, Application }
+import akka.actor.ActorSystem
+import javax.inject.Inject
+import play.api.inject.ApplicationLifecycle
+import play.api.{Application, Configuration, Logger, Play}
 import play.libs.Akka
+
 import scala.concurrent.duration._
 import play.api.libs.concurrent.Execution.Implicits._
+
+import scala.concurrent.Future
+
+trait DatasetsAutodumpService
 
 /**
  * Dataset file groupings automatic dump service.
  */
-class DatasetsAutodumpService (application: Application) extends Plugin {
+class DatasetsAutodumpServiceImpl @Inject() (lifecycle: ApplicationLifecycle, actorSystem: ActorSystem,
+  configuration: Configuration) extends DatasetsAutodumpService {
 
-  val datasets: DatasetService = DI.injector.getInstance(classOf[DatasetService])
-  
-  override def onStart() {
-    Logger.debug("Starting dataset file groupings autodumper Plugin")
-    //Dump dataset file groupings periodically
-    val timeInterval = play.Play.application().configuration().getInt("datasetdump.dumpEvery") 
-	    Akka.system().scheduler.schedule(0.days, timeInterval.intValue().days){
-	      dumpDatasetGroupings
+  val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
+
+  Logger.debug("Starting dataset file groupings autodumper Plugin")
+  //Dump dataset file groupings periodically
+  val timeInterval = configuration.get[Int]("datasetdump.dumpEvery")
+    actorSystem.scheduler.schedule(0.days, timeInterval.intValue().days){
+      dumpDatasetGroupings
 	}
-  }
-  
-  override def onStop() {
+
+  lifecycle.addStopHook { () =>
     Logger.debug("Shutting down dataset file groupings autodumper Plugin")
+    Future.successful(())
   }
 
-  override lazy val enabled = {
-    !application.configuration.getString("datasetsdumpservice").filter(_ == "disabled").isDefined
+  lazy val enabled = {
+    !(configuration.get[String]("datasetsdumpservice") == "disabled")
   }
   
   def dumpDatasetGroupings() = {

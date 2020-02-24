@@ -1,11 +1,8 @@
 package unit
 
 import java.util.Date
-import models.{Tag, UUID, File, Metadata, UserAgent}
-import securesocial.core.{AuthenticationMethod, IdentityId, SocialUser}
-import java.net.URL
-import play.api.libs.json.JsObject
-import models.MiniUser
+
+import models.{File, MiniUser, Tag, UUID}
 
 /**
  * Mixin of default data to use for testing.

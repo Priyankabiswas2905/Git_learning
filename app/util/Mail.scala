@@ -1,10 +1,11 @@
 package util
 
+import akka.actor.ActorSystem
+import javax.inject.Inject
 import models.User
 import play.api.libs.concurrent.Akka
-import play.api.templates.Html
+import play.twirl.api.Html
 import play.api.Logger
-import com.typesafe.plugin._
 import play.api.libs.concurrent.Execution.Implicits._
 import services.{DI, UserService}
 
@@ -12,11 +13,15 @@ import scala.collection.immutable.Iterable
 import scala.collection.mutable
 import scala.concurrent.duration._
 import play.api.Play.current
+import play.api.libs.mailer._
 
 /**
   * Helper functions for sending emails.
   */
 object Mail {
+
+  val actorSystem: ActorSystem = DI.injector.instanceOf[ActorSystem]
+
   /**
    * Send email to a single recipient
    */
@@ -82,7 +87,7 @@ object Mail {
   }
 
   private def getAdmins: List[String] = {
-    val userService: UserService = DI.injector.getInstance(classOf[UserService])
+    val userService: UserService = DI.injector.instanceOf[UserService]
 
     val admins = mutable.ListBuffer[String]()
     val seen = mutable.HashSet[String]()

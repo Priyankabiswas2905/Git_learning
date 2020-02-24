@@ -2,7 +2,7 @@
 @import api.Permission
 @import play.api.libs.json.Json
 @import play.api.Play.current
-@import play.api.i18n.Messages
+@import play.api.i18n.Messages.Implicits._
     <div class="row">
         <div class="col-md-12">
         @if(resourceType == ResourceRef.collection) {
@@ -109,16 +109,9 @@
             @if(resourceType == ResourceRef.dataset) {
                 <h4 class="bottom-padding">Copy Dataset to @Messages("spaces.title")</h4>
                 @spaces.spaceSelect(resourceId, resourceType, "spaceCopySelect", "copyDatasetToSpace('" + resourceId + "')", "Copy", "Copy dataset to " + Messages("space.title"), "copy-to-space-widget")
-            } @* else {
-              <h4>Copy Collection to Space</h4>
-              @spaces.spaceSelect(resourceId, resourceType, "spaceCopySelect", "copyCollectionToSpace('"+resourceId+"')", "Copy", "Copy collection to Space", "copy-to-space-widget")
-
-              }*@
+            }
         }
-
     }
-
-
 
 <link rel="stylesheet" href="@routes.Assets.at("stylesheets/chosen.css")">
 <script src="@routes.Assets.at("javascripts/chosen.jquery.js")" type="text/javascript"></script>

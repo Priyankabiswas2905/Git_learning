@@ -1,30 +1,37 @@
 package api
 
-import java.io.{ByteArrayInputStream, InputStream, ByteArrayOutputStream}
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream}
 import java.security.{DigestInputStream, MessageDigest}
 import java.text.SimpleDateFormat
-import java.util.zip.{ZipEntry, ZipOutputStream, Deflater}
+import java.util.zip.{Deflater, ZipEntry, ZipOutputStream}
 
 import Iterators.RootCollectionIterator
 import _root_.util.JSONLD
 import api.Permission.Permission
 import org.apache.commons.codec.binary.Hex
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import play.api.Play.current
 import models._
-import play.api.libs.iteratee.Enumerator
 import services._
 import play.api.libs.json._
 import play.api.libs.json.{JsObject, JsValue}
 import play.api.libs.json.Json.toJson
-import javax.inject.{ Singleton, Inject}
+import javax.inject.{Inject, Singleton}
+
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.{Future, ExecutionContext}
+import scala.concurrent.{ExecutionContext, Future}
 import play.api.libs.concurrent.Execution.Implicits._
+
 import scala.util.parsing.json.JSONArray
-import scala.util.{Try, Success, Failure}
+import scala.util.{Failure, Success, Try}
 import java.util.{Calendar, Date}
+
+import akka.NotUsed
+import akka.stream.scaladsl.Source
+import akka.util.ByteString
 import controllers.Utils
+import play.api.libs.iteratee.Enumerator
+import play.api.mvc.BaseController
 
 import scala.collection.immutable.List
 
@@ -43,9 +50,10 @@ class Collections @Inject() (datasets: DatasetService,
                              folders : FolderService,
                              files: FileService,
                              metadataService : MetadataService,
-                             adminsNotifierService: AdminsNotifierService) extends ApiController {
+                             adminsNotifierService: AdminsNotifierService,
+                             config: Configuration) extends ApiController with BaseController {
 
-  def createCollection() = PermissionAction(Permission.CreateCollection) (parse.json) { implicit request =>
+  def createCollection() = PermissionAction(Permission.CreateCollection) { implicit request: UserRequest[JsValue] =>
     Logger.debug("Creating new collection")
     (request.body \ "name").asOpt[String].map { name =>
 
@@ -82,7 +90,9 @@ class Collections @Inject() (datasets: DatasetService,
     }.getOrElse(BadRequest(toJson("Missing parameter [name]")))
   }
 
-  def attachDataset(collectionId: UUID, datasetId: UUID) = PermissionAction(Permission.AddResourceToCollection, Some(ResourceRef(ResourceRef.collection, collectionId))) { implicit request =>
+  def attachDataset(collectionId: UUID, datasetId: UUID) =
+    PermissionAction(Permission.AddResourceToCollection, Some(ResourceRef(ResourceRef.collection, collectionId))) { implicit request =>
+
     collections.addDataset(collectionId, datasetId) match {
       case Success(_) => {
         val datasetsInCollection: Int = collections.get(collectionId) match {
@@ -270,6 +280,7 @@ class Collections @Inject() (datasets: DatasetService,
   def listPossibleParents(currentCollectionId : String, title: Option[String], date: Option[String], limit: Int, exact: Boolean) = PrivateServerAction { implicit request =>
     val selfAndAncestors = collections.getSelfAndAncestors(UUID(currentCollectionId))
     val descendants = collections.getAllDescendants(UUID(currentCollectionId)).toList
+
     val allCollections = listCollections(title, date, limit, Set[Permission](Permission.AddResourceToCollection, Permission.EditCollection), false,
       request.user, request.user.fold(false)(_.superAdminMode), exact)
     val possibleNewParents = allCollections.filter(c =>
@@ -362,7 +373,7 @@ class Collections @Inject() (datasets: DatasetService,
             name = s.get
           }
           case e: JsError => {
-            Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+            Logger.error("Errors: " + JsError.toFlatForm(e).toString())
             BadRequest(toJson(s"name data is missing"))
           }
         }
@@ -389,7 +400,7 @@ class Collections @Inject() (datasets: DatasetService,
             description = s.get
           }
           case e: JsError => {
-            Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+            Logger.error("Errors: " + JsError.toFlatForm(e).toString())
             BadRequest(toJson(s"description data is missing"))
           }
         }
@@ -509,7 +520,7 @@ class Collections @Inject() (datasets: DatasetService,
       case Some(followeeModel) => {
         val sourceFollowerIDs = followeeModel.followers
         val excludeIDs = follower.followedEntities.map(typedId => typedId.id) ::: List(followeeUUID, follower.id)
-        val num = play.api.Play.configuration.getInt("number_of_recommendations").getOrElse(10)
+        val num = config.getInt("number_of_recommendations").getOrElse(10)
         userService.getTopRecommendations(sourceFollowerIDs, excludeIDs, num)
       }
       case None => {
@@ -761,10 +772,11 @@ class Collections @Inject() (datasets: DatasetService,
     implicit val user = request.user
     collections.get(id) match {
       case Some(collection) => {
-        val bagit = play.api.Play.configuration.getBoolean("downloadCollectionBagit").getOrElse(true)
+        val bagit = config.get[Boolean]("downloadCollectionBagit")
         // Use custom enumerator to create the zip file on the fly
         // Use a 1MB in memory byte array
-        Ok.chunked(enumeratorFromCollection(collection,1024*1024, compression,bagit,user)).withHeaders(
+        Ok.chunked(Source.fromPublisher(play.api.libs.iteratee.streams.IterateeStreams.enumeratorToPublisher(
+          enumeratorFromCollection(collection,1024*1024, compression,bagit,user)))).withHeaders(
           "Content-Type" -> "application/zip",
           "Content-Disposition" -> ("attachment; filename=\"" + collection.name+ ".zip\"")
         )
@@ -783,12 +795,9 @@ class Collections @Inject() (datasets: DatasetService,
     implicit val pec = ec.prepare()
     val md5Files = scala.collection.mutable.HashMap.empty[String, MessageDigest]
     val md5Bag = scala.collection.mutable.HashMap.empty[String, MessageDigest]
-
     var totalBytes = 0L
-
     val byteArrayOutputStream = new ByteArrayOutputStream(chunkSize)
     val zip = new ZipOutputStream(byteArrayOutputStream)
-
     var bytesSet = false
 
     //val datasetsInCollection = getDatasetsInCollection(collection,user.get)

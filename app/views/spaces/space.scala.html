@@ -1,9 +1,17 @@
-@(space: ProjectSpace, collections: List[Collection], publicDatasets: List[Dataset], datasets: List[Dataset], publishedData: List[play.api.libs.json.JsValue], servicesUrl: String, userRoleMap: Map[User, String], userSelections: List[String])(implicit user: Option[models.User])
+@(space: ProjectSpace,
+        collections: List[Collection],
+        publicDatasets: List[Dataset],
+        datasets: List[Dataset],
+        publishedData: List[play.api.libs.json.JsValue],
+        servicesUrl: String,
+        userRoleMap: Map[User, String],
+        userSelections: List[String])(implicit user: Option[models.User])
 @import play.api.libs.json._
-
-@import play.api.Play.current
 @import api.Permission
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
+
 @main(space.name) {
     @if( space.bannerURL.isDefined || space.logoURL.isDefined){
         <div class="row">

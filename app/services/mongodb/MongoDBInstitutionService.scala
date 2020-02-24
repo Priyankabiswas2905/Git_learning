@@ -1,7 +1,7 @@
 package services.mongodb
 
 import models.Institution
-import services.InstitutionService
+import services.{DI, InstitutionService}
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
 import play.api.Play.current
@@ -30,8 +30,6 @@ class MongoDBInstitutionService extends InstitutionService {
 
 
 object Institution extends ModelCompanion[Institution, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Institution, ObjectId](collection = x.collection("institutions")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Institution, ObjectId](collection = mongoService.collection("institutions")) {}
 }

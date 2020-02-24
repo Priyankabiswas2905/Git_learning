@@ -76,9 +76,9 @@ import services.DI
  */
 
 object Events {
-	val scheduler: SchedulerService =  DI.injector.getInstance(classOf[SchedulerService])
-	val users: UserService =  DI.injector.getInstance(classOf[UserService])
-  val events: EventService =  DI.injector.getInstance(classOf[EventService])
+	val scheduler: SchedulerService =  DI.injector.instanceOf[SchedulerService]
+	val users: UserService =  DI.injector.instanceOf[UserService]
+  val events: EventService =  DI.injector.instanceOf[EventService]
 
  /**
   * Gets the events for each viewer and sends out emails

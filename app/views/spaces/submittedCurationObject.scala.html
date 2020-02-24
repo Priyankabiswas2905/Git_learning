@@ -1,5 +1,7 @@
 @(curationObject: models.CurationObject, files :List[CurationFile], m: List[models.Metadata], limit:Int, spaceName: String)(implicit user: Option[models.User])
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @import helper._
 @import _root_.util.Formatters._
 
@@ -43,7 +45,7 @@
         </span><br/>
         
         <b>@Messages("owner.label")</b>: @curationObject.author.fullName <br/>
-        <b>Created</b>: @curationObject.created.date.format("MMM dd, yyyy") <br/>
+        <b>Created</b>: @curationObject.created <br/>
         <b>Repository</b>: @curationObject.repository.getOrElse("Not selected.") <br/>
         <b>Submitted</b>: @{curationObject.submittedDate match {
         case Some(d) => d.format("MMM dd, yyyy")

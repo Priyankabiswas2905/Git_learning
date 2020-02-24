@@ -1,9 +1,8 @@
 package services
 
 import java.io.IOException
-import java.net.URI
+import java.net.{URI, URLEncoder}
 import java.text.SimpleDateFormat
-import java.net.URLEncoder
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props}
 
@@ -43,6 +42,7 @@ import scala.util.Try
   * @param flags
   * @param secretKey
   */
+
 case class ExtractorMessage(
   msgid: UUID,
   fileId: UUID,
@@ -105,8 +105,6 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   var vhost: String = ""
   var username: String = ""
   var password: String = ""
-  var rabbitmquri: String = ""
-  var exchange: String = ""
   var mgmtPort: String = ""
 
   var globalAPIKey = play.api.Play.configuration.getString("commKey").getOrElse("")
@@ -120,15 +118,20 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     mgmtPort = configuration.getString("clowder.rabbitmq.managmentPort").getOrElse("15672")
     Logger.debug("uri= "+ rabbitmquri)
 
-    try {
-      val uri = new URI(rabbitmquri)
-      factory = Some(new ConnectionFactory())
-      factory.get.setUri(uri)
-    } catch {
-      case t: Throwable => {
-        factory = None
-        Logger.error("Invalid URI for RabbitMQ", t)
-      }
+  Logger.debug("Starting Rabbitmq Plugin")
+  rabbitmquri = configuration.get[String]("clowder.rabbitmq.uri")
+  exchange = configuration.get[String]("clowder.rabbitmq.exchange")
+  mgmtPort = configuration.get[String]("clowder.rabbitmq.managmentPort")
+  Logger.debug("uri= "+ rabbitmquri)
+
+  try {
+    val uri = new URI(rabbitmquri)
+    factory = Some(new ConnectionFactory())
+    factory.get.setUri(uri)
+  } catch {
+    case t: Throwable => {
+      factory = None
+      Logger.error("Invalid URI for RabbitMQ", t)
     }
   }
 
@@ -137,6 +140,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     Logger.debug("Shutting down Rabbitmq Plugin")
     factory = None
     close()
+    Future.successful(())
   }
 
   /** Check if play plugin is enabled **/
@@ -190,8 +194,6 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   def connect: Boolean = {
     if (channel.isDefined) return true
     if (!factory.isDefined) return true
-
-    val configuration = play.api.Play.configuration
 
     try {
       val protocol = if (factory.get.isSSL) "https://" else "http://"
@@ -788,7 +790,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   // ----------------------------------------------------------------------
   // RABBITMQ MANAGEMENT ENDPOINTS
   // ----------------------------------------------------------------------
-  def getRestEndPoint(path: String): Future[Response] = {
+  def getRestEndPoint(path: String): Future[WSResponse] = {
     connect
 
     restURL match {
@@ -1130,9 +1132,7 @@ class PublishDirectActor(channel: Channel, replyQueueName: String) extends Actor
       } catch {
         case e: Exception => {
           Logger.error("Error connecting to rabbitmq broker", e)
-          current.plugin[RabbitmqPlugin].foreach {
-            _.close()
-          }
+          rabbitmqService.close()
         }
       }
     }
@@ -1162,7 +1162,7 @@ class MsgConsumer(channel: Channel, target: ActorRef) extends DefaultConsumer(ch
   * Actual message on reply queue.
   */
 class EventFilter(channel: Channel, queue: String) extends Actor {
-  val extractions: ExtractionService = DI.injector.getInstance(classOf[ExtractionService])
+  val extractions: ExtractionService = DI.injector.instanceOf[ExtractionService]
 
   def receive = {
     case statusBody: String =>

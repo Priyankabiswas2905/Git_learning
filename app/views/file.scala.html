@@ -8,7 +8,9 @@
 		view_count: Int, view_date: java.util.Date)(implicit user: Option[models.User], request: RequestHeader)
 
 @import helper._
+@import play.api.i18n.Messages
 @import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @import api.Permission
 @import _root_.util.FileUtils
 @import _root_.util.Formatters._
@@ -73,7 +75,7 @@
 			Configuration.expressInstallPath = "@(routes.Assets.at("plugins") + "/" + "expressInstall.swf")";
 			Configuration.jsPath = "@(routes.Assets.at("javascripts"))";
 			Configuration.imagesPath = "@(routes.Assets.at("images"))";
-			Configuration.appContext = "@play.api.Play.configuration.getString("application.context").getOrElse("")";
+			Configuration.appContext = "@configuration.get[String]("application.context").getOrElse("")";
 			var cur_description;
 			function updateFileDescription() {
 				cur_description = $('#ds_description').html().trim();
@@ -328,7 +330,7 @@
 							</button>
 						}
                         @if(Permission.checkPermission(Permission.EditFile, ResourceRef(ResourceRef.file, file.id))
-                                && play.api.Play.current.plugin[services.RabbitmqPlugin].isDefined) {
+                                && current.configuration.getBoolean("clowder.rabbitmq.enabled").getOrElse(false) == true) {
                             <a href="@routes.Extractors.submitFileExtraction(UUID(id))" class="btn btn-link" >
                                 <span class="glyphicon glyphicon-send"></span>
                                 Submit for extraction

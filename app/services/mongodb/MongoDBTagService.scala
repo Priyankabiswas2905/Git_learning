@@ -107,7 +107,7 @@ class MongoDBTagService @Inject()(files: FileService, datasets: DatasetService, 
    *      id:       the id in the original addTags call
    *      request:  the request in the original addTags call
    *  Return type:
-   *      play.api.mvc.SimpleResult[JsValue]
+   *      play.api.mvc.Result[JsValue]
    *      in the form of Ok, NotFound and BadRequest
    *      where: Ok contains the JsObject: "status" -> "success", the other two contain a JsString,
    *      which contains the cause of the error, such as "No 'tags' specified", and
@@ -162,8 +162,6 @@ class MongoDBTagService @Inject()(files: FileService, datasets: DatasetService, 
 }
 
 object Tag extends ModelCompanion[Tag, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Tag, ObjectId](collection = x.collection("tags")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Tag, ObjectId](collection = mongoService.collection("tags")) {}
 }

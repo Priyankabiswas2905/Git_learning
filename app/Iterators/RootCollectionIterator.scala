@@ -160,7 +160,7 @@ class RootCollectionIterator(pathToFolder : String, root_collection : models.Col
     }
   }
 
-  def next() = {
+  def next(): Option[InputStream] = {
     file_type match {
       //collection info
       case 0 => {

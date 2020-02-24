@@ -2,9 +2,8 @@ package services.mongodb
 
 import com.mongodb.casbah.commons.MongoDBObject
 import com.mongodb.casbah.Imports._
-
-import services.TempFileService
-import models.{UUID, TempFile}
+import services.{DI, TempFileService}
+import models.{TempFile, UUID}
 import javax.inject.Singleton
 import org.bson.types.ObjectId
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
@@ -34,9 +33,7 @@ class MongoDBTempFileService extends TempFileService {
 }
 
 object TempFileDAO extends ModelCompanion[TempFile, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[TempFile, ObjectId](collection = x.collection("uploadquery")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[TempFile, ObjectId](collection = mongoService.collection("uploadquery")) {}
 }
 

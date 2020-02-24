@@ -1,16 +1,16 @@
 package api
 
 import api.Permission.Permission
+import com.google.inject.Inject
 import models.{ClowderUser, ResourceRef, User, UserStatus}
 import org.apache.commons.codec.binary.Base64
-import org.mindrot.jbcrypt.BCrypt
 import play.api.Logger
-import play.api.mvc._
-import securesocial.core.providers.UsernamePasswordProvider
-import securesocial.core.{Authenticator, SecureSocial, UserService}
+import play.api.i18n.I18nSupport
+import play.api.libs.json.JsValue
+import play.api.mvc.{ControllerComponents, _}
 import services.{AppConfiguration, DI}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
  * Action builders check permissions in API calls. When creating a new endpoint, pick one of the actions defined below.
@@ -23,13 +23,15 @@ import scala.concurrent.Future
  * PermissionAction: call the wrapped code iff the user has the right permission on the reference object.
  *
  */
-trait ApiController extends Controller {
+trait ApiController extends BaseController with I18nSupport {
 
   val userservice = DI.injector.getInstance(classOf[services.UserService])
 
   /** get user if logged in */
-  def UserAction(needActive: Boolean) = new ActionBuilder[UserRequest] {
-    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[SimpleResult]) = {
+  def UserAction(needActive: Boolean) = new ActionBuilder[UserRequest, JsValue] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[JsValue] = controllerComponents.parsers.json
+    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
         case Some(u) if !AppConfiguration.acceptedTermsOfServices(u.termsOfServices) => Future.successful(Unauthorized("Terms of Service not accepted"))
@@ -42,8 +44,10 @@ trait ApiController extends Controller {
   /**
    * Use when you want to require the user to be logged in on a private server or the server is public.
    */
-  def PrivateServerAction = new ActionBuilder[UserRequest] {
-    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[SimpleResult]) = {
+  def PrivateServerAction = new ActionBuilder[UserRequest, JsValue] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[JsValue] = controllerComponents.parsers.json
+    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
         case Some(u) if !AppConfiguration.acceptedTermsOfServices(u.termsOfServices) => Future.successful(Unauthorized("Terms of Service not accepted"))
@@ -56,8 +60,10 @@ trait ApiController extends Controller {
   }
 
   /** call code iff user is logged in */
-  def AuthenticatedAction = new ActionBuilder[UserRequest] {
-    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[SimpleResult]) = {
+  def AuthenticatedAction = new ActionBuilder[UserRequest, JsValue] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[JsValue] = controllerComponents.parsers.json
+    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
         case Some(u) if !AppConfiguration.acceptedTermsOfServices(u.termsOfServices) => Future.successful(Unauthorized("Terms of Service not accepted"))
@@ -69,8 +75,10 @@ trait ApiController extends Controller {
   }
 
   /** call code iff user is a server admin */
-  def ServerAdminAction = new ActionBuilder[UserRequest] {
-    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[SimpleResult]) = {
+  def ServerAdminAction = new ActionBuilder[UserRequest, JsValue] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[JsValue] = controllerComponents.parsers.json
+    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
         case Some(u) if !AppConfiguration.acceptedTermsOfServices(u.termsOfServices) => Future.successful(Unauthorized("Terms of Service not accepted"))
@@ -82,8 +90,10 @@ trait ApiController extends Controller {
   }
 
   /** call code iff user has right permission for resource */
-  def PermissionAction(permission: Permission, resourceRef: Option[ResourceRef] = None, affectedResource: Option[ResourceRef] = None) = new ActionBuilder[UserRequest] {
-    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[SimpleResult]) = {
+  def PermissionAction(permission: Permission, resourceRef: Option[ResourceRef] = None, affectedResource: Option[ResourceRef] = None) = new ActionBuilder[UserRequest, JsValue] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[JsValue] = controllerComponents.parsers.json
+    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       val userRequest = getUser(request)
       userRequest.user match {
         case Some(u) if !AppConfiguration.acceptedTermsOfServices(u.termsOfServices) => Future.successful(Unauthorized("Terms of Service not accepted"))
@@ -105,8 +115,10 @@ trait ApiController extends Controller {
    * Disable a route without having to comment out the entry in the routes file. Useful for when we want to keep the
    * code around but we don't want users to have access to it.
    */
-  def DisabledAction = new ActionBuilder[UserRequest] {
-    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[SimpleResult]) = {
+  def DisabledAction = new ActionBuilder[UserRequest, JsValue] {
+    override protected def executionContext: ExecutionContext = controllerComponents.executionContext
+    override def parser: BodyParser[JsValue] = controllerComponents.parsers.json
+    def invokeBlock[A](request: Request[A], block: (UserRequest[A]) => Future[Result]) = {
       Future.successful(Unauthorized("Disabled"))
     }
   }
@@ -152,7 +164,6 @@ trait ApiController extends Controller {
     request.headers.get("Authorization").foreach { authHeader =>
       val header = new String(Base64.decodeBase64(authHeader.slice(6, authHeader.length).getBytes))
       val credentials = header.split(":")
-
       UserService.findByEmailAndProvider(credentials(0), UsernamePasswordProvider.UsernamePassword).foreach { identity =>
         val user = DI.injector.getInstance(classOf[services.UserService]).findByIdentity(identity)
         if (BCrypt.checkpw(credentials(1), identity.passwordInfo.get.password)) {
@@ -171,6 +182,7 @@ trait ApiController extends Controller {
               return UserRequest(None, request, None)
           }
         }
+        return UserRequest(user, request)
       }
     }
 
@@ -189,8 +201,8 @@ trait ApiController extends Controller {
 
     // 4) check api key, either the global one in the config file or the user key in the database
     request.queryString.get("key").foreach { key =>
-      val userservice = DI.injector.getInstance(classOf[services.UserService])
-      val commkey = play.Play.application().configuration().getString("commKey")
+      val userservice = DI.injector.instanceOf[services.UserService]
+      val commkey = configuration.get[String]("commKey")
       key.foreach { realkey =>
         // check to see if this is the global key
         if (realkey == commkey) {

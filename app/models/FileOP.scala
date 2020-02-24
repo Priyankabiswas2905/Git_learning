@@ -12,8 +12,8 @@ object FileOP {
    * 
    */
   
-  val previews: PreviewService=DI.injector.getInstance(classOf[PreviewService])
-  val files:FileService=DI.injector.getInstance(classOf[FileService])
+  val previews: PreviewService=DI.injector.instanceOf[PreviewService]
+  val files:FileService=DI.injector.instanceOf[FileService]
   
   def extractTags(file: models.File) = {
     val tags = file.tags

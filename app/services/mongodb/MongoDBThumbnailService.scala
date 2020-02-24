@@ -2,11 +2,12 @@ package services.mongodb
 
 import java.io.InputStream
 import java.util.Date
+
 import org.bson.types.ObjectId
-import services.{ByteStorageService, ThumbnailService}
+import services.{ByteStorageService, DI, ThumbnailService}
 import models.{Thumbnail, UUID}
 import com.mongodb.casbah.commons.MongoDBObject
-import javax.inject.{Inject}
+import javax.inject.Inject
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import MongoContext.context
 import play.api.Play.current
@@ -73,11 +74,7 @@ class MongoDBThumbnailService @Inject()(storage: ByteStorageService) extends Thu
 
   object ThumbnailDAO extends ModelCompanion[Thumbnail, ObjectId] {
     val COLLECTION = "thumbnails"
-
-    val dao = current.plugin[MongoSalatPlugin] match {
-      case None => throw new RuntimeException("No MongoSalatPlugin");
-      case Some(x) => new SalatDAO[Thumbnail, ObjectId](collection = x.collection(COLLECTION)) {}
-    }
+    val mongoService = DI.injector.instanceOf[MongoService]
+    val dao = new SalatDAO[Thumbnail, ObjectId](collection = mongoService.collection(COLLECTION)) {}
   }
-
 }

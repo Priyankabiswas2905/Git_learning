@@ -1,5 +1,7 @@
 @(links: List[java.net.URL], space:models.ProjectSpace, classes: String)(implicit user: Option[models.User])
 @import play.api.i18n.Messages
+@import play.api.Play.current
+@import play.api.i18n.Messages.Implicits._
 @import api.Permission
 
 <div class="@classes">

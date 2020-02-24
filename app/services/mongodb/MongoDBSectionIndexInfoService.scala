@@ -5,7 +5,7 @@ import MongoContext.context
 import play.api.Play.current
 import com.mongodb.casbah.Imports._
 import play.api.Logger
-import services.SectionIndexInfoService
+import services.{DI, SectionIndexInfoService}
 import models.{SectionIndexInfo, UUID}
 
 /**
@@ -89,8 +89,6 @@ class MongoDBSectionIndexInfoService extends SectionIndexInfoService {
 }
 
 object SectionIndexInfoDAO extends ModelCompanion[SectionIndexInfo, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[SectionIndexInfo, ObjectId](collection = x.collection("sectionIndexInfo")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[SectionIndexInfo, ObjectId](collection = mongoService.collection("sectionIndexInfo")) {}
 }

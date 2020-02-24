@@ -3,13 +3,14 @@ package services.mongodb
 import java.io._
 import java.text.SimpleDateFormat
 import java.util.{ArrayList, Date}
-import javax.inject.{Inject, Singleton}
 
+import javax.inject.{Inject, Singleton}
 import Transformation.LidoToCidocConvertion
 import util.{Formatters, Parsers}
 import api.Permission
 import api.Permission.Permission
 import com.mongodb.DBObject
+import com.google.inject.Provider
 import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.WriteConcern
 import com.mongodb.casbah.commons.MongoDBList
@@ -21,7 +22,7 @@ import models.{File, _}
 import org.apache.commons.io.FileUtils
 import org.bson.types.ObjectId
 import org.json.JSONObject
-import play.api.Logger
+import play.api.{Configuration, Logger}
 import play.api.Play._
 import play.api.libs.json.Json._
 import play.api.libs.json.{JsArray, JsValue, Json}
@@ -41,7 +42,7 @@ import scala.util.parsing.json.JSONArray
 @Singleton
 class MongoDBDatasetService @Inject() (
   collections: CollectionService,
-  files: FileService,
+  files: Provider[FileService],
   comments: CommentService,
   spaces: SpaceService,
   userService: UserService,
@@ -49,7 +50,8 @@ class MongoDBDatasetService @Inject() (
   metadatas:MetadataService,
   events: EventService,
   appConfig: AppConfigurationService,
-  searches: SearchService) extends DatasetService {
+  searches: SearchService,
+  configuration: Configuration) extends DatasetService {
 
   object MustBreak extends Exception {}
 
@@ -341,10 +343,10 @@ class MongoDBDatasetService @Inject() (
     // - access  == show all datasets the user can see
     // - default == public only
     val public = MongoDBObject("public" -> true)
-    val enablePublic = play.Play.application().configuration().getBoolean("enablePublic")
+    val enablePublic = configuration.get[Boolean]("enablePublic")
     //emptySpaces should not be used in most cases since your dataset maybe in a space, then you are changed to viewer or kicked off.
     val emptySpaces = MongoDBObject("spaces" -> List.empty)
-    val publicSpaces = spaces.listByStatus(SpaceStatus.PUBLIC.toString).map(s => new ObjectId(s.id.stringify))
+    val publicSpaces = spaces.get().listByStatus(SpaceStatus.PUBLIC.toString).map(s => new ObjectId(s.id.stringify))
 
     val filterTrash = if (showTrash == false)  {
       MongoDBObject("trash"->false)
@@ -355,7 +357,7 @@ class MongoDBDatasetService @Inject() (
     }
 
     // create access filter
-    val filterAccess = if (showAll || configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public" && permissions.contains(Permission.ViewDataset)) {
+    val filterAccess = if (showAll || configuration.get[String]("permissions") == "public" && permissions.contains(Permission.ViewDataset)) {
       MongoDBObject()
     } else {
       user match {
@@ -385,7 +387,7 @@ class MongoDBDatasetService @Inject() (
           val permissionsString = permissions.map(_.toString)
           val okspaces = if (showOnlyShared){
             u.spaceandrole.filter(_.role.permissions.intersect(permissionsString).nonEmpty).filter((p: UserSpaceAndRole)=>
-              (spaces.get(p.spaceId) match {
+              (spaces.get().get(p.spaceId) match {
                 case Some(space) => {
                   if (space.userCount > 1){
                     true
@@ -588,7 +590,7 @@ class MongoDBDatasetService @Inject() (
 
   private def buildTagFilter(user: Option[User]): MongoDBObject = {
     val orlist = collection.mutable.ListBuffer.empty[MongoDBObject]
-    if(!(configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public")){
+    if(!(configuration.get[String]("permissions") == "public")){
       user match {
         case Some(u) if u.superAdminMode => orlist += MongoDBObject()
         case Some(u) if !u.superAdminMode => {
@@ -723,7 +725,7 @@ class MongoDBDatasetService @Inject() (
   }
 
   def findByTag(tag: String, user: Option[User]): List[Dataset] = {
-    if(configuration(play.api.Play.current).getString("permissions").getOrElse("public") == "public"){
+    if(configuration.get[String]("permissions") == "public"){
       Dataset.dao.find(MongoDBObject("tags.name" -> tag)).toList
     } else {
       Dataset.dao.find(buildTagFilter(user) ++
@@ -871,7 +873,7 @@ class MongoDBDatasetService @Inject() (
   }
 
   def updateName(id: UUID, name: String) {
-    events.updateObjectName(id, name)
+    events.get().updateObjectName(id, name)
     val result = Dataset.update(MongoDBObject("_id" -> new ObjectId(id.stringify)),
       $set("name" -> name),
       false, false, WriteConcern.Safe)
@@ -938,7 +940,7 @@ class MongoDBDatasetService @Inject() (
     val dataset = get(id).get
     val existingTags = dataset.tags.filter(x => userIdStr == x.userId && eid == x.extractor_id).map(_.name)
     val createdDate = new Date
-    val maxTagLength = play.api.Play.configuration.getInt("clowder.tagLength").getOrElse(100)
+    val maxTagLength = configuration.get[Int]("clowder.tagLength")
     tags.foreach(tag => {
       val shortTag = if (tag.length > maxTagLength) {
         Logger.error("Tag is truncated to " + maxTagLength + " chars : " + tag)
@@ -1286,10 +1288,10 @@ class MongoDBDatasetService @Inject() (
           folders.delete(folder, host, apiKey, user)
         }
         for (follower <- dataset.followers) {
-          userService.unfollowDataset(follower, id)
+          userService.get().unfollowDataset(follower, id)
         }
         for(space <- dataset.spaces) {
-          spaces.removeDataset(dataset.id, space)
+          spaces.get().removeDataset(dataset.id, space)
         }
         metadatas.removeMetadataByAttachTo(ResourceRef(ResourceRef.dataset, id), host, apiKey, user)
         Dataset.remove(MongoDBObject("_id" -> new ObjectId(dataset.id.stringify)))
@@ -1316,7 +1318,7 @@ class MongoDBDatasetService @Inject() (
       MongoDBObject("_id" -> new ObjectId(datasetId.stringify)),
       $addToSet("spaces" -> Some(new ObjectId(spaceId.stringify))),
       false, false)
-    if (get(datasetId).exists(_.isTRIAL == true) && spaces.get(spaceId).exists(_.isTrial == false)) {
+    if (get(datasetId).exists(_.isTRIAL == true) && spaces.get().get(spaceId).exists(_.isTrial == false)) {
       Dataset.update(MongoDBObject("_id" -> new ObjectId(datasetId.stringify)),
         $set("status" -> DatasetStatus.DEFAULT.toString),
         false, false)
@@ -1332,7 +1334,7 @@ class MongoDBDatasetService @Inject() (
     if (play.Play.application().configuration().getBoolean("verifySpaces")) {
 
       get(datasetId) match {
-        case Some(d) if !d.spaces.map(s => spaces.get(s)).flatten.exists(_.isTrial == false) =>
+        case Some(d) if !d.spaces.map(s => spaces.get().get(s)).flatten.exists(_.isTrial == false) =>
           Dataset.update(MongoDBObject("_id" -> new ObjectId(datasetId.stringify)),
             $set("status" -> DatasetStatus.TRIAL.toString),
             false, false)
@@ -1346,10 +1348,10 @@ class MongoDBDatasetService @Inject() (
 
 		    val fileSep = System.getProperty("file.separator")
 		    val lineSep = System.getProperty("line.separator")
-		    var dsMdDumpDir = play.api.Play.configuration.getString("datasetdump.dir").getOrElse("")
+		    var dsMdDumpDir = configuration.get[String]("datasetdump.dir")
 			if(!dsMdDumpDir.endsWith(fileSep))
 				dsMdDumpDir = dsMdDumpDir + fileSep
-			var dsMdDumpMoveDir = play.api.Play.configuration.getString("datasetdumpmove.dir").getOrElse("")
+			var dsMdDumpMoveDir = configuration.get[String]("datasetdumpmove.dir")
 			if(dsMdDumpMoveDir.equals("")){
 				Logger.warn("Will not move dumped datasets metadata to staging directory. No staging directory set.")
 			}
@@ -1413,10 +1415,10 @@ class MongoDBDatasetService @Inject() (
 
 		    val fileSep = System.getProperty("file.separator")
 		    val lineSep = System.getProperty("line.separator")
-		    var datasetsDumpDir = play.api.Play.configuration.getString("datasetdump.dir").getOrElse("")
+		    var datasetsDumpDir = configuration.get[String]("datasetdump.dir").getOrElse("")
 			if(!datasetsDumpDir.endsWith(fileSep))
 				datasetsDumpDir = datasetsDumpDir + fileSep
-			var dsDumpMoveDir = play.api.Play.configuration.getString("datasetdumpmove.dir").getOrElse("")
+			var dsDumpMoveDir = configuration.get[String]("datasetdumpmove.dir").getOrElse("")
 			if(dsDumpMoveDir.equals("")){
 				Logger.warn("Will not move dumped dataset groupings to staging directory. No staging directory set.")
 			}
@@ -1525,17 +1527,13 @@ class MongoDBDatasetService @Inject() (
 }
 
 object Dataset extends ModelCompanion[Dataset, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[Dataset, ObjectId](collection = x.collection("datasets")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[Dataset, ObjectId](collection = mongoService.collection("datasets")) {}
 }
 
 object DatasetXMLMetadata extends ModelCompanion[DatasetXMLMetadata, ObjectId] {
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[DatasetXMLMetadata, ObjectId](collection = x.collection("datasetxmlmetadata")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[DatasetXMLMetadata, ObjectId](collection = mongoService.collection("datasetxmlmetadata")) {}
 }
 
 /**
@@ -1544,12 +1542,8 @@ object DatasetXMLMetadata extends ModelCompanion[DatasetXMLMetadata, ObjectId] {
  * services classes that utilize it.
  */
 object LicenseData extends ModelCompanion[LicenseData, ObjectId] {
-//  val collection = MongoConnection()("test-alt")("licensedata")
-//  val dao = new SalatDAO[LicenseData, ObjectId](collection = collection) {}
-  val dao = current.plugin[MongoSalatPlugin] match {
-    case None => throw new RuntimeException("No MongoSalatPlugin");
-    case Some(x) => new SalatDAO[LicenseData, ObjectId](collection = x.collection("licensedata")) {}
-  }
+  val mongoService = DI.injector.instanceOf[MongoService]
+  val dao = new SalatDAO[LicenseData, ObjectId](collection = mongoService.collection("licensedata")) {}
 }
 
 object DatasetStats extends ModelCompanion[StatisticUser, ObjectId] {
