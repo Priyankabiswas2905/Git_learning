@@ -60,9 +60,6 @@ class Search @Inject() (
   def searchJson(query: String, grouping: String, from: Option[Int], size: Option[Int]) = PermissionAction(Permission.ViewDataset) {
     implicit request =>
       implicit val user = request.user
-      if (config.get[Boolean]("elasticsearchSettings.enabled")) {
-        val queryList = Json.parse(query).as[List[JsValue]]
-        val results = elasticsearchService.search(queryList, grouping)
 
       if (searches.isEnabled) {
         val queryList = Json.parse(query).as[List[JsValue]]
@@ -75,7 +72,7 @@ class Search @Inject() (
 
   /**
    * Search MultimediaFeatures.
-   */?
+   */
   def searchMultimediaIndex(section_id: UUID) = PermissionAction(Permission.ViewSection, Some(ResourceRef(ResourceRef.section, section_id))) {
     implicit request =>
 

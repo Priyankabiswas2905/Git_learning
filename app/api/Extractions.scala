@@ -46,8 +46,8 @@ class Extractions @Inject()(
    * This may change accordingly.
    */
   def uploadExtract(showPreviews: String = "DatasetLevel", extract: Boolean = true) = PermissionAction(Permission.AddFile)(parse.multipartFormData) { implicit request =>
-    val uploadedFiles = _root_.util.FileUtils.uploadFilesMultipart(request, key="File", index=false,
-      showPreviews=showPreviews, runExtractors=extract, insertDTSRequests = true, apiKey=request.apiKey)
+    val uploadedFiles = _root_.util.FileUtils.uploadFilesMultipart(request, key = "File", index = false,
+      showPreviews = showPreviews, runExtractors = extract, insertDTSRequests = true, apiKey = request.apiKey)
     uploadedFiles.length match {
       case 0 => BadRequest("No files uploaded")
       case 1 => Ok(toJson(Map("id" -> uploadedFiles.head.id)))
@@ -60,8 +60,8 @@ class Extractions @Inject()(
    *
    */
   def uploadByURL(extract: Boolean = true) = PermissionAction(Permission.AddFile)(parse.json) { implicit request =>
-    val uploadedFiles = _root_.util.FileUtils.uploadFilesJSON(request, key="fileurl", index=false, runExtractors=extract,
-      insertDTSRequests = true, apiKey=request.apiKey)
+    val uploadedFiles = _root_.util.FileUtils.uploadFilesJSON(request, key = "fileurl", index = false, runExtractors = extract,
+      insertDTSRequests = true, apiKey = request.apiKey)
     uploadedFiles.length match {
       case 0 => BadRequest("No fileurls uploaded")
       case 1 => Ok(toJson(Map("id" -> uploadedFiles.head.id)))
@@ -74,65 +74,65 @@ class Extractions @Inject()(
    *
    */
   def multipleUploadByURL() = PermissionAction(Permission.AddFile).async(parse.json) { implicit request =>
-      request.user match {
-        case Some(user) => {
-          val pageurl = request.body.\("webPageURL").as[String]
-          val fileurlsjs = request.body.\("fileurls").asOpt[List[String]]
-          Logger.debug("[multipleUploadByURLs] file Urls=" + fileurlsjs)
-          val listURLs = fileurlsjs.getOrElse(List())
-          val listIds = for {fileurl <- listURLs} yield {
-            val urlsplit = fileurl.split("/")
-            val filename = urlsplit(urlsplit.length - 1)
-            val futureResponse = ws.url(fileurl).get()
-            val fid = for {response <- futureResponse} yield {
-              if (response.status == 200) {
-                implicit val materializer = ActorMaterializer()
-                val inputStream: InputStream = response.bodyAsSource.runWith(
-                  StreamConverters.asInputStream(FiniteDuration(3, TimeUnit.SECONDS))
-                )
-                val contentLengthStr = response.header("Content-Length").getOrElse("-1")
-                val contentLength = Integer.parseInt(contentLengthStr).toLong
-                val file = files.save(inputStream, filename, contentLength, response.header("Content-Type"), user, null)
-                file match {
-                  case Some(f) => {
-                    // Add new file & byte count to appConfig
-                    appConfig.incrementCount('files, 1)
-                    appConfig.incrementCount('bytes, f.length)
+    request.user match {
+      case Some(user) => {
+        val pageurl = request.body.\("webPageURL").as[String]
+        val fileurlsjs = request.body.\("fileurls").asOpt[List[String]]
+        Logger.debug("[multipleUploadByURLs] file Urls=" + fileurlsjs)
+        val listURLs = fileurlsjs.getOrElse(List())
+        val listIds = for {fileurl <- listURLs} yield {
+          val urlsplit = fileurl.split("/")
+          val filename = urlsplit(urlsplit.length - 1)
+          val futureResponse = ws.url(fileurl).get()
+          val fid = for {response <- futureResponse} yield {
+            if (response.status == 200) {
+              implicit val materializer = ActorMaterializer()
+              val inputStream: InputStream = response.bodyAsSource.runWith(
+                StreamConverters.asInputStream(FiniteDuration(3, TimeUnit.SECONDS))
+              )
+              val contentLengthStr = response.header("Content-Length").getOrElse("-1")
+              val contentLength = Integer.parseInt(contentLengthStr).toLong
+              val file = files.save(inputStream, filename, contentLength, response.header("Content-Type"), user, null)
+              file match {
+                case Some(f) => {
+                  // Add new file & byte count to appConfig
+                  appConfig.incrementCount('files, 1)
+                  appConfig.incrementCount('bytes, f.length)
 
-                    // notify extractors
-                    current.plugin[RabbitmqPlugin].foreach {
-                      // FIXME dataset not available?
-                      _.fileCreated(f, None, Utils.baseUrl(request), request.apiKey)
-                    }
+                  // notify extractors
+                  current.plugin[RabbitmqPlugin].foreach {
+                    // FIXME dataset not available?
+                    _.fileCreated(f, None, Utils.baseUrl(request), request.apiKey)
+                  }
 
-                    /*--- Insert DTS Requests  ---*/
-                    val clientIP = request.remoteAddress
-                    val serverIP = request.host
-                    dtsrequests.insertRequest(serverIP, clientIP, f.filename, f.id, f.contentType, f.length, f.uploadDate)
-                  }
-                  case None => {
-                    Logger.error("Could not retrieve file that was just saved.")
-                    //InternalServerError("Error uploading file")
-                  }
+                  /*--- Insert DTS Requests  ---*/
+                  val clientIP = request.remoteAddress
+                  val serverIP = request.host
+                  dtsrequests.insertRequest(serverIP, clientIP, f.filename, f.id, f.contentType, f.length, f.uploadDate)
                 }
-                file.map { f => (f.id.toString, fileurl) }.get
-              } else {
-                ("failed-" + UUID.generate.toString, fileurl)
+                case None => {
+                  Logger.error("Could not retrieve file that was just saved.")
+                  //InternalServerError("Error uploading file")
+                }
               }
+              file.map { f => (f.id.toString, fileurl) }.get
+            } else {
+              ("failed-" + UUID.generate.toString, fileurl)
             }
-            fid
           }
-
-          for {x <- scala.concurrent.Future.sequence(listIds)} yield {
-            val uuid = UUID.generate
-            extractions.save(new WebPageResource(uuid, pageurl, x.toMap))
-            var uuidMap = Map("id" -> uuid.toString)
-            val y = uuidMap ++ x.toMap
-            Ok(toJson(y))
-          }
+          fid
         }
-        case None => Future(BadRequest(toJson("Not authorized.")))
+
+        for {x <- scala.concurrent.Future.sequence(listIds)} yield {
+          val uuid = UUID.generate
+          extractions.save(new WebPageResource(uuid, pageurl, x.toMap))
+          var uuidMap = Map("id" -> uuid.toString)
+          val y = uuidMap ++ x.toMap
+          Ok(toJson(y))
+        }
       }
+      case None => Future(BadRequest(toJson("Not authorized.")))
+    }
   }
 
   /**
@@ -164,13 +164,7 @@ class Extractions @Inject()(
         else {
           BadRequest("Not valid id")
         }
-        case None =>
-          Logger.error("Could not retrieve file that was just saved.")
-          InternalServerError("Error uploading file")
-      } //file match
-    } // if Object id
-    else {
-      BadRequest("Not valid id")
+      }
     }
   }
 
@@ -274,10 +268,10 @@ class Extractions @Inject()(
               val fstatus = for {
                 rkeyResponse <- blist
               } yield {
-                  val status = computeStatus(rkeyResponse, file, l)
-                  Logger.debug(" [checkExtractionsStatuses]: l.toString : " + l.toString)
-                  Map("id" -> file.id.toString, "status" -> status)
-                } //end of yield
+                val status = computeStatus(rkeyResponse, file, l)
+                Logger.debug(" [checkExtractionsStatuses]: l.toString : " + l.toString)
+                Map("id" -> file.id.toString, "status" -> status)
+              } //end of yield
               fstatus
             } //end of some file
             case None => {
@@ -285,7 +279,7 @@ class Extractions @Inject()(
             }
           } //end of match file
           statuses
-          } //end of outer yield
+        } //end of outer yield
         for {
           ls <- scala.concurrent.Future.sequence(listStatus)
         } yield {
@@ -356,7 +350,6 @@ class Extractions @Inject()(
         status = "Done"
 
       }
-
     } //end of outer else
     status
   }
@@ -365,7 +358,7 @@ class Extractions @Inject()(
     val listNames = extractors.getExtractorNames(categories)
     val listNamesJson = toJson(listNames)
     Ok(toJson(Map("Extractors" -> listNamesJson)))
-   }
+  }
 
   def getExtractorInputTypes() = AuthenticatedAction { implicit request =>
     val listInputTypes = extractors.getExtractorInputTypes()
@@ -405,7 +398,7 @@ class Extractions @Inject()(
     Ok(jarr)
   }
 
-  def listExtractors(categories: List[String]) = AuthenticatedAction  { implicit request =>
+  def listExtractors(categories: List[String]) = AuthenticatedAction { implicit request =>
     Ok(Json.toJson(extractors.listExtractorsInfo(categories)))
   }
 
@@ -421,7 +414,7 @@ class Extractions @Inject()(
     // If repository is of type object, change it into an array.
     // This is for backward compatibility with requests from existing extractors.
     var requestJson = request.body \ "repository" match {
-      case rep: JsObject => request.body.as[JsObject] ++ Json.obj("repository" ->  Json.arr(rep))
+      case rep: JsObject => request.body.as[JsObject] ++ Json.obj("repository" -> Json.arr(rep))
       case _ => request.body
     }
 
@@ -484,7 +477,7 @@ class Extractions @Inject()(
 
               var datasetId: UUID = null
               // search datasets containning this file, either directly under dataset or indirectly.
-              val datasetslists:List[Dataset] = datasets.findByFileIdAllContain(file_id)
+              val datasetslists: List[Dataset] = datasets.findByFileIdAllContain(file_id)
               // Note, we assume only at most one dataset will contain a given file.
               if (0 != datasetslists.length) {
                 datasetId = datasetslists.head.id
@@ -502,20 +495,9 @@ class Extractions @Inject()(
               Conflict(toJson(Map("status" -> "error", "msg" -> "File is not ready. Please wait and try again.")))
             }
           }
-
-          var datasetId: UUID = null
-          datasets.findByFileId(file_id).map(ds => {
-            datasetId = ds.id
-          })
-          rabbitMQService.extract(ExtractorMessage(new UUID(originalId), file.id, host, key, extra, file.length.toString,
-            datasetId, newFlags))
-          Ok(Json.obj("status" -> "OK"))
-        } else {
-          Conflict(toJson(Map("status" -> "error", "msg" -> "File is not ready. Please wait and try again.")))
+          case None =>
+            BadRequest(toJson(Map("request" -> "File not found")))
         }
-      }
-      case None =>
-        BadRequest(toJson(Map("request" -> "File not found")))
     }
   }
 

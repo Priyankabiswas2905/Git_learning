@@ -116,22 +116,23 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     rabbitmquri = configuration.getString("clowder.rabbitmq.uri").getOrElse("amqp://guest:guest@localhost:5672/%2f")
     exchange = configuration.getString("clowder.rabbitmq.exchange").getOrElse("clowder")
     mgmtPort = configuration.getString("clowder.rabbitmq.managmentPort").getOrElse("15672")
-    Logger.debug("uri= "+ rabbitmquri)
+    Logger.debug("uri= " + rabbitmquri)
 
-  Logger.debug("Starting Rabbitmq Plugin")
-  rabbitmquri = configuration.get[String]("clowder.rabbitmq.uri")
-  exchange = configuration.get[String]("clowder.rabbitmq.exchange")
-  mgmtPort = configuration.get[String]("clowder.rabbitmq.managmentPort")
-  Logger.debug("uri= "+ rabbitmquri)
+    Logger.debug("Starting Rabbitmq Plugin")
+    rabbitmquri = configuration.get[String]("clowder.rabbitmq.uri")
+    exchange = configuration.get[String]("clowder.rabbitmq.exchange")
+    mgmtPort = configuration.get[String]("clowder.rabbitmq.managmentPort")
+    Logger.debug("uri= " + rabbitmquri)
 
-  try {
-    val uri = new URI(rabbitmquri)
-    factory = Some(new ConnectionFactory())
-    factory.get.setUri(uri)
-  } catch {
-    case t: Throwable => {
-      factory = None
-      Logger.error("Invalid URI for RabbitMQ", t)
+    try {
+      val uri = new URI(rabbitmquri)
+      factory = Some(new ConnectionFactory())
+      factory.get.setUri(uri)
+    } catch {
+      case t: Throwable => {
+        factory = None
+        Logger.error("Invalid URI for RabbitMQ", t)
+      }
     }
   }
 

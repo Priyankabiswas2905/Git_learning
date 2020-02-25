@@ -49,71 +49,20 @@ class Status @Inject()(spaces: SpaceService,
       result.put("elasticsearch", Json.obj("status" -> "disconnected"))
     }
 
-    current.plugins foreach {
-      // mongo
-      case p: MongoSalatPlugin => {
-        result.put("mongo", if (Permission.checkServerAdmin(user)) {
-              Json.obj("uri" -> p.mongoURI.toString(),
-                "updates" -> appConfig.getProperty[List[String]]("mongodb.updates", List.empty[String]))
-            } else {
-              jsontrue
-            })
-      }
-      result.put("postgres", if (Permission.checkServerAdmin(user)) {
-        Json.obj("catalog" -> conn.getCatalog,
-          "schema" -> conn.getSchema,
-          "updates" -> appConfig.getProperty[List[String]]("postgres.updates", List.empty[String]),
-          "status" -> status)
-      } else {
-        Json.obj("status" -> status)
-      })
-    }
+    // mongo
+    result.put("mongo", if (Permission.checkServerAdmin(user)) {
+      Json.obj("uri" -> mongoService.mongoURI.toString(),
+        "updates" -> appConfig.getProperty[List[String]]("mongodb.updates", List.empty[String]))
+    } else {
+      jsontrue
+    })
 
-      // mongo
-      result.put("mongo", if (Permission.checkServerAdmin(user)) {
-        Json.obj("uri" -> mongoService.mongoURI.toString(),
-          "updates" -> appConfig.getProperty[List[String]]("mongodb.updates", List.empty[String]))
-      } else {
-        jsontrue
-      })
-
-      // rabbitmq
-    if (current.configuration.getBoolean("clowder.rabbitmq.enabled").getOrElse(false)) {
-        val status = if (rabbitMQService.connect) {
-          "connected"
-        } else {
-          "disconnected"
-        }
-        result.put("rabbitmq", if (Permission.checkServerAdmin(user)) {
-          Json.obj("uri" -> rabbitMQService.rabbitmquri,
-            "exchange" -> rabbitMQService.exchange,
-            "status" -> status)
-        } else {
-          Json.obj("status" -> status)
-        })
-      }
-
-      // versus
-      result.put("versus", if (Permission.checkServerAdmin(user)) {
-        Json.obj("host" -> configuration.getString("versus.host").getOrElse("").toString)
-      } else {
-        jsontrue
-      })
-
-      case p => {
-        val name = p.getClass.getName
-        if (name.startsWith("services.")) {
-          val status = if (p.enabled) {
-            "enabled"
-          } else {
-            "disabled"
-          }
-          result.put(p.getClass.getName, Json.obj("status" -> status))
-        } else {
-          Logger.debug(s"Ignoring ${name} plugin")
-        }
-      }
-    }
+    // versus
+    result.put("versus", if (Permission.checkServerAdmin(user)) {
+      Json.obj("host" -> configuration.getString("versus.host").getOrElse("").toString)
+    } else {
+      jsontrue
+    })
 
     Json.toJson(result.toMap[String, JsValue])
   }

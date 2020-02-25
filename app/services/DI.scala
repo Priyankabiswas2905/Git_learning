@@ -17,7 +17,7 @@ object DI {
 class ConfigurationModule extends AbstractModule {
   protected def configure(): Unit = {
     bind(classOf[ApplicationStart]).asEagerSingleton()
-    bind(classOf[MongoService]).to(get("service.MongoService", "services.mongodb.MongoSalatPlugin")
+    bind(classOf[MongoService]).to(get("service.MongoService", "services.mongodb.MongoSalatPlugin"))
     bind(classOf[AppConfigurationService]).to(get("service.appConfiguration", "services.mongodb.MongoDBAppConfigurationService"))
     bind(classOf[UserService]).to(get("service.users", "services.mongodb.MongoDBUserService"))
     // ByteStorageService is used to store the actual bytes

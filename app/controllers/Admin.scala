@@ -215,7 +215,7 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
    * Builds a specific index in Versus
    */
   def buildIndex(id: String) = ServerAdminAction.async { implicit request =>
-    val versusEnabled : Boolean = play.api.Play.current.configuration.getBoolean("versusService").getOrElse(false)
+    val versusEnabled: Boolean = play.api.Play.current.configuration.getBoolean("versusService").getOrElse(false)
     if (versusEnabled) {
       Logger.trace("Inside Admin.buildIndex(), index = " + id)
       val buildResponse = versusService.buildIndex(UUID(id))
@@ -227,6 +227,7 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
     } else {
       Future(Ok("VersusService not enabled, index not built."))
     }
+  }
 
   /**
    * Deletes a specific index in Versus
