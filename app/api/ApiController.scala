@@ -8,7 +8,7 @@ import play.api.Logger
 import play.api.i18n.I18nSupport
 import play.api.libs.json.JsValue
 import play.api.mvc.{ControllerComponents, _}
-import services.{AppConfiguration, DI}
+import services.{AppConfiguration, DI, UserService}
 
 import scala.concurrent.{ExecutionContext, Future}
 

@@ -1,6 +1,7 @@
 package api
 
 import java.util.Date
+
 import akka.actor.ActorSystem
 import javax.inject.Inject
 import org.apache.commons.lang3.StringEscapeUtils
@@ -9,12 +10,12 @@ import play.api.Play.current
 import play.api.libs.json.Json.toJson
 import play.twirl.api.Html
 import services._
-import models.{ClowderUser, Event, UUID}
+import models.{ClowderUser, Event, UUID, UserStatus}
 import services.mongodb.MongoService
 import play.api.{Configuration, Logger}
 import util.Mail
-
 import play.api.libs.json.{JsString, JsUndefined, JsValue}
+import models.User._
 
 /**
  * Admin endpoints for JSON API.
