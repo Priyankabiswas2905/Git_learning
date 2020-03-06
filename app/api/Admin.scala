@@ -4,6 +4,7 @@ import java.util.Date
 
 import akka.actor.ActorSystem
 import javax.inject.Inject
+import models._
 import org.apache.commons.lang3.StringEscapeUtils
 import play.api.mvc.Controller
 import play.api.Play.current
