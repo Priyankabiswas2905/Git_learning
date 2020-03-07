@@ -25,7 +25,7 @@ import scala.concurrent.{ExecutionContext, Future}
  */
 trait ApiController extends BaseController with I18nSupport {
 
-  val userservice = DI.injector.getInstance(classOf[services.UserService])
+  val userService = DI.injector.instanceOf(classOf[services.UserService])
 
   /** get user if logged in */
   def UserAction(needActive: Boolean) = new ActionBuilder[UserRequest, JsValue] {
@@ -165,9 +165,9 @@ trait ApiController extends BaseController with I18nSupport {
       val header = new String(Base64.decodeBase64(authHeader.slice(6, authHeader.length).getBytes))
       val credentials = header.split(":")
       UserService.findByEmailAndProvider(credentials(0), UsernamePasswordProvider.UsernamePassword).foreach { identity =>
-        val user = DI.injector.getInstance(classOf[services.UserService]).findByIdentity(identity)
+        val user = DI.injector.i(classOf[services.UserService]).findByIdentity(identity)
         if (BCrypt.checkpw(credentials(1), identity.passwordInfo.get.password)) {
-          val user = DI.injector.getInstance(classOf[services.UserService]).findByIdentity(identity) match {
+          val user = userService.findByIdentity(identity) match {
             case Some(u: ClowderUser) if Permission.checkServerAdmin(Some(u)) => Some(u.copy(superAdminMode=superAdmin))
             case Some(u) => Some(u)
             case None => None
@@ -176,7 +176,7 @@ trait ApiController extends BaseController with I18nSupport {
           // find or create an api key for extractor submissions
           user match {
             case Some(u) =>
-              val apiKey = userservice.getExtractionApiKey(u.identityId)
+              val apiKey = userService.getExtractionApiKey(u.identityId)
               return UserRequest(user, request, Some(apiKey.key))
             case None =>
               return UserRequest(None, request, None)
@@ -188,7 +188,7 @@ trait ApiController extends BaseController with I18nSupport {
 
     // 3) X-API-Key, header Authorization is user API key
     request.headers.get("X-API-Key").foreach { apiKey =>
-      userservice.findByKey(apiKey) match {
+      userService.findByKey(apiKey) match {
         case Some(u: ClowderUser) if Permission.checkServerAdmin(Some(u)) => {
           return UserRequest(Some(u.copy(superAdminMode = superAdmin)), request, Some(apiKey))
         }
