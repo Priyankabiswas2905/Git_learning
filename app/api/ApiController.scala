@@ -141,10 +141,10 @@ trait ApiController extends BaseController with I18nSupport {
     // 1) secure social, this allows the web app to make calls to the API and use the secure social user
     for (
       authenticator <- SecureSocial.authenticatorFromRequest(request);
-      identity <- UserService.find(authenticator.identityId)
+      identity <- userService.find(authenticator.identityId)
     ) yield {
       Authenticator.save(authenticator.touch)
-      val user = DI.injector.getInstance(classOf[services.UserService]).findByIdentity(identity) match {
+      val user = userService.findByIdentity(identity) match {
         case Some(u: ClowderUser) if Permission.checkServerAdmin(Some(u)) => Some(u.copy(superAdminMode=superAdmin))
         case Some(u) => Some(u)
         case None => None
@@ -153,7 +153,7 @@ trait ApiController extends BaseController with I18nSupport {
       // find or create an api key for extractor submissions
       user match {
         case Some(u) =>
-          val apiKey = userservice.getExtractionApiKey(u.identityId)
+          val apiKey = userService.getExtractionApiKey(u.identityId)
           return UserRequest(user, request, Some(apiKey.key))
         case None =>
           return UserRequest(None, request, None)
