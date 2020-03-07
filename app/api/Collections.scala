@@ -161,7 +161,7 @@ class Collections @Inject() (datasets: DatasetService,
   def removeCollection(collectionId: UUID) = PermissionAction(Permission.DeleteCollection, Some(ResourceRef(ResourceRef.collection, collectionId))) { implicit request =>
     collections.get(collectionId) match {
       case Some(collection) => {
-        val useTrash = play.api.Play.configuration.getBoolean("useTrash").getOrElse(false)
+        val useTrash = appConfig.getProperty[Boolean]("useTrash").getOrElse(false)
         if (!useTrash || (useTrash && collection.trash)){
           events.addObjectEvent(request.user , collection.id, collection.name, EventType.DELETE_COLLECTION.toString)
           collections.delete(collectionId)
