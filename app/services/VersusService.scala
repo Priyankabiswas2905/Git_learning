@@ -73,6 +73,7 @@ class VersusService @Inject() (
    */
   def getAdapters(): Future[WSResponse] = {
     Logger.trace("VersusPlugin.getAdapters")
+    val host = appConfig.getProperty[String]("versus.host").getOrElse("")
     val adapterUrl = host + "/adapters"
     val adapterList: Future[WSResponse] = wsClient.url(adapterUrl).withHttpHeaders("Accept" -> "application/json").get()
 
@@ -84,6 +85,7 @@ class VersusService @Inject() (
    */
   def getExtractors(): Future[WSResponse] = {
     Logger.trace("VersusPlugin.getExtractors")
+    val host = appConfig.getProperty[String]("versus.host").getOrElse("")
     val extractorUrl = host + "/extractors"
     val extractorList: Future[WSResponse] = wsClient.url(extractorUrl).withHeaders("Accept" -> "application/json").get()
 
@@ -93,6 +95,7 @@ class VersusService @Inject() (
    * Gets the list of measures available in Versus web server
    */
   def getMeasures(): Future[WSResponse] = {
+    val host = appConfig.getProperty[String]("versus.host").getOrElse("")
     val measureUrl = host + "/measures"
     val measureList: Future[WSResponse] = wsClient.url(measureUrl).withHeaders("Accept" -> "application/json").get()
 
@@ -105,6 +108,7 @@ class VersusService @Inject() (
    */
   def getIndexers(): Future[WSResponse] = {
     Logger.trace("VersusPlugin.getIndexers")
+    val host = appConfig.getProperty[String]("versus.host").getOrElse("")
     val indexerUrl = host + "/indexers"
     val indexerList: Future[WSResponse] = wsClient.url(indexerUrl).withHeaders("Accept" -> "application/json").get()
 
@@ -117,6 +121,7 @@ class VersusService @Inject() (
    */
   def getIndexes(): Future[WSResponse] = {
     Logger.trace("VersusPlugin.getIndexes")
+    val host = appConfig.getProperty[String]("versus.host").getOrElse("")
     val indexurl = host + "/indexes"
     var k = 0
     val indexList: Future[WSResponse] = wsClient.url(indexurl).withHeaders("Accept" -> "application/json").get()
@@ -136,6 +141,7 @@ class VersusService @Inject() (
    */
   def getIndexesAsFutureList(): Future[List[models.VersusIndex]] = {
     Logger.trace("VersusPlugin: Getting indexes as a future list")
+    val host = appConfig.getProperty[String]("versus.host").getOrElse("")
     val indexurl = host + "/indexes"
     val indexList: Future[WSResponse] = wsClient.url(indexurl).withHeaders("Accept" -> "application/json").get()
     indexList.map {
@@ -158,6 +164,7 @@ class VersusService @Inject() (
    */
   def getIndexesForType(typeToSearch: String, sectionsSelected: List[String]): Future[List[models.VersusIndex]] = {
     Logger.trace("VP getIndexesForType")
+    val host = appConfig.getProperty[String]("versus.host").getOrElse("")
     val indexurl = host + "/indexes"
 
     var matchingIndexes = new ListBuffer[models.VersusIndex]
@@ -248,6 +255,7 @@ class VersusService @Inject() (
     //also delete from mongo collection
     //will search mongo for given id, if found - will delete, if not found - will do nothing
     sectionIndexInfo.delete(indexId)
+    val host = appConfig.getProperty[String]("versus.host").getOrElse("")
     val deleteurl = host + "/indexes/" + indexId
     wsClient.url(deleteurl).delete()
   }
@@ -363,6 +371,7 @@ class VersusService @Inject() (
     //called from app/api/Files->removeFile()
     //
     Logger.trace("VersusPlugin: removeFromIndexes for fileId = " + fileId)
+    val host = appConfig.getProperty[String]("versus.host").getOrElse("")
     files.get(fileId) match {
       case Some(file) => {
         //
@@ -491,6 +500,7 @@ class VersusService @Inject() (
 
   def queryIndex(inputFileURL: String, indexId: String): Future[List[PreviewFilesSearchResult]] = {
     Logger.trace("VersusPlugin.queryIndex")
+    val host = appConfig.getProperty[String]("versus.host").getOrElse("")
     val queryIndexUrl = host + "/indexes/" + indexId + "/query"
     //example: queryIndexUrl = http://localhost:8080/api/v1/indexes/a885bad2-f463-496f-a881-c01ebd4c31f1/query
     //will call IndexResource.queryindex on Versus side
