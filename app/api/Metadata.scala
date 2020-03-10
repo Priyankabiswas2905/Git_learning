@@ -262,7 +262,7 @@ class Metadata @Inject() (
             .getOrElse(List.empty)
             .map(term => term.trim())
             .filter(term => !term.isEmpty)
-          if (terms.isEmpty()) {
+          if (terms.isEmpty) {
             BadRequest(toJson("Empty terms list is not allowed"))
           } else {
             val vocabulary = vocabs.create(terms)
@@ -287,7 +287,7 @@ class Metadata @Inject() (
                 .getOrElse(List.empty)
                 .map(term => term.trim())
                 .filter(term => !term.isEmpty)
-              if (terms.isEmpty()) {
+              if (terms.isEmpty) {
                 BadRequest(toJson("Empty terms list is not allowed"))
               } else {
                 val vocabulary = vocabs.update(id, terms)
