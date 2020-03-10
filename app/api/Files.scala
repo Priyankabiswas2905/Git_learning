@@ -18,7 +18,7 @@ import play.api.i18n.Messages
 import play.api.libs.iteratee.Enumerator
 import play.api.libs.json.Json._
 import play.api.libs.json._
-import play.api.mvc.{Action, ResponseHeader, Result, SimpleResult}
+import play.api.mvc.{Action, ResponseHeader, Result}
 import services._
 import scala.collection.mutable.ListBuffer
 import scala.util.parsing.json.JSONArray
@@ -118,7 +118,7 @@ class Files @Inject()(
                     range match {
                       case (start, end) =>
                         inputStream.skip(start)
-                        SimpleResult(
+                        Result(
                           header = ResponseHeader(PARTIAL_CONTENT,
                             Map(
                               CONNECTION -> "keep-alive",
@@ -179,7 +179,7 @@ class Files @Inject()(
               range match {
                 case (start, end) =>
                   inputStream.skip(start)
-                  SimpleResult(
+                  Result(
                     header = ResponseHeader(PARTIAL_CONTENT,
                       Map(
                         CONNECTION -> "keep-alive",

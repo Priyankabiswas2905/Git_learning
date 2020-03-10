@@ -59,7 +59,7 @@ class Status @Inject()(spaces: SpaceService,
 
     // versus
     result.put("versus", if (Permission.checkServerAdmin(user)) {
-      Json.obj("host" -> configuration.getString("versus.host").getOrElse("").toString)
+      Json.obj("host" -> appConfig.getProperty[String]("versus.host").getOrElse("").toString)
     } else {
       jsontrue
     })

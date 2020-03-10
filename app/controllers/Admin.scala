@@ -21,7 +21,8 @@ import scala.concurrent.Future
  */
 @Singleton
 class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: UserService,
-                       metadataService: MetadataService, versusService: VersusService) extends SecuredController {
+                       metadataService: MetadataService, versusService: VersusService,
+                       appConfig: AppConfigurationService) extends SecuredController {
 
   def customize = ServerAdminAction { implicit request =>
     val theme = AppConfiguration.getTheme
@@ -114,7 +115,7 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
    * Gets available Indexers from Versus
    */
   def getIndexers() = ServerAdminAction.async { implicit request =>
-    val versusEnabled : Boolean = play.api.Play.current.configuration.getBoolean("versusService").getOrElse(false)
+    val versusEnabled : Boolean = appConfig.getProperty[Boolean]("versusService").getOrElse(false)
     if (versusEnabled) {
       val indexerListResponse = versusService.getIndexers()
       for {
@@ -133,7 +134,7 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
    */
    def createIndex() = ServerAdminAction.async(parse.json) { implicit request =>
 
-     val versusEnabled : Boolean = play.api.Play.current.configuration.getBoolean("versusService").getOrElse(false)
+     val versusEnabled : Boolean = appConfig.getProperty[Boolean]("versusService").getOrElse(false)
      if (versusEnabled) {
        Logger.trace("Contr.Admin.CreateIndex()")
        val adapter =    (request.body \ "adapter").as[String]
@@ -394,7 +395,7 @@ class Admin @Inject() (sectionIndexInfo: SectionIndexInfoService, userService: U
   def users() = ServerAdminAction { implicit request: UserRequest[AnyContent] =>
     implicit val user = request.user
 
-    val configAdmins = configuration.get[String]("initialAdmins").trim.split("\\s*,\\s*").filter(_ != "").toList
+    val configAdmins = appConfig.getProperty[String]("initialAdmins").getOrElse("").trim.split("\\s*,\\s*").filter(_ != "").toList
     val users = userService.list.sortWith(_.lastName.toLowerCase() < _.lastName.toLowerCase())
     Ok(views.html.admin.users(configAdmins, users))
   }

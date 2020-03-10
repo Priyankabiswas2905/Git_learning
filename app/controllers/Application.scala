@@ -228,7 +228,7 @@ class Application @Inject() (files: FileService, collections: CollectionService,
     implicit val user = request.user
 
     // Set bytes from appConfig
-    val appConfig = DI.injector.getInstance(classOf[AppConfigurationService])
+    val appConfig = DI.injector.instanceOf(classOf[AppConfigurationService])
     val filesBytes = appConfig.getIndexCounts.numBytes
 
     // Set other counts from DB
