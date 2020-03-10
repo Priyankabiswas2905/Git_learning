@@ -9,7 +9,7 @@ import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.iteratee._
 import play.api.libs.ws.WS.WSRequestHolder
 import play.api.libs.ws._
-import play.api.mvc.SimpleResult
+import play.api.mvc.Result
 
 import scala.concurrent.Future
 
@@ -111,7 +111,7 @@ class Proxy @Inject()() extends ApiController {
     * Copies the header values from our intermediary (proxied) response to the
     * SimpleResult that we will return to the caller of the proxy API
     */
-  def buildProxiedResponse(lastResponse: Response, proxiedResponse: SimpleResult): SimpleResult = {
+  def buildProxiedResponse(lastResponse: Response, proxiedResponse: Result): Result = {
     // TODO: other response headers my be needed for specific cases
     val chunkedResponse = proxiedResponse.withHeaders (
       //CONNECTION -> lastResponse.header("Connection").orNull,

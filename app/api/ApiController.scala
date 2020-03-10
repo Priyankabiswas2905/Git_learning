@@ -1,7 +1,6 @@
 package api
 
 import api.Permission.Permission
-import com.google.inject.Inject
 import models.{ClowderUser, ResourceRef, User, UserStatus}
 import org.apache.commons.codec.binary.Base64
 import play.api.Logger
@@ -141,7 +140,7 @@ trait ApiController extends BaseController with I18nSupport {
     // 1) secure social, this allows the web app to make calls to the API and use the secure social user
     for (
       authenticator <- SecureSocial.authenticatorFromRequest(request);
-      identity <- userService.find(authenticator.identityId)
+      identity <- userService.findById(authenticator.identityId)
     ) yield {
       Authenticator.save(authenticator.touch)
       val user = userService.findByIdentity(identity) match {
@@ -165,7 +164,7 @@ trait ApiController extends BaseController with I18nSupport {
       val header = new String(Base64.decodeBase64(authHeader.slice(6, authHeader.length).getBytes))
       val credentials = header.split(":")
       UserService.findByEmailAndProvider(credentials(0), UsernamePasswordProvider.UsernamePassword).foreach { identity =>
-        val user = DI.injector.i(classOf[services.UserService]).findByIdentity(identity)
+        val user = userService.findByIdentity(identity)
         if (BCrypt.checkpw(credentials(1), identity.passwordInfo.get.password)) {
           val user = userService.findByIdentity(identity) match {
             case Some(u: ClowderUser) if Permission.checkServerAdmin(Some(u)) => Some(u.copy(superAdminMode=superAdmin))
@@ -201,15 +200,14 @@ trait ApiController extends BaseController with I18nSupport {
 
     // 4) check api key, either the global one in the config file or the user key in the database
     request.queryString.get("key").foreach { key =>
-      val userservice = DI.injector.instanceOf[services.UserService]
-      val commkey = configuration.get[String]("commKey")
+      val commkey = AppConfiguration.appConfig.getProperty[String]("commKey")
       key.foreach { realkey =>
         // check to see if this is the global key
         if (realkey == commkey) {
           return UserRequest(Some(User.anonymous.copy(superAdminMode=true)), request, Some(realkey))
         }
         // check to see if this is a key for a specific user
-        userservice.findByKey(realkey) match {
+        userService.findByKey(realkey) match {
           case Some(u: ClowderUser) if Permission.checkServerAdmin(Some(u)) => {
             return UserRequest(Some(u.copy(superAdminMode = superAdmin)), request, Some(realkey))
           }

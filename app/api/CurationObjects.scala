@@ -27,7 +27,9 @@ class CurationObjects @Inject()(datasets: DatasetService,
       spaces: SpaceService,
       userService: UserService,
       curationObjectController: controllers.CurationObjects,
-      metadatas: MetadataService, config: Configuration
+      metadatas: MetadataService,
+      config: Configuration,
+      appConfig: AppConfigurationService
       ) extends ApiController {
   def getCurationObjectOre(curationId: UUID) = PermissionAction(Permission.EditStagingArea, Some(ResourceRef(ResourceRef.curationObject, curationId))) {
     implicit request =>
@@ -282,7 +284,7 @@ class CurationObjects @Inject()(datasets: DatasetService,
       implicit val user = request.user
       curations.get(curationId) match {
         case Some(c) => {
-          val endpoint =configuration.get[String]("stagingarea.uri").replaceAll("/$","")
+          val endpoint = appConfig.getProperty[String]("stagingarea.uri").getOrElse("").replaceAll("/$","")
           val httpDelete = new HttpDelete(endpoint + "/urn:uuid:" + curationId.toString())
           val client = new DefaultHttpClient
           val response = client.execute(httpDelete)

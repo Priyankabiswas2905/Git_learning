@@ -1671,7 +1671,7 @@ class  Datasets @Inject()(
   def detachAndDeleteDataset(id: UUID) = PermissionAction(Permission.DeleteDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     datasets.get(id) match{
       case Some(dataset) => {
-        val useTrash = play.api.Play.configuration.getBoolean("useTrash").getOrElse(false)
+        val useTrash = appConfig.getProperty[Boolean]("useTrashs").getOrElse(false)
         if (!useTrash || (useTrash && dataset.trash)) {
           for (f <- dataset.files) {
             detachFileHelper(dataset.id, f, dataset, request.user)
@@ -1715,7 +1715,7 @@ class  Datasets @Inject()(
   def deleteDataset(id: UUID) = PermissionAction(Permission.DeleteDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     datasets.get(id) match {
       case Some(ds) => {
-        val useTrash = play.api.Play.configuration.getBoolean("useTrash").getOrElse(false)
+        val useTrash = appConfig.getProperty[Boolean]("useTrash").getOrElse(false)
         if (!useTrash || (useTrash && ds.trash)){
           deleteDatasetHelper(id, request)
         } else {
@@ -1938,7 +1938,7 @@ class  Datasets @Inject()(
       case Some(followeeModel) => {
         val sourceFollowerIDs = followeeModel.followers
         val excludeIDs = follower.followedEntities.map(typedId => typedId.id) ::: List(followeeUUID, follower.id)
-        val num = config.get[Int]("number_of_recommendations")
+        val num = appConfig.getProperty[Int]("number_of_recommendations").getOrElse(0)
         userService.getTopRecommendations(sourceFollowerIDs, excludeIDs, num)
       }
       case None => {
@@ -2340,7 +2340,7 @@ class  Datasets @Inject()(
     implicit val user = request.user
     datasets.get(id) match {
       case Some(dataset) => {
-        val bagit = play.api.Play.configuration.getBoolean("downloadDatasetBagit").getOrElse(true)
+        val bagit = appConfig.getProperty[Boolean]("downloadDatasetBagit").getOrElse(true)
 
         // Increment download count if tracking is enabled
         if (tracking)

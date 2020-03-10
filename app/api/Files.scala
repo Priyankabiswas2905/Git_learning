@@ -659,7 +659,7 @@ class Files @Inject()(
       case None => BadRequest(toJson("File not found " + id))
     }
     files.index(id)
-    configuration.getString("userdfSPARQLStore").getOrElse("no") match {
+    appConfig.getProperty[String]("userdfSPARQLStore").getOrElse("no") match {
       case "yes" => {
         files.setUserMetadataWasModified(id, true)
       }
@@ -699,8 +699,8 @@ class Files @Inject()(
       }
       case "services.s3.S3ByteStorageService" => {
         if (serverAdmin) {
-          val bucketName = configuration.getString(S3ByteStorageService.BucketName).getOrElse("")
-          val serviceEndpoint = configuration.getString(S3ByteStorageService.ServiceEndpoint).getOrElse("")
+          val bucketName = appConfig.getProperty[String](S3ByteStorageService.BucketName).getOrElse("")
+          val serviceEndpoint = appConfig.getProperty[String](S3ByteStorageService.ServiceEndpoint).getOrElse("")
           Map(
             "id" -> file.id.toString,
             "filename" -> file.filename,
@@ -910,7 +910,7 @@ class Files @Inject()(
           licenseType = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"licenseType data is missing."))
         }
       }
@@ -923,7 +923,7 @@ class Files @Inject()(
           rightsHolder = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"rightsHolder data is missing."))
         }
       }
@@ -956,7 +956,7 @@ class Files @Inject()(
           }
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"licenseText data is missing."))
         }
       }
@@ -969,7 +969,7 @@ class Files @Inject()(
           licenseUrl = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"licenseUrl data is missing."))
         }
       }
@@ -982,7 +982,7 @@ class Files @Inject()(
           allowDownload = s.get
         }
         case e: JsError => {
-          Logger.error("Errors: " + JsError.toFlatJson(e).toString())
+          Logger.error("Errors: " + JsError.toFlatForm(e).toString())
           BadRequest(toJson(s"allowDownload data is missing."))
         }
       }
@@ -1596,7 +1596,7 @@ class Files @Inject()(
       case Some(followeeModel) => {
         val sourceFollowerIDs = followeeModel.followers
         val excludeIDs = follower.followedEntities.map(typedId => typedId.id) ::: List(followeeUUID, follower.id)
-        val num = config.get[Int]("number_of_recommendations")
+        val num = appConfig.getProperty[Int]("number_of_recommendations").getOrElse(0)
         userService.getTopRecommendations(sourceFollowerIDs, excludeIDs, num)
       }
       case None => {

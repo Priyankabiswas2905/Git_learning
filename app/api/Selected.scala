@@ -28,7 +28,8 @@ class Selected @Inject()(selections: SelectionService,
                          spaces:SpaceService,
                          folders : FolderService,
                          metadataService : MetadataService,
-                         events: EventService) extends Controller with ApiController {
+                         events: EventService,
+                         appConfig: AppConfigurationService) extends Controller with ApiController {
 
   def get() = AuthenticatedAction { implicit request =>
     Logger.debug("Requesting Selected.get" + request.body)
@@ -110,7 +111,7 @@ class Selected @Inject()(selections: SelectionService,
     Logger.debug("Requesting Selected.downloadAll")
     request.user match {
       case Some(user) => {
-        val bagit = play.api.Play.configuration.getBoolean("downloadDatasetBagit").getOrElse(true)
+        val bagit = appConfig.getProperty[Boolean]("downloadDatasetBagit").getOrElse(true)
         val selected = selections.get(user.email.get)
         Ok.chunked(enumeratorFromSelected(selected,1024*1024,bagit,Some(user))).withHeaders(
           "Content-Type" -> "application/zip",

@@ -2,15 +2,15 @@ package services
 
 import javax.inject.Inject
 import models.UUID
-import play.api.templates.Html
 import play.api.{Application, Configuration, Logger}
 import play.api.Play.current
+import play.twirl.api.Html
 import util.Mail
 
-class AdminsNotifierService @Inject()(userService: UserService)() {
+class AdminsNotifierService @Inject()(userService: UserService, appConfig: AppConfigurationService)() {
 
   val enabled = {
-    !play.api.Play.configuration.getString("adminnotifierservice").filter(_ == "disabled").isDefined
+    !appConfig.getProperty[String]("adminnotifierservice").filter(_ == "disabled").isDefined
   }
   
   def sendAdminsNotification(baseURL: String, resourceType: String = "Dataset", eventType: String = "added",

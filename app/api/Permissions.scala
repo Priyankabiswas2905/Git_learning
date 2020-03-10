@@ -4,7 +4,6 @@ import api.Permission.getUserByIdentity
 import models.{UUID, ResourceRef, User, UserStatus}
 import play.api.{Configuration, Logger}
 import play.api.mvc._
-import play.api.Play.configuration
 import services._
 
 /**
@@ -137,6 +136,7 @@ object Permission extends Enumeration {
   lazy val metadatas: MetadataService = DI.injector.instanceOf[MetadataService]
   lazy val vocabularies: VocabularyService = DI.injector.instanceOf[VocabularyService]
   lazy val vocabularyterms: VocabularyTermService = DI.injector.instanceOf[VocabularyTermService]
+  lazy val appConfig: AppConfigurationService = DI.injector.instanceOf[AppConfigurationService]
 
   /** Returns true if the user is listed as a server admin */
 	def checkServerAdmin(user: Option[User]): Boolean = {
@@ -281,7 +281,7 @@ object Permission extends Enumeration {
   }
 
   def checkPermissions(user: Option[User], permission: Permission, resourceRefs: List[ResourceRef]): PermissionsList = {
-    (user, configuration(play.api.Play.current).getString("permissions").getOrElse("public"), resourceRefs) match {
+    (user, appConfig.getProperty[String]("permissions").getOrElse("public"), resourceRefs) match {
       case (Some(u), "public", r) => {
         if (READONLY.contains(permission))
           generatePermissionsList(r, true)
@@ -289,7 +289,7 @@ object Permission extends Enumeration {
           checkPermissions(u, permission, r)
       }
       case (Some(u), "private", r) => {
-        if (configuration(play.api.Play.current).getBoolean("makeGeostreamsPublicReadable").getOrElse(true) && permission == Permission.ViewGeoStream)
+        if (appConfig.getProperty[Boolean]("makeGeostreamsPublicReadable").getOrElse(true) && permission == Permission.ViewGeoStream)
           generatePermissionsList(r, true)
         else
           checkPermissions(u, permission, r)
