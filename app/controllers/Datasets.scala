@@ -33,9 +33,7 @@ class Datasets @Inject() (
     folders: FolderService,
     metadata: MetadataService,
     events: EventService,
-    selections: SelectionService,
-    toolService: ToolManagerService,
-    geostreamsService: GeostreamsService) extends SecuredController {
+    selections: SelectionService) extends SecuredController {
 
   object ActivityFound extends Exception {}
 
