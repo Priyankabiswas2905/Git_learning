@@ -7,7 +7,7 @@ import javax.inject.Inject
 import play.api.Logger
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.iteratee._
-import play.api.libs.ws.WS.WSRequestHolder
+import play.api.libs.ws.WSRequest
 import play.api.libs.ws._
 import play.api.mvc.Result
 
@@ -37,7 +37,7 @@ object Proxy {
   val ConfigPrefix: String = "clowder.proxy."
 }
 
-class Proxy @Inject()() extends ApiController {
+class Proxy @Inject()(ws: WSClient) extends ApiController {
   import Proxy.ConfigPrefix
 
   /**
@@ -76,15 +76,15 @@ class Proxy @Inject()() extends ApiController {
     val username = if (null != userInfo) { userInfo.split(":").apply(0) } else { "" }
     val password = if (null != userInfo) { userInfo.split(":").apply(1) } else { "" }
 
-    val initialReq = WS.url(sanitizedUrl)
-        .withQueryString(originalRequest.queryString.mapValues(_.head).toSeq: _*)
+    val initialReq = ws.url(sanitizedUrl)
+        .addQueryStringParameters(originalRequest.queryString.mapValues(_.head).toSeq: _*)
         .withFollowRedirects(true)
 
     // If original request had Content-Type/Length headers, copy them to the proxied request
     val contentType = originalRequest.headers.get("Content-Type").orNull
     val contentLength = originalRequest.headers.get("Content-Length").orNull
     val reqWithContentHeaders = if (contentType != null && contentLength != null) {
-      initialReq.withHeaders(CONTENT_TYPE -> contentType, CONTENT_LENGTH -> contentLength)
+      initialReq.addHttpHeaders(CONTENT_TYPE -> contentType, CONTENT_LENGTH -> contentLength)
     } else {
       initialReq
     }
@@ -92,7 +92,7 @@ class Proxy @Inject()() extends ApiController {
     // If original request had a Cookie header, copy it to the proxied request
     val cookies = originalRequest.headers.get("Cookie").orNull
     val reqWithHeaders = if (cookies != null) {
-      reqWithContentHeaders.withHeaders(COOKIE -> cookies)
+      reqWithContentHeaders.addHttpHeaders(COOKIE -> cookies)
     } else {
       reqWithContentHeaders
     }
@@ -111,7 +111,7 @@ class Proxy @Inject()() extends ApiController {
     * Copies the header values from our intermediary (proxied) response to the
     * SimpleResult that we will return to the caller of the proxy API
     */
-  def buildProxiedResponse(lastResponse: Response, proxiedResponse: Result): Result = {
+  def buildProxiedResponse(lastResponse: WSResponse, proxiedResponse: Result): Result = {
     // TODO: other response headers my be needed for specific cases
     val chunkedResponse = proxiedResponse.withHeaders (
       //CONNECTION -> lastResponse.header("Connection").orNull,
@@ -134,7 +134,7 @@ class Proxy @Inject()() extends ApiController {
   /**
     * Given a response, chunk its body and return/forward it as a SimpleResult
     */
-  def chunkAndForwardResponse(originalResponse: Response): SimpleResult = {
+  def chunkAndForwardResponse(originalResponse: WSResponse): Result = {
     val statusCode = originalResponse.getAHCResponse.getStatusCode
     if (statusCode >= 400) {
       Logger.error("PROXY :: " + statusCode + " - " + originalResponse.getAHCResponse.getStatusText)
