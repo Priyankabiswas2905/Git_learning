@@ -7,11 +7,13 @@ import models.{PreviewFilesSearchResult, SearchResultFile, SearchResultPreview, 
 import play.api.Play.current
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json.{JsValue, Json}
-import play.api.libs.ws.{Response, WS}
 import play.api.mvc.Request
-import play.api.{ Logger}
+import play.api.Logger
+import play.api.libs.ws._
+import play.api.libs.ws.WSResponse
 
-import scala.collection.immutable.Map
+import scala.collection.immutable.{HashMap, Map}
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 
@@ -25,17 +27,19 @@ class VersusService @Inject() (
                               datasets: DatasetService,
                               sections: SectionService,
                               queries: MultimediaQueryService,
-                              sectionIndexInfo: SectionIndexInfoService
+                              sectionIndexInfo: SectionIndexInfoService,
+                              appConfig: AppConfigurationService,
+                              wsClient: WSClient
                               ) {
 
   /*
  * This method sends the file's url to Versus for the extraction of descriptors from the file
  */
   def extract(fileid: UUID)(implicit request: Request[Any]): Future[WSResponse] = {
-    val key = "?key=" + configuration.get[String]("commKey")
+    val key = "?key=" + appConfig.getProperty[String]("commKey").getOrElse("")
     val https = controllers.Utils.https(request)
     val fileUrl = api.routes.Files.download(fileid).absoluteURL(https) + key
-    val host = configuration.getString("versus.host").getOrElse("")
+    val host = appConfig.getProperty[String]("versus.host").getOrElse("")
 
     val extractUrl = host + "/extract"
 
@@ -43,7 +47,7 @@ class VersusService @Inject() (
       res =>
         Logger.debug("Extract Job ID=" + res.body)
 
-        val desResponse = wsClient.url(extractUrl + "/" + res.body).withHeaders("Accept" -> "application/json").get()
+        val desResponse = wsClient.url(extractUrl + "/" + res.body).withHttpHeaders("Accept" -> "application/json").get()
         desResponse.map {
           response =>
             files.get(fileid) match {
@@ -70,7 +74,7 @@ class VersusService @Inject() (
   def getAdapters(): Future[WSResponse] = {
     Logger.trace("VersusPlugin.getAdapters")
     val adapterUrl = host + "/adapters"
-    val adapterList: Future[WSResponse] = wsClient.url(adapterUrl).withHeaders("Accept" -> "application/json").get()
+    val adapterList: Future[WSResponse] = wsClient.url(adapterUrl).withHttpHeaders("Accept" -> "application/json").get()
 
     adapterList
   }
@@ -219,7 +223,7 @@ class VersusService @Inject() (
   def getIndexesForContentTypeAsFutureList(contentType: String): Future[List[models.VersusIndex]] = {
     Logger.trace("VersusPlugin,getIndexesForContentTypeAsFutureList")
     val indexurl = host + "/indexes"
-    wsClient.url(indexurl).withHeaders("Accept" -> "application/json").get().map {
+    wsClient.url(indexurl).withHttpHeaders("Accept" -> "application/json").get().map {
       response =>
         val indexes = Json.parse(response.body).as[Seq[models.VersusIndex]]
         val fileType = contentType.split("/")
@@ -282,11 +286,11 @@ class VersusService @Inject() (
     //called from /app/api/Indexes.scala->index()  which is called from extractors,
     //(e.g. cinemetrics extractor ->uploadShot, or from face extractor, etc)
     val https = controllers.Utils.https(request)
-    val prevURL = api.routes.Previews.download(previewId).absoluteURL(https) + key
-    val host = configuration.get[String]("versus.host")
+    val prevURL = api.routes.PreviewsClient.download(previewId).absoluteURL(https) + key
+    val host = appConfig.getProperty[String]("versus.host").getOrElse("")
 
     //find out what extractor created this preview
-    val extractorId = previews.getExtractorId(previewId)
+    val extractorId = previewsClient.getExtractorId(previewId)
 
     //indexes that have TYPE parameter contain sections, and indexes that don't have TYPE parameter contain whole files.
     //go through all indexes and find ones that DO have the TYPE param and with type being a substring of the extractor id
@@ -309,7 +313,7 @@ class VersusService @Inject() (
     //called from /app/controllers/Files.scala->upload()
     //fileURL will be used by versus comparison resource to get file's bytes
     //need 'blob' in fileURL
-    val key = "?key=" + configuration.get[String]("commKey")
+    val key = "?key=" + appConfig.getProperty[String]("commKey").getOrElse("")
     val https = controllers.Utils.https(request)
     val fileURL = api.routes.Files.download(fileId).absoluteURL(https) + key
     //indexes that have TYPE parameter contain sections, and indexes that don't have TYPE parameter contain whole files.
@@ -369,7 +373,7 @@ class VersusService @Inject() (
         //
         if (file.contentType.contains("video/")) {
           //find previews of type IMAGE and delete these from Versus
-          for (preview <- previews.findByFileId(file.id)) {
+          for (preview <- previewsClient.findByFileId(file.id)) {
             if (preview.contentType.contains("image")) {
               for (indexList <- getIndexesAsFutureList()) {
                 for (index <- indexList) {
@@ -378,7 +382,7 @@ class VersusService @Inject() (
                 }
               }
             }
-          } // end of for(preview <- previews.findByFileId(file.id)){             
+          } // end of for(preview <- previewsClient.findByFileId(file.id)){             
         }
 
         if (!file.contentType.contains("video/")) {
@@ -416,7 +420,7 @@ class VersusService @Inject() (
   def queryIndexForExistingFile(inputFileId: UUID, indexId: String)(implicit request: Request[Any]): Future[List[PreviewFilesSearchResult]] = {
     //called when multimedia search -> find similar is clicked    
     Logger.trace("VersusPlugin - queryIndexForExistingFile  - file id = " + inputFileId)
-    val key = "?key=" + configuration.get[String]("commKey")
+    val key = "?key=" + appConfig.getProperty[String]("commKey").getOrElse("")
     val https = controllers.Utils.https(request)
     val queryStr = api.routes.Files.download(inputFileId).absoluteURL(https) + key
     queryIndex(queryStr, indexId)
@@ -428,7 +432,7 @@ class VersusService @Inject() (
   def queryIndexForNewFile(newFileId: UUID, indexId: String)(implicit request: Request[Any]):
   Future[List[PreviewFilesSearchResult]] = {
     Logger.trace("queryIndexForNewFile")
-    val key = "?key=" + configuration.get[String]("commKey")
+    val key = "?key=" + appConfig.getProperty[String]("commKey").getOrElse("")
     val https = controllers.Utils.https(request)
     val queryStr = api.routes.Files.downloadquery(newFileId).absoluteURL(https) + key
     queryIndex(queryStr, indexId)
@@ -512,7 +516,7 @@ class VersusService @Inject() (
             //when searching for videos - might get previews search results, no 'blob' in preview doc id
             if (isPreview) {
               //result.docID = http://localhost:9000/api/previews/52fd1970e4b02ac3e30280a5?key=r1ek3rs         
-              for (blob <- previews.getBlob(resultId)) {
+              for (blob <- previewsClient.getBlob(resultId)) {
                 val previewName = blob._2
                 for (previewResult <- getPrevSearchResult(resultId, previewName, result)) {
                   resultList += new PreviewFilesSearchResult("preview", null, previewResult)
@@ -546,7 +550,7 @@ class VersusService @Inject() (
     //if searching for file already uploaded previously, use api/files
     // val queryStr = client + "/api/files/" + inputFileId + "/blob?key=" + configuration.getString("commKey").get
     //if searching for a new file, i.e.  uploaded just now, use api/queries
-    val key = "?key=" + configuration.get[String]("commKey")
+    val key = "?key=" + appConfig.getProperty[String]("commKey").getOrElse("")
     val https = controllers.Utils.https(request)
     val queryStr = api.routes.Files.downloadquery(UUID(inputFileId)).absoluteURL(https) + key
     val responseFuture: Future[WSResponse] = wsClient.url(host + "/indexes/" + indexId + "/query").post(Map("infile" -> Seq(queryStr)))
@@ -604,7 +608,7 @@ class VersusService @Inject() (
       val formatter = new DecimalFormat("#.#####")
       val proxvalue = formatter.format(result.proximity).toDouble
       val normalizedProxvalue = formatter.format(result.proximity / result.maxProximity).toDouble
-      previews.get(preview_id) match {
+      previewsClient.get(preview_id) match {
         case Some(preview) => {
 
           var sectionStartTime = 0
@@ -650,6 +654,6 @@ class VersusService @Inject() (
         //No preview found
         case None => { return None }
 
-      } //END OF : previews.get(preview_id) match        
+      } //END OF : previewsClient.get(preview_id) match        
     }
 }
