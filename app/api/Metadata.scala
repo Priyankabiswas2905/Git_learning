@@ -687,7 +687,7 @@ class Metadata @Inject() (
     val repoEndpoint = (play.Play.application().configuration().getString("SEADservices.uri")) + "repositories"
     if (repoEndpoint != null) {
       val endpoint = (repoEndpoint + "/" + URLEncoder.encode(id, "UTF-8"))
-      val futureResponse = WS.url(endpoint).get()
+      val futureResponse = wsClient.url(endpoint).get()
       var success = false
       val result = futureResponse.map {
         case response =>
