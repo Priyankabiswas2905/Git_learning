@@ -2,7 +2,6 @@ package api
 
 import java.net.URL
 
-import com.ning.http.client.Realm.AuthScheme
 import javax.inject.Inject
 import play.api.Logger
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
@@ -100,7 +99,7 @@ class Proxy @Inject()(ws: WSClient) extends ApiController {
     // If the configured URL contained service account credentials(UserInfo), copy it to the proxied request
     if (!username.isEmpty && !password.isEmpty) {
       Logger.debug(s"PROXY :: Using service account credentials - $username")
-      return reqWithHeaders.withAuth(username, password, AuthScheme.BASIC)
+      return reqWithHeaders.withAuth(username, password, WSAuthScheme.BASIC)
     } else {
       Logger.debug("PROXY :: No credentials specified")
       return reqWithHeaders
