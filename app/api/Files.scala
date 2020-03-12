@@ -315,7 +315,7 @@ class Files @Inject()(
           case s: JsSuccess[Agent] => {
             creator = s.get
             //if creator is found, continue processing
-            val context: JsValue = (json \ "@context")
+            val context: JsValue = (json \ "@context").get
 
             // check if the context is a URL to external endpoint
             val contextURL: Option[URL] = context.asOpt[String].map(new URL(_))

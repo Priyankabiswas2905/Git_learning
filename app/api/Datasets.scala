@@ -617,7 +617,7 @@ class  Datasets @Inject()(
 
                 //parse the rest of the request to create a new models.Metadata object
                 val attachedTo = ResourceRef(ResourceRef.dataset, id)
-                val content = (json \ "content")
+                val content = (json \ "content").get
                 val version = None
                 val metadata = models.Metadata(UUID.generate, attachedTo, contextID, contextURL, createdAt, creator,
                   content, version)
