@@ -37,6 +37,7 @@ class Metadata @Inject() (
   events: EventService,
   spaceService: SpaceService,
   searches: SearchService,
+  extractionBusService: ExtractionBusService,
   wsClient: WSClient,
   configuration: Configuration) extends ApiController {
 
@@ -71,17 +72,17 @@ class Metadata @Inject() (
     // Next get Elasticsearch metadata fields if plugin available
     if (searches.isEnabled()) {
       val mdTerms = searches.getAutocompleteMetadataFields(query)
-      for (term <- mdTerms) {
-        // e.g. "metadata.http://localhost:9000/clowder/api/extractors/terra.plantcv.angle",
-        //      "metadata.Jane Doe.Alternative Title"
-        if (!(listOfTerms contains term))
-          listOfTerms.append(term)
-      }
-      Ok(toJson(listOfTerms.distinct))
+        for (term <- mdTerms) {
+          // e.g. "metadata.http://localhost:9000/clowder/api/extractors/terra.plantcv.angle",
+          //      "metadata.Jane Doe.Alternative Title"
+          if (!(listOfTerms contains term))
+            listOfTerms.append(term)
+        }
+        Ok(toJson(listOfTerms.distinct))
     } else {
-      BadRequest("Elasticsearch plugin is not enabled")
+        BadRequest("Elasticsearch plugin is not enabled")
+      }
     }
-  }
 
   def getDefinitionsByDataset(id: UUID) = PermissionAction(Permission.AddMetadata, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     implicit val user = request.user
@@ -485,40 +486,36 @@ class Metadata @Inject() (
             val metadataId = metadataService.addMetadata(metadata)
             val mdMap = metadata.getExtractionSummary
 
-            attachedTo match {
-              case Some(resource) => {
-                resource.resourceType match {
-                  case ResourceRef.dataset => {
-                    datasets.index(resource.id)
-                    //send RabbitMQ message
-                    datasets.get(resource.id) match {
-                      case Some(ds) => {
-                        events.addObjectEvent(Some(user), resource.id, ds.name, EventType.ADD_METADATA_DATASET.toString)
+                attachedTo match {
+                  case Some(resource) => {
+                    resource.resourceType match {
+                      case ResourceRef.dataset => {
+                        datasets.index(resource.id)
+                        //send RabbitMQ message
+                        datasets.get(resource.id) match {
+                          case Some(ds) => {
+                            events.addObjectEvent(Some(user), resource.id, ds.name, EventType.ADD_METADATA_DATASET.toString)
+                          }
+                        }
+                        extractionBusService.metadataAddedToResource(metadataId, resource, mdMap, Utils.baseUrl(request), request.apiKey, request.user)
                       }
-                    }
-                    current.plugin[RabbitmqPlugin].foreach { p =>
-                      p.metadataAddedToResource(metadataId, resource, mdMap, Utils.baseUrl(request), request.apiKey, request.user)
+                      case ResourceRef.file => {
+                        files.index(resource.id)
+                        //send RabbitMQ message
+                        files.get(resource.id) match {
+                          case Some(f) => {
+                            events.addObjectEvent(Some(user), resource.id, f.filename, EventType.ADD_METADATA_FILE.toString)
+                          }
+                        }
+                        extractionBusService.metadataAddedToResource(metadataId, resource, mdMap, Utils.baseUrl(request), request.apiKey, request.user)
+                      }
+                      case _ =>
+                        Logger.error("File resource type not recognized")
                     }
                   }
-                  case ResourceRef.file => {
-                    files.index(resource.id)
-                    //send RabbitMQ message
-                    files.get(resource.id) match {
-                      case Some(f) => {
-                        events.addObjectEvent(Some(user), resource.id, f.filename, EventType.ADD_METADATA_FILE.toString)
-                      }
-                    }
-                    current.plugin[RabbitmqPlugin].foreach { p =>
-                      p.metadataAddedToResource(metadataId, resource, mdMap, Utils.baseUrl(request), request.apiKey, request.user)
-                    }
-                  }
-                  case _ =>
-                    Logger.error("File resource type not recognized")
+                  case None =>
+                    Logger.error("Metadata missing attachedTo subdocument")
                 }
-              }
-              case None =>
-                Logger.error("Metadata missing attachedTo subdocument")
-            }
 
             // FIXME: the API should return JSON, not raw HTML
             // Emit our newly-created metadata as both a new card and a new table row
@@ -550,19 +547,14 @@ class Metadata @Inject() (
                 case ResourceRef.file => {
                   searches.delete(m.attachedTo.id.stringify)
                   files.index(m.attachedTo.id)
-                  current.plugin[RabbitmqPlugin].foreach { p =>
-                    p.metadataRemovedFromResource(id, m.attachedTo, Utils.baseUrl(request),
-                      request.apiKey, request.user)
-                  }
+                  extractionBusService.metadataRemovedFromResource(id, m.attachedTo, Utils.baseUrl(request),
+                    request.apiKey, request.user)
                 }
                 case ResourceRef.dataset => {
                   // Delete existing index entry and re-index
                   searches.delete(m.attachedTo.id.stringify)
                   datasets.index(m.attachedTo.id)
-
-                  current.plugin[RabbitmqPlugin].foreach { p =>
-                    p.metadataRemovedFromResource(id, m.attachedTo, Utils.baseUrl(request), request.apiKey, request.user)
-                  }
+                  extractionBusService.metadataRemovedFromResource(id, m.attachedTo, Utils.baseUrl(request), request.apiKey, request.user)
                 }
                 case _ => {
                   Logger.error("Unknown attached resource type for metadata")

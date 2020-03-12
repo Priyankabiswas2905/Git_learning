@@ -15,7 +15,7 @@ import javax.inject.{Inject, Singleton}
 import com.mongodb.casbah.commons.TypeImports.ObjectId
 import com.mongodb.casbah.WriteConcern
 import services.{ContextLDService, CurationService, DatasetService, SearchService, ExtractorMessage, FileService,
-  FolderService, MetadataService, RabbitmqPlugin}
+  FolderService, MetadataService, ExtractionBusService}
 import api.{Permission, UserRequest}
 import controllers.Utils
 
@@ -29,6 +29,7 @@ class MongoDBMetadataService @Inject() (contextService: ContextLDService,
                                         folders: FolderService,
                                         curations: CurationService,
                                         searches: SearchService,
+                                        extractionBusService: ExtractionBusService,
                                         mongoService: MongoService) extends MetadataService {
 
   /**
@@ -145,12 +146,9 @@ class MongoDBMetadataService @Inject() (contextService: ContextLDService,
     }
 
     // send extractor message after attached to resource
-    current.plugin[RabbitmqPlugin].foreach { p =>
-      metadataDocs.foreach { m =>
-        p.metadataRemovedFromResource(m.id, resourceRef, host, apiKey, user)
-      }
+    metadataDocs.foreach { m =>
+      extractionBusService.metadataRemovedFromResource(m.id, resourceRef, host, apiKey, user)
     }
-
     metadataDocs.map(m => m.id)
   }
 
@@ -172,12 +170,9 @@ class MongoDBMetadataService @Inject() (contextService: ContextLDService,
     }
 
     // send extractor message after attached to resource
-    current.plugin[RabbitmqPlugin].foreach { p =>
-      metadataDocs.foreach { m =>
-        p.metadataRemovedFromResource(m.id, resourceRef, host, apiKey, user)
-      }
+    metadataDocs.foreach { m =>
+      extractionBusService.metadataRemovedFromResource(m.id, resourceRef, host, apiKey, user)
     }
-
     metadataDocs.map(m => m.id)
   }
 

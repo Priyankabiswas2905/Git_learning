@@ -53,7 +53,8 @@ class  Datasets @Inject()(
   thumbnailService : ThumbnailService,
   appConfig: AppConfigurationService,
   adminsNotifierService: AdminsNotifierService,
-  searches: SearchService) extends ApiController {
+  searches: SearchService,
+  extractionBusService: ExtractionBusService) extends ApiController {
 
   def get(id: UUID) = PermissionAction(Permission.ViewDataset, Some(ResourceRef(ResourceRef.dataset, id))) { implicit request =>
     datasets.get(id) match {
@@ -227,7 +228,7 @@ class  Datasets @Inject()(
                   if (!file.xmlMetadata.isEmpty) {
                     val xmlToJSON = files.getXMLMetadataJSON(UUID(file_id))
                     datasets.addXMLMetadata(UUID(id), UUID(file_id), xmlToJSON)
-                  }
+                    }
                   searches.index(d, true)
 
                   adminsNotifierService.sendAdminsNotification(Utils.baseUrl(request), "Dataset", "added", id, name)
@@ -579,9 +580,7 @@ class  Datasets @Inject()(
         val mdMap = metadata.getExtractionSummary
 
         //send RabbitMQ message
-        current.plugin[RabbitmqPlugin].foreach { p =>
-          p.metadataAddedToResource(metadataId, metadata.attachedTo, mdMap, Utils.baseUrl(request), request.apiKey, request.user)
-        }
+        extractionBusService.metadataAddedToResource(metadataId, metadata.attachedTo, mdMap, Utils.baseUrl(request), request.apiKey, request.user)
 
         events.addObjectEvent(request.user, id, x.name, EventType.ADD_METADATA_DATASET.toString)
 
@@ -628,9 +627,7 @@ class  Datasets @Inject()(
                 val mdMap = metadata.getExtractionSummary
 
                 //send RabbitMQ message
-                current.plugin[RabbitmqPlugin].foreach { p =>
-                  p.metadataAddedToResource(metadataId, metadata.attachedTo, mdMap, Utils.baseUrl(request), request.apiKey, request.user)
-                }
+                extractionBusService.metadataAddedToResource(metadataId, metadata.attachedTo, mdMap, Utils.baseUrl(request), request.apiKey, request.user)
 
                 events.addObjectEvent(request.user, id, x.name, EventType.ADD_METADATA_DATASET.toString)
 
@@ -712,10 +709,8 @@ class  Datasets @Inject()(
         }
 
         // send extractor message after attached to resource
-        current.plugin[RabbitmqPlugin].foreach { p =>
-          metadataIds.foreach { mId =>
-            p.metadataRemovedFromResource(mId, ResourceRef(ResourceRef.dataset, id), Utils.baseUrl(request), request.apiKey, request.user)
-          }
+        metadataIds.foreach { mId =>
+          extractionBusService.metadataRemovedFromResource(mId, ResourceRef(ResourceRef.dataset, id), Utils.baseUrl(request), request.apiKey, request.user)
         }
 
         Ok(toJson(Map("status" -> "success", "count" -> metadataIds.size.toString)))

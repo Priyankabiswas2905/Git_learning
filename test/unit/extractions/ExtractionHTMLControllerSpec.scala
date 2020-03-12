@@ -9,6 +9,7 @@ import org.scalatest.mock.MockitoSugar._
 import org.mockito.Mockito.doNothing
 import services.ExtractorService
 import services.ExtractionService
+import services.ExtractionBusService
 import services.ExtractionRequestsService
 import services.PreviewService
 import services.ThumbnailService
@@ -58,6 +59,7 @@ class ExtractionAPIControllerSpec extends PlaySpec with OneAppPerSuite {
   val mockPreviews = mock[PreviewService]
   val mockthumbnails = mock[ThumbnailService]
   val mockAppConfig = mock[AppConfigurationService]
+  val mockExtractionBusService = mock[ExtractionBusService]
 
   when(mockExtractors.getExtractorNames(List.empty)).thenReturn(List("ncsa.cv.face", "ncsa.ocr"))
   when(mockExtractors.getExtractorInputTypes).thenReturn(List("image", "text"))

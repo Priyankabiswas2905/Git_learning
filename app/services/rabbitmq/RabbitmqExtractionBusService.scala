@@ -12,69 +12,20 @@ import com.ning.http.client.Realm.AuthScheme
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.AMQP.Queue
 import com.rabbitmq.client._
+import javax.inject.Inject
 import models._
 import org.bson.types.ObjectId
 import play.api.http.MimeTypes
 import play.api.Play.current
 import play.api.libs.json._
 import play.api.libs.ws.{Response, WS}
-import play.api.{Application, Logger, Plugin}
+import play.api.{Application, Configuration, Logger}
 import play.libs.Akka
 import securesocial.core.IdentityId
+import services.{CancellationMessage, DI, DatasetService, Entity, ExtractionBusService, ExtractionService, ExtractorMessage, ExtractorService, FileService, SpaceService, UserService}
 
 import scala.concurrent.{Await, Future}
 import scala.util.Try
-
-/**
-  * Despite the `fileId` be named as such, it is currently serialized as `id` and used as the id of any resource in
-  * question. So this will be the preview id in the case of messages operating on a preview, it will be the dataset
-  * id in the case of dataset messages (yes there is also `datasetId`, pyclowder2 checks that the two are the same.
-  * FIXME make optional fields Option[UUID]
-  * FIXME rename fileId to id and add a resourceType field (dataset, file, preview, etc.)
-  * TODO drop `intermediateId` or figure out how it works and use accordingly
-  * @param fileId this should only be used as
-  * @param intermediateId
-  * @param host
-  * @param queue
-  * @param metadata
-  * @param fileSize
-  * @param datasetId
-  * @param flags
-  * @param secretKey
-  */
-
-case class ExtractorMessage(
-  msgid: UUID,
-  fileId: UUID,
-  notifies: List[String],
-  intermediateId: UUID,
-  host: String,
-  queue: String,
-  metadata: Map[String, Any],
-  fileSize: String,
-  datasetId: UUID = null,
-  flags: String = "",
-  secretKey: String,
-  // new fields
-  routing_key: String,
-  source: Entity,
-  activity: String,
-  target: Option[Entity]
-)
-
-// TODO add other optional fields
-case class Entity(
-  id: ResourceRef,
-  mimeType: Option[String],
-  extra: JsObject
-)
-
-case class CancellationMessage(id: UUID, queueName: String, msgid: UUID)
-
-object Entity {
-  implicit val implicitEntityWrites = Json.format[Entity]
-}
-
 
 
 /**
@@ -105,9 +56,22 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   var vhost: String = ""
   var username: String = ""
   var password: String = ""
-  var mgmtPort: String = ""
+  var rabbitmquri: String =  play.api.Play.configuration.getString("clowder.rabbitmq.uri").getOrElse("amqp://guest:guest@localhost:5672/%2f")
+  var exchange: String =  play.api.Play.configuration.getString("clowder.rabbitmq.exchange").getOrElse("clowder")
+  var mgmtPort: String = play.api.Play.configuration.getString("clowder.rabbitmq.managmentPort").getOrElse("15672")
 
   var globalAPIKey = play.api.Play.configuration.getString("commKey").getOrElse("")
+
+  try {
+    val uri = new URI(rabbitmquri)
+    factory = Some(new ConnectionFactory())
+    factory.get.setUri(uri)
+  } catch {
+    case t: Throwable => {
+      factory = None
+      Logger.error("Invalid URI for RabbitMQ", t)
+    }
+  }
 
   /** On start connect to broker. */
   override def onStart() {
@@ -116,13 +80,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     rabbitmquri = configuration.getString("clowder.rabbitmq.uri").getOrElse("amqp://guest:guest@localhost:5672/%2f")
     exchange = configuration.getString("clowder.rabbitmq.exchange").getOrElse("clowder")
     mgmtPort = configuration.getString("clowder.rabbitmq.managmentPort").getOrElse("15672")
-    Logger.debug("uri= " + rabbitmquri)
-
-    Logger.debug("Starting Rabbitmq Plugin")
-    rabbitmquri = configuration.get[String]("clowder.rabbitmq.uri")
-    exchange = configuration.get[String]("clowder.rabbitmq.exchange")
-    mgmtPort = configuration.get[String]("clowder.rabbitmq.managmentPort")
-    Logger.debug("uri= " + rabbitmquri)
+    Logger.debug("uri= "+ rabbitmquri)
 
     try {
       val uri = new URI(rabbitmquri)
@@ -141,13 +99,12 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     Logger.debug("Shutting down Rabbitmq Plugin")
     factory = None
     close()
-    Future.successful(())
   }
 
   /** Check if play plugin is enabled **/
-  override lazy val enabled = {
-    !application.configuration.getString("rabbitmqplugin").filter(_ == "disabled").isDefined
-  }
+//  lazy val enabled = {
+//    play.api.Play.configuration.getString("rabbitmqplugin").filter(_ == "disabled").isDefined
+//  }
 
   /** Close connection to broker. **/
   def close() {
@@ -295,16 +252,22 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   }
 
   /**
-    * Submit and Extractor message to the extraction queue. This is the low level call used by public methods in this
-    * class.
-    * @param message a model representing the JSON message to send to the queue
-    */
-  private def extractWorkQueue(message: ExtractorMessage) = {
+   * Submit and Extractor message to the extraction queue. This is the low level call used by public methods in this
+   * class.
+   * @param message a model representing the JSON message to send to the queue
+   */
+  private def extractWorkQueue(message: services.ExtractorMessage): Boolean = {
     Logger.debug(s"Publishing $message directly to queue ${message.queue}")
     connect
     extractQueue match {
-      case Some(x) => x ! message
-      case None => Logger.warn("Could not send message over RabbitMQ")
+      case Some(x) => {
+        x ! message
+        true
+      }
+      case None => {
+        Logger.warn("Could not send message over RabbitMQ")
+        false
+      }
     }
   }
 
@@ -313,8 +276,9 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     * @param contentType original content type in standar form, for example text/csv
     * @return escaped routing key
     */
-  private def contentTypeToRoutingKey(contentType: String) =
+  private def contentTypeToRoutingKey(contentType: String): String = {
     contentType.replace(".", "_").replace("/", ".")
+  }
 
   /**
     * Given a dataset, return the union of all extractors registered for each space the dataset is in.
@@ -433,7 +397,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     * @param file_id the UUID of file
     * @param extractor_id the extractor queue name to be submitted
     */
-  def postSubmissionEven(file_id: UUID, extractor_id: String): UUID = {
+  def postSubmissionEvent(file_id: UUID, extractor_id: String): UUID = {
     val extractions: ExtractionService = DI.injector.getInstance(classOf[ExtractionService])
 
     import java.text.SimpleDateFormat
@@ -482,7 +446,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
 
           val notifies = getEmailNotificationEmailList(requestAPIKey)
 
-          val id = postSubmissionEven(file.id, queue)
+          val id = postSubmissionEvent(file.id, queue)
 
           val msg = ExtractorMessage(id, file.id, notifies, file.id, host, queue, extraInfo, file.length.toString,
             d.id, "", apiKey, routingKey, source, "created", None)
@@ -507,7 +471,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     val sourceExtra = JsObject((Seq("filename" -> JsString(file.filename))))
     val source = Entity(ResourceRef(ResourceRef.file, file.id), Some(file.contentType), sourceExtra)
     val notifies = getEmailNotificationEmailList(requestAPIKey)
-    val id = postSubmissionEven(file.id, routingKey)
+    val id = postSubmissionEvent(file.id, routingKey)
     val msg = ExtractorMessage(id, file.id, notifies, file.id, host, routingKey, extraInfo, file.length.toString, null,
       "", apiKey, routingKey, source, "created", None)
     extractWorkQueue(msg)
@@ -532,13 +496,13 @@ class RabbitmqPlugin(application: Application) extends Plugin {
 
       val notifies = getEmailNotificationEmailList(requestAPIKey)
 
-      val id = postSubmissionEven(file.id, extractorId)
+      val id = postSubmissionEvent(file.id, extractorId)
 
       val msg = ExtractorMessage(id, file.id, notifies, file.id, host, extractorId, Map.empty, file.length.toString, dataset.id,
         "", apiKey, routingKey, source, "added", Some(target))
       extractWorkQueue(msg)
+      }
     }
-  }
 
   /**
     * Send message when a group of files is added to a dataset via UI.
@@ -559,15 +523,15 @@ class RabbitmqPlugin(application: Application) extends Plugin {
 
       val notifies = getEmailNotificationEmailList(requestAPIKey)
 
-      val id = postSubmissionEven(dataset.id, extractorId)
+      val id = postSubmissionEvent(dataset.id, extractorId)
 
       var totalsize: Long = 0
       filelist.map(f => totalsize += f.length)
       val msg = ExtractorMessage(id, dataset.id, notifies, dataset.id, host, extractorId, msgExtra, totalsize.toString, dataset.id,
         "", apiKey, routingKey, source, "added", None)
       extractWorkQueue(msg)
+      }
     }
-  }
 
   /**
     * Send message when file is removed from a dataset and deleted.
@@ -586,7 +550,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
       val target = Entity(ResourceRef(ResourceRef.dataset, dataset.id), None, JsObject(Seq.empty))
 
       val notifies = getEmailNotificationEmailList(requestAPIKey)
-      val id = postSubmissionEven(file.id, extractorId)
+      val id = postSubmissionEvent(file.id, extractorId)
       val msg = ExtractorMessage(id, file.id, notifies, file.id, host, extractorId, Map.empty, file.length.toString, dataset.id,
         "", apiKey, routingKey, source, "removed", Some(target))
       extractWorkQueue(msg)
@@ -604,14 +568,14 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     * @param newFlags
     */
   def submitFileManually(originalId: UUID, file: File, host: String, queue: String, extraInfo: Map[String, Any],
-    datasetId: UUID, newFlags: String, requestAPIKey: Option[String], user: Option[User]): Unit = {
+    datasetId: UUID, newFlags: String, requestAPIKey: Option[String], user: Option[User]): Boolean = {
     Logger.debug(s"Sending message to $queue from $host with extraInfo $extraInfo")
     val apiKey = getApiKey(requestAPIKey, user)
     val sourceExtra = JsObject((Seq("filename" -> JsString(file.filename))))
     val source = Entity(ResourceRef(ResourceRef.file, originalId), Some(file.contentType), sourceExtra)
 
     val notifies = getEmailNotificationEmailList(requestAPIKey)
-    val id = postSubmissionEven(file.id, queue)
+    val id = postSubmissionEvent(file.id, queue)
     val msg = ExtractorMessage(id, file.id, notifies, file.id, host, queue, extraInfo, file.length.toString, datasetId,
       "", apiKey, "extractors." + queue, source, "submitted", None)
     extractWorkQueue(msg)
@@ -626,14 +590,14 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     * @param newFlags
     */
   def submitDatasetManually(host: String, queue: String, extraInfo: Map[String, Any], datasetId: UUID, newFlags: String,
-    requestAPIKey: Option[String], user: Option[User]): Unit = {
+    requestAPIKey: Option[String], user: Option[User]): Boolean = {
     Logger.debug(s"Sending message $queue from $host with extraInfo $extraInfo")
     val apiKey = getApiKey(requestAPIKey, user)
     val source = Entity(ResourceRef(ResourceRef.dataset, datasetId), None, JsObject(Seq.empty))
 
     val notifies = getEmailNotificationEmailList(requestAPIKey)
 
-    val id = postSubmissionEven(datasetId, queue)
+    val id = postSubmissionEvent(datasetId, queue)
     val msg = ExtractorMessage(id, datasetId, notifies, datasetId, host, queue, extraInfo, 0.toString, datasetId,
       "", apiKey, "extractors." + queue, source, "submitted", None)
     extractWorkQueue(msg)
@@ -664,7 +628,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
               val source = Entity(ResourceRef(ResourceRef.metadata, metadataId), None, JsObject(Seq.empty))
               val target = Entity(resourceRef, None, JsObject(Seq.empty))
 
-              val id = postSubmissionEven(resourceRef.id, extractorId)
+              val id = postSubmissionEvent(resourceRef.id, extractorId)
               val msg = ExtractorMessage(id, resourceRef.id, notifies, resourceRef.id, host, extractorId, extraInfo, 0.toString, resourceRef.id,
                 "", apiKey, routingKey, source, "added", Some(target))
               extractWorkQueue(msg)
@@ -681,7 +645,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
             val source = Entity(ResourceRef(ResourceRef.metadata, metadataId), None, JsObject(Seq.empty))
             val target = Entity(resourceRef, None, JsObject(Seq.empty))
 
-            val id = postSubmissionEven(resourceRef.id, extractorId)
+            val id = postSubmissionEvent(resourceRef.id, extractorId)
             val msg = ExtractorMessage(id, resourceRef.id, notifies, resourceRef.id, host, extractorId, extraInfo, 0.toString, null,
               "", apiKey, routingKey, source, "added", Some(target))
             extractWorkQueue(msg)
@@ -716,7 +680,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
               val source = Entity(ResourceRef(ResourceRef.metadata, metadataId), None, JsObject(Seq.empty))
               val target = Entity(resourceRef, None, JsObject(Seq.empty))
 
-              val id = postSubmissionEven(resourceRef.id, extractorId)
+              val id = postSubmissionEvent(resourceRef.id, extractorId)
               val msg = ExtractorMessage(id, resourceRef.id, notifies, resourceRef.id, host, extractorId, extraInfo, 0.toString, resourceRef.id,
                 "", apiKey, routingKey, source, "removed", Some(target))
               extractWorkQueue(msg)
@@ -733,7 +697,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
             val source = Entity(ResourceRef(ResourceRef.metadata, metadataId), None, JsObject(Seq.empty))
             val target = Entity(resourceRef, None, JsObject(Seq.empty))
 
-            val id = postSubmissionEven(resourceRef.id, extractorId)
+            val id = postSubmissionEvent(resourceRef.id, extractorId)
             val msg = ExtractorMessage(id, resourceRef.id, notifies, resourceRef.id, host, extractorId, extraInfo, 0.toString, null,
               "", apiKey, routingKey, source, "removed", Some(target))
             extractWorkQueue(msg)
@@ -761,7 +725,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     val notifies = getEmailNotificationEmailList(requestAPIKey)
     val source = Entity(ResourceRef(ResourceRef.file, tempFileId), Some(contentType), JsObject(Seq.empty))
 
-    val id = postSubmissionEven(tempFileId, routingKey)
+    val id = postSubmissionEvent(tempFileId, routingKey)
     val msg = ExtractorMessage(id, tempFileId, notifies, tempFileId, host, routingKey, Map.empty[String, Any], length, null,
       "", apiKey, routingKey, source, "created", None)
     extractWorkQueue(msg)
@@ -781,7 +745,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
     val target = Entity(ResourceRef(ResourceRef.section, sectionId), None, JsObject(Seq.empty))
     val notifies = getEmailNotificationEmailList(requestAPIKey)
 
-    val id = postSubmissionEven(sectionId, routingKey)
+    val id = postSubmissionEvent(sectionId, routingKey)
     val msg = ExtractorMessage(id, sectionId, notifies, sectionId, host, routingKey, extraInfo, 0.toString, null,
       "", apiKey, routingKey, source, "added", Some(target))
     extractWorkQueue(msg)
@@ -791,7 +755,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   // ----------------------------------------------------------------------
   // RABBITMQ MANAGEMENT ENDPOINTS
   // ----------------------------------------------------------------------
-  def getRestEndPoint(path: String): Future[WSResponse] = {
+  def getRestEndPoint(path: String): Future[Response] = {
     connect
 
     restURL match {
@@ -949,12 +913,14 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   * @param connection                     the connection to the rabbitmq
   * @param cancellationDownloadQueueName  the queue name of the cancellation downloaded queue
   */
-class PendingRequestCancellationActor(exchange: String, connection: Option[Connection], cancellationDownloadQueueName: String, cancellationSearchTimeout: Long) extends Actor {
+class PendingRequestCancellationActor @Inject() (exchange: String, connection: Option[Connection], cancellationDownloadQueueName: String, cancellationSearchTimeout: Long) extends Actor {
   val configuration = play.api.Play.configuration
   val CancellationSearchNumLimits: Integer = configuration.getString("submission.cancellation.search.numlimits").getOrElse("100").toInt
   def receive = {
     case CancellationMessage(id, queueName, msg_id) => {
       val extractions: ExtractionService = DI.injector.getInstance(classOf[ExtractionService])
+      val rabbitmqService: ExtractionBusService = DI.injector.getInstance(classOf[ExtractionBusService])
+
       val dateFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssX")
       var startDate = Some(new java.util.Date())
       extractions.insert(Extraction(UUID.generate(), id, queueName, "Cancel Requested", startDate, None))
@@ -1042,10 +1008,7 @@ class PendingRequestCancellationActor(exchange: String, connection: Option[Conne
       //3. resubmit pending requests from cancellation download queue to the target queue.
       val cancellationQueueConsumer: QueueingConsumer = new QueueingConsumer(channel)
       val cancellationQueueConsumerTag: String = channel.basicConsume(cancellationDownloadQueueName, false, cancellationQueueConsumer)
-      current.plugin[RabbitmqPlugin] match {
-        case Some(p) => p.resubmitPendingRequests(cancellationQueueConsumer, channel, cancellationSearchTimeout)
-        case None => Logger.error(s"[CANCELLATION] RabbitmqPlugin not enabled")
-      }
+      rabbitmqService.resubmitPendingRequests(cancellationQueueConsumer, channel, cancellationSearchTimeout)
 
       try {
         channel.basicCancel(cancellationQueueConsumerTag)
@@ -1068,10 +1031,13 @@ class PendingRequestCancellationActor(exchange: String, connection: Option[Conne
   * Send message on specified channel directly to a queue and tells receiver to reply
   * on specified queue.
   */
-class PublishDirectActor(channel: Channel, replyQueueName: String) extends Actor {
+class PublishDirectActor @Inject() (channel: Channel, replyQueueName: String) extends Actor {
   val appHttpPort = play.api.Play.configuration.getString("http.port").getOrElse("")
   val appHttpsPort = play.api.Play.configuration.getString("https.port").getOrElse("")
   val clowderurl = play.api.Play.configuration.getString("clowder.rabbitmq.clowderurl")
+
+  val rabbitmqService: ExtractionBusService = DI.injector.getInstance(classOf[ExtractionBusService])
+
 
   def receive = {
     case ExtractorMessage(msgid, fileid, notifies, intermediateId, host, key, metadata, fileSize, datasetId, flags, secretKey, routingKey,
@@ -1163,7 +1129,7 @@ class MsgConsumer(channel: Channel, target: ActorRef) extends DefaultConsumer(ch
   * Actual message on reply queue.
   */
 class EventFilter(channel: Channel, queue: String) extends Actor {
-  val extractions: ExtractionService = DI.injector.instanceOf[ExtractionService]
+  val extractions: ExtractionService = DI.injector.getInstance(classOf[ExtractionService])
 
   def receive = {
     case statusBody: String =>

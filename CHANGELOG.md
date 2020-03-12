@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## 2.0.0-alpha
 
+
+### Changed
+- Rabbitmq Plugin replaced with ExtractionBusService, implemented by RabbitmqExtractionBusService
+
+
 ### Removed
 - Removed geostreams api endpoints, controllers and views
 - Removed postgres plugin

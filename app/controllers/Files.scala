@@ -56,6 +56,7 @@ class Files @Inject() (
   fileConvertService: FileConvertService,
   versusService: VersusService,
   adminsNotifierService: AdminsNotifierService,
+  extractionBusService: ExtractionBusService,
   appConfig: AppConfigurationService,
   searches: SearchService,
   fileDumpService: FileDumpService,
@@ -430,12 +431,8 @@ class Files @Inject() (
                     InternalServerError(fileType.substring(7))
                   }
                 }
-
                 // submit for extraction
-                current.plugin[RabbitmqPlugin].foreach {
-                  // FIXME dataset not available?
-                  _.fileCreated(f, None, Utils.baseUrl(request), request.apiKey)
-                }
+                extractionBusService.fileCreated(f, None, Utils.baseUrl(request), request.apiKey)
 
                 /** *** Inserting DTS Requests   **/
                 val clientIP = request.remoteAddress
@@ -451,10 +448,8 @@ class Files @Inject() (
                 //for metadata files
                 if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
                   val xmlToJSON = FilesUtils.readXMLgetJSON(uploadedFile.ref.file)
-
                   files.addXMLMetadata(f.id, xmlToJSON)
                 }
-                versusService.index(f.id.toString, fileType)
 
                 searches.index(f)
 
@@ -569,16 +564,13 @@ class Files @Inject() (
               val extra = Map("filename" -> f.filename)
               dtsrequests.insertRequest(serverIP, clientIP, f.filename, f.id, fileType, f.length, f.uploadDate)
               /****************************/
-	            current.plugin[RabbitmqPlugin].foreach{
-                // FIXME dataset not available?
-                _.fileCreated(f, None, Utils.baseUrl(request), request.apiKey)
-              }
+              extractionBusService.fileCreated(f, None, Utils.baseUrl(request), request.apiKey)
 	            
 	            //for metadata files
 	            if(fileType.equals("application/xml") || fileType.equals("text/xml")){
 	              val xmlToJSON = FilesUtils.readXMLgetJSON(uploadedFile.ref.file)
 	              files.addXMLMetadata(f.id, xmlToJSON)
-	            }
+                }
               searches.index(f)
 
               versusService.indexFile(f.id, fileType)
@@ -741,30 +733,30 @@ class Files @Inject() (
    */
   def downloadAsFormat(id: UUID, outputFormat: String) = PermissionAction(Permission.DownloadFiles, Some(ResourceRef(ResourceRef.file, id))).async { implicit request =>
     implicit val user = request.user
-    if (UUID.isValid(id.stringify)) {
-      files.get(id) match {
-        case Some(file) => {
-          //get bytes for file to be converted
-          files.getBytes(id) match {
-            case Some((inputStream, filename, contentType, contentLength)) => {
+        if (UUID.isValid(id.stringify)) {
+          files.get(id) match {
+            case Some(file) => {
+              //get bytes for file to be converted
+              files.getBytes(id) match {
+                case Some((inputStream, filename, contentType, contentLength)) => {
 
-              //prepare encoded file name for converted file
-              val lastSeparatorIndex = file.filename.replace("_", ".").lastIndexOf(".")
-              val outputFileName = file.filename.substring(0, lastSeparatorIndex) + "." + outputFormat
+                  //prepare encoded file name for converted file
+                  val lastSeparatorIndex = file.filename.replace("_", ".").lastIndexOf(".")
+                  val outputFileName = file.filename.substring(0, lastSeparatorIndex) + "." + outputFormat
 
-              //create local temp file to save polyglot output
-              val tempFileName = "temp_converted_file." + outputFormat
-              val tempFile: java.io.File = new java.io.File(tempFileName)
-              tempFile.deleteOnExit()
+                  //create local temp file to save polyglot output
+                  val tempFileName = "temp_converted_file." + outputFormat
+                  val tempFile: java.io.File = new java.io.File(tempFileName)
+                  tempFile.deleteOnExit()
 
-              val outputStream: OutputStream = new BufferedOutputStream(new FileOutputStream(tempFile))
+                  val outputStream: OutputStream = new BufferedOutputStream(new FileOutputStream(tempFile))
 
               val fileConvertUser: Option[String] = configuration.getString("fileconvert.username")
               val fileConvertPassword: Option[String] = configuration.getString("fileconvert.password")
               val fileConvertConvertURL: Option[String] = configuration.getString("fileconvert.convertURL")
 
               if (fileConvertConvertURL.isDefined && fileConvertUser.isDefined && fileConvertPassword.isDefined) {
-                files.incrementDownloads(id, user)
+                    files.incrementDownloads(id, user)
 
                 //first call to Polyglot to get url of converted file
                 fileConvertService.getConvertedFileURL(filename, inputStream, outputFormat)
@@ -926,9 +918,7 @@ class Files @Inject() (
 
             fileDumpService.dump(DumpOfFile(uploadedFile.ref.file, f.id.toString, nameOfFile))
 
-            current.plugin[RabbitmqPlugin].foreach {
-              _.multimediaQuery(f.id, f.contentType, f.length.toString, Utils.baseUrl(request), request.apiKey)
-            }
+            extractionBusService.multimediaQuery(f.id, f.contentType, f.length.toString, Utils.baseUrl(request), request.apiKey)
 
             //for metadata files
             if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
@@ -1014,9 +1004,7 @@ class Files @Inject() (
             val id = f.id
             val extra = Map("filename" -> f.filename, "action" -> "upload")
 
-            current.plugin[RabbitmqPlugin].foreach {
-              _.fileCreated(f, host, request.apiKey)
-            }
+            extractionBusService.fileCreated(f, host, request.apiKey)
 
             //for metadata files
             if (fileType.equals("application/xml") || fileType.equals("text/xml")) {
@@ -1133,10 +1121,8 @@ class Files @Inject() (
                     searches.index(f)
 
                     // notify extractors that a file has been uploaded and added to a dataset
-                    current.plugin[RabbitmqPlugin].foreach { rabbitMQ =>
-                      rabbitMQ.fileCreated(f, Some(dataset), Utils.baseUrl(request), request.apiKey)
-                      rabbitMQ.fileAddedToDataset(f, dataset, Utils.baseUrl(request), request.apiKey)
-                    }
+                    extractionBusService.fileCreated(f, Some(dataset), Utils.baseUrl(request), request.apiKey)
+                    extractionBusService.fileAddedToDataset(f, dataset, Utils.baseUrl(request), request.apiKey)
 
                     Logger.debug("Uploading Completed")
                     // redirect to dataset page

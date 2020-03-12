@@ -42,6 +42,8 @@ object FileUtils {
   lazy val fileDumpService: FileDumpService = DI.injector.instanceOf[FileDumpServiceImpl]
   lazy val actorSystem = DI.injector.instanceOf[ActorSystem]
   lazy val configuration = DI.injector.instanceOf[Configuration]
+  lazy val extractionBusService : ExtractionBusService = DI.injector.getInstance(classOf[ExtractionBusService])
+
 
   def getContentType(filename: Option[String], contentType: Option[String]): String = {
     getContentType(filename.getOrElse(""), contentType)
@@ -538,9 +540,7 @@ object FileUtils {
       val mdMap = metadata.getExtractionSummary
 
       //send RabbitMQ message
-      current.plugin[RabbitmqPlugin].foreach { p =>
-        p.metadataAddedToResource(metadataId, metadata.attachedTo, mdMap, requestHost, apiKey, user)
-      }
+      extractionBusService.metadataAddedToResource(metadataId, metadata.attachedTo, mdMap, requestHost, apiKey, user)
     }
   }
 
@@ -757,9 +757,7 @@ object FileUtils {
 
     // send file to rabbitmq for processing
     if (runExtractors) {
-      current.plugin[RabbitmqPlugin].foreach { p =>
-        p.fileCreated(file, dataset, clowderurl, apiKey)
-      }
+      extractionBusService.fileCreated(file, dataset, clowderurl, apiKey)
     }
 
     // index the file
@@ -779,9 +777,7 @@ object FileUtils {
     dataset.foreach{ds =>
 
       if (runExtractors) {
-        current.plugin[RabbitmqPlugin].foreach { p =>
-          p.fileAddedToDataset(file, ds, clowderurl, apiKey)
-        }
+        extractionBusService.fileAddedToDataset(file, ds, clowderurl, apiKey)
       }
 
       // index dataset

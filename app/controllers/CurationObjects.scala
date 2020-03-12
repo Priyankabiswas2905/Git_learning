@@ -43,9 +43,9 @@ class CurationObjects @Inject() (
   events: EventService,
   userService: UserService,
   metadatas: MetadataService,
+  extractionBusService: ExtractionBusService,
   contextService: ContextLDService,
-  wsClient: WSClient,
-  rabbitMQService: RabbitMQService) extends SecuredController {
+  wsClient: WSClient) extends SecuredController {
 
   /**
    * String name of the Space such as 'Project space' etc., parsed from conf/messages
@@ -169,10 +169,8 @@ class CurationObjects @Inject() (
                   val mdMap = m.getExtractionSummary
 
                   //send RabbitMQ message
-                  current.plugin[RabbitmqPlugin].foreach { p =>
-                    p.metadataAddedToResource(metadataId, ResourceRef(ResourceRef.file, f.id), mdMap, Utils.baseUrl(request),
-                      request.apiKey, request.user)
-                  }
+                  extractionBusService.metadataAddedToResource(metadataId, ResourceRef(ResourceRef.file, f.id), mdMap, Utils.baseUrl(request),
+                    request.apiKey, request.user)
                 })
               })
 
@@ -205,10 +203,8 @@ class CurationObjects @Inject() (
                       ResourceRef(ResourceRef.curationObject, newCuration.id)))
                     val mdMap = m.getExtractionSummary
                     //send RabbitMQ message
-                    current.plugin[RabbitmqPlugin].foreach { p =>
-                      p.metadataAddedToResource(metadataId, ResourceRef(ResourceRef.dataset, dataset.id), mdMap,
-                        Utils.baseUrl(request), request.apiKey, request.user)
-                    }
+                    extractionBusService.metadataAddedToResource(metadataId, ResourceRef(ResourceRef.dataset, dataset.id), mdMap,
+                      Utils.baseUrl(request), request.apiKey, request.user)
                   }
                 })
               Redirect(routes.CurationObjects.getCurationObject(newCuration.id))
@@ -248,9 +244,7 @@ class CurationObjects @Inject() (
               val metadataId = metadatas.addMetadata(m.copy(id = UUID.generate(), attachedTo = curationRef))
               val mdMap = m.getExtractionSummary
               //send RabbitMQ message
-              current.plugin[RabbitmqPlugin].foreach { p =>
-                p.metadataAddedToResource(metadataId, curationRef, mdMap, requestHost, apiKey, user)
-              }
+              extractionBusService.metadataAddedToResource(metadataId, curationRef, mdMap, requestHost, apiKey, user)
             })
         })
 
