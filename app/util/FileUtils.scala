@@ -24,8 +24,10 @@ import scala.util.Try
 import javax.mail.internet.MimeUtility
 import java.net.URLEncoder
 
+import akka.actor.ActorSystem
+
 object FileUtils {
-  val appConfig: AppConfigurationService = DI.injector.getInstance(classOf[AppConfigurationService])
+  val appConfig: AppConfigurationService = DI.injector.instanceOf(classOf[AppConfigurationService])
 
   lazy val files: FileService = DI.injector.instanceOf[FileService]
   lazy val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
@@ -42,7 +44,7 @@ object FileUtils {
   lazy val fileDumpService: FileDumpService = DI.injector.instanceOf[FileDumpServiceImpl]
   lazy val actorSystem = DI.injector.instanceOf[ActorSystem]
   lazy val configuration = DI.injector.instanceOf[Configuration]
-  lazy val extractionBusService : ExtractionBusService = DI.injector.getInstance(classOf[ExtractionBusService])
+  lazy val extractionBusService : ExtractionBusService = DI.injector.instanceOf(classOf[ExtractionBusService])
 
 
   def getContentType(filename: Option[String], contentType: Option[String]): String = {
@@ -339,7 +341,7 @@ object FileUtils {
       if (url.isSuccess && url.get.isDefined) {
         url.get.foreach(processURL(_, jsv, user, creator, clowderurl, dataset, folder, key, index, showPreviews, originalZipFile, flagsFromPrevious, intermediateUpload, runExtractors, apiKey).foreach(uploadedFiles += _))
       } else if (jsv.keys.contains("path")) {
-        val path = Parsers.parseString(jsv \ "path")
+        val path = Parsers.parseString((jsv \ "path").get)
         processPath(path, jsv, user, creator, clowderurl, dataset, folder, key, index, showPreviews, originalZipFile, flagsFromPrevious, intermediateUpload, runExtractors, apiKey).foreach(uploadedFiles += _)
       }
     }}
