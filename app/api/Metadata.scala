@@ -39,7 +39,8 @@ class Metadata @Inject() (
   searches: SearchService,
   extractionBusService: ExtractionBusService,
   wsClient: WSClient,
-  configuration: Configuration) extends ApiController {
+  configuration: Configuration,
+  appConfig: AppConfigurationService) extends ApiController {
 
   def getDefinitions() = PermissionAction(Permission.ViewDataset) {
     implicit request =>
@@ -449,7 +450,7 @@ class Metadata @Inject() (
           val userURI = controllers.routes.Application.index().absoluteURL() + "api/users/" + user.id
           val creator = UserAgent(user.id, "cat:user", MiniUser(user.id, user.fullName, user.avatarUrl.getOrElse(""), user.email), Some(new URL(userURI)))
 
-          val context: JsValue = (json \ "@context")
+          val context: JsValue = (json \ "@context").get
 
           // figure out what resource this is attached to
           val attachedTo =
@@ -475,7 +476,7 @@ class Metadata @Inject() (
             } else None
 
           //parse the rest of the request to create a new models.Metadata object
-          val content = (json \ "content")
+          val content = (json \ "content").get
           val version = None
 
           if (attachedTo.isDefined) {
@@ -605,8 +606,8 @@ class Metadata @Inject() (
     implicit request: UserRequest[JsValue] =>
 
     implicit val context = scala.concurrent.ExecutionContext.Implicits.global
-    val endpoint = (play.Play.application().configuration().getString("people.uri"))
-    if (play.api.Play.current.configuration.getBoolean("stagingArea").getOrElse(false) && endpoint != null) {
+    val endpoint = appConfig.getProperty[String]("people.uri").getOrElse("")
+    if (appConfig.getProperty[Boolean]("stagingArea").getOrElse(false) && endpoint != null) {
 
       val futureResponse = wsClient.url(endpoint).get()
       var jsonResponse: play.api.libs.json.JsValue = new JsArray()
@@ -676,7 +677,7 @@ class Metadata @Inject() (
   def getRepository(id: String) = PermissionAction(Permission.ViewMetadata).async { implicit request =>
 
     implicit val context = scala.concurrent.ExecutionContext.Implicits.global
-    val repoEndpoint = (play.Play.application().configuration().getString("SEADservices.uri")) + "repositories"
+    val repoEndpoint = appConfig.getProperty[String]("SEADservices.uri") + "repositories"
     if (repoEndpoint != null) {
       val endpoint = (repoEndpoint + "/" + URLEncoder.encode(id, "UTF-8"))
       val futureResponse = wsClient.url(endpoint).get()
