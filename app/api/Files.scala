@@ -364,8 +364,8 @@ class Files @Inject()(
     val json = request.body.as[JsObject]
 
     try {
-      val fileList: JsValue = (json \ "files")
-      val metadata: JsValue = (json \ "metadata")
+      val fileList : JsValue = (json \ "files").get
+      val metadata: JsValue = (json \ "metadata").get
           //parse request for agent/creator info
           //creator can be UserAgent or ExtractorAgent
           var creator: models.Agent = null
@@ -373,7 +373,7 @@ class Files @Inject()(
             case s: JsSuccess[Agent] => {
               creator = s.get
               //if creator is found, continue processing
-              val context: JsValue = (metadata \ "@context")
+              val context: JsValue = (metadata \ "@context").get
 
               // check if the context is a URL to external endpoint
               val contextURL: Option[URL] = context.asOpt[String].map(new URL(_))
