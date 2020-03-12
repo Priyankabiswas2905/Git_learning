@@ -1,17 +1,17 @@
 package controllers
 
 import java.util.Calendar
-import javax.inject.Inject
 
+import javax.inject.Inject
 import models.ExtractionInfoSetUp
 import play.api.Logger
 import play.api.Play.current
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json._
-import services.{ExtractionRequestsService, ExtractorService}
+import services.{AppConfigurationService, ExtractionRequestsService, ExtractorService}
 
 
-class ExtractionInfo @Inject() (extractors: ExtractorService, dtsrequests: ExtractionRequestsService) extends SecuredController {
+class ExtractionInfo @Inject() (extractors: ExtractorService, dtsrequests: ExtractionRequestsService, appConfig: AppConfigurationService) extends SecuredController {
 
 /**
  * Directs currently running extractors information to the webpage 
@@ -65,11 +65,10 @@ class ExtractionInfo @Inject() (extractors: ExtractorService, dtsrequests: Extra
    * DTS Chrome Extension page
    */
   def getExtensionPage() = AuthenticatedAction { implicit request =>
-    val configuration = play.api.Play.configuration
     val url = Utils.baseUrl(request)
     var hostname = if (url.indexOf('.') == -1) { url.substring(url.indexOf('/') + 2, url.lastIndexOf(':')) } else { url.substring(url.indexOf('/') + 2, url.indexOf('.')) }
     Logger.debug(" url= " + url + "  hostname " + hostname)
-    val extensionHostUrl = configuration.getString("dts.extension.host").getOrElse("")
+    val extensionHostUrl = appConfig.getProperty[String]("dts.extension.host").getOrElse("")
     Ok(views.html.dtsExtension(Utils.baseUrl(request), hostname, extensionHostUrl))
   }
 }

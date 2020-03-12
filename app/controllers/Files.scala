@@ -10,7 +10,6 @@ import fileutils.FilesUtils
 import models._
 import org.apache.commons.lang.StringEscapeUtils._
 import play.api.Logger
-import play.api.Play.{configuration, current}
 import play.api.{Configuration, Environment, Logger}
 import play.api.data.Form
 import play.api.data.Forms._
@@ -751,9 +750,9 @@ class Files @Inject() (
 
                   val outputStream: OutputStream = new BufferedOutputStream(new FileOutputStream(tempFile))
 
-              val fileConvertUser: Option[String] = configuration.getString("fileconvert.username")
-              val fileConvertPassword: Option[String] = configuration.getString("fileconvert.password")
-              val fileConvertConvertURL: Option[String] = configuration.getString("fileconvert.convertURL")
+              val fileConvertUser: Option[String] = appConfig.getProperty[String]("fileconvert.username")
+              val fileConvertPassword: Option[String] = appConfig.getProperty[String]("fileconvert.password")
+              val fileConvertConvertURL: Option[String] = appConfig.getProperty[String]("fileconvert.convertURL")
 
               if (fileConvertConvertURL.isDefined && fileConvertUser.isDefined && fileConvertPassword.isDefined) {
                     files.incrementDownloads(id, user)
