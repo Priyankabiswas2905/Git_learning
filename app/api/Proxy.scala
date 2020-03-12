@@ -65,7 +65,7 @@ class Proxy @Inject()(ws: WSClient) extends ApiController {
   /**
     * Build up our intermediary (proxied) request from the original
     */
-  def buildProxiedRequest(proxyTarget: String, originalRequest: UserRequest[String]): WSRequestHolder = {
+  def buildProxiedRequest(proxyTarget: String, originalRequest: UserRequest[String]): WSRequest = {
     // Parse basic auth credentials from target URL
     val targetUrl: URL = new URL(proxyTarget);
     val userInfo = targetUrl.getUserInfo()
@@ -134,15 +134,15 @@ class Proxy @Inject()(ws: WSClient) extends ApiController {
     * Given a response, chunk its body and return/forward it as a SimpleResult
     */
   def chunkAndForwardResponse(originalResponse: WSResponse): Result = {
-    val statusCode = originalResponse.getAHCResponse.getStatusCode
+    val statusCode = originalResponse.status
     if (statusCode >= 400) {
-      Logger.error("PROXY :: " + statusCode + " - " + originalResponse.getAHCResponse.getStatusText)
+      Logger.error("PROXY :: " + statusCode + " - " + originalResponse.statusText)
     }
 
     // Chunk the response
     val bodyStream = originalResponse.ahcResponse.getResponseBodyAsStream
     val bodyEnumerator = Enumerator.fromStream(bodyStream)
-    val payload = Status(statusCode).chunked(bodyEnumerator)
+     val payload = Status(statusCode).chunked(bodyEnumerator)
 
     // Return a SimpleResult, coerced into our desired Content-Type
     val contentType = originalResponse.header("Content-Type").getOrElse("text/plain")

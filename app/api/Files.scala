@@ -329,11 +329,11 @@ class Files @Inject()(
               } else None
 
             // when the new metadata is added
-            val createdAt = Parsers.parseDate((json \ "created_at")).fold(new Date())(_.toDate)
+            val createdAt = Parsers.parseDate(json \ "created_at").get.fold(new Date())(_.toDate)
 
             //parse the rest of the request to create a new models.Metadata object
             val attachedTo = ResourceRef(ResourceRef.file, id)
-            val content = (json \ "content")
+            val content = (json \ "content").get
             val version = None
             val metadata = models.Metadata(UUID.generate, attachedTo, contextID, contextURL, createdAt, creator,
               content, version)
