@@ -12,7 +12,7 @@ import play.api.libs.ws._
 import scala.concurrent.duration._
 import models._
 import play.api.libs.ws
-import services.SpaceService
+import services.{AppConfigurationService, DI, SpaceService}
 
 /**
  * Utility to get publications from sead services.
@@ -20,10 +20,11 @@ import services.SpaceService
  */
 object Publications {
       
-      
+    val appConfig : AppConfigurationService = DI.injector.instanceOf(classOf[AppConfigurationService])
+
     def getPublications(space: String, spaces: SpaceService) = {
     implicit val context = scala.concurrent.ExecutionContext.Implicits.global
-    val endpoint = play.Play.application().configuration().getString("publishData.list.uri").replaceAll("/$", "")
+    val endpoint = appConfig.getProperty[String]("publishData.list.uri").getOrElse("").replaceAll("/$", "")
     Logger.debug(endpoint)
     val futureResponse = WS.url(endpoint).get()
     var publishDataList: List[Map[String, String]] = List.empty
@@ -57,7 +58,7 @@ object Publications {
 
           rawDataList.reverse
         } else {
-          Logger.error("Error Getting published data: " + response.getAHCResponse.getResponseBody)
+          Logger.error("Error Getting published data: " + response.statusText)
           List.empty
         }
     }
