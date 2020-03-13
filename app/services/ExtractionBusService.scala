@@ -19,8 +19,8 @@ import org.bson.types.ObjectId
 import play.api.http.MimeTypes
 import play.api.Play.current
 import play.api.libs.json._
-import play.api.libs.ws.{Response, WS}
-import play.api.{Application, Configuration, Logger, Plugin}
+import play.api.libs.ws._
+import play.api.{Application, Configuration, Logger}
 import play.libs.Akka
 import securesocial.core.IdentityId
 import services.Entity
@@ -112,17 +112,17 @@ trait ExtractionBusService {
 
   def submitSectionPreviewManually(preview: Preview, sectionId: UUID, host: String, requestAPIKey: Option[String])
 
-  def getExchanges : Future[Response]
+  def getExchanges : Future[WSResponse]
 
-  def getQueuesNamesForAnExchange(exchange: String): Future[Response]
+  def getQueuesNamesForAnExchange(exchange: String): Future[WSResponse]
 
-  def getBindings: Future[Response]
+  def getBindings: Future[WSResponse]
 
-  def getChannelsList: Future[Response]
+  def getChannelsList: Future[WSResponse]
 
-  def getQueueDetails(qname: String): Future[Response]
+  def getQueueDetails(qname: String): Future[WSResponse]
 
-  def getQueueBindings(qname: String): Future[Response]
+  def getQueueBindings(qname: String): Future[WSResponse]
 
   def cancelPendingSubmission(id: UUID, queueName: String, msg_id: UUID)
 
