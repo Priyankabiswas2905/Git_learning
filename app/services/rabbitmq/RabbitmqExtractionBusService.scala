@@ -1,9 +1,11 @@
-package services
+package services.rabbitmq
 
 import java.io.IOException
-import java.net.{URI, URLEncoder}
+import java.net.URI
 import java.text.SimpleDateFormat
+import java.net.URLEncoder
 
+import javax.inject.Singleton
 import akka.actor.{Actor, ActorRef, PoisonPill, Props}
 
 import scala.concurrent.duration._
@@ -18,11 +20,11 @@ import org.bson.types.ObjectId
 import play.api.http.MimeTypes
 import play.api.Play.current
 import play.api.libs.json._
-import play.api.libs.ws.{Response, WS}
+import play.api.libs.ws._
 import play.api.{Application, Configuration, Logger}
 import play.libs.Akka
 import securesocial.core.IdentityId
-import services.{CancellationMessage, DI, DatasetService, Entity, ExtractionBusService, ExtractionService, ExtractorMessage, ExtractorService, FileService, SpaceService, UserService}
+import services.{AppConfigurationService, CancellationMessage, DI, DatasetService, Entity, ExtractionBusService, ExtractionService, ExtractorMessage, ExtractorService, FileService, SpaceService, UserService}
 
 import scala.concurrent.{Await, Future}
 import scala.util.Try
@@ -31,12 +33,14 @@ import scala.util.Try
 /**
   * Rabbitmq service.
   */
-class RabbitmqPlugin(application: Application) extends Plugin {
-  val files: FileService = DI.injector.getInstance(classOf[FileService])
-  val spacesService: SpaceService = DI.injector.getInstance(classOf[SpaceService])
-  val extractorsService: ExtractorService = DI.injector.getInstance(classOf[ExtractorService])
-  val datasetService: DatasetService = DI.injector.getInstance(classOf[DatasetService])
-  val userService: UserService = DI.injector.getInstance(classOf[UserService])
+@Singleton
+class RabbitmqExtractionBusService @Inject() (
+                                 files: FileService,
+                                 spacesService: SpaceService,
+                                 extractorsService: ExtractorService,
+                                 datasetService: DatasetService,
+                                 userService: UserService,
+                                 appConfig: AppConfigurationService) extends ExtractionBusService {
 
   var channel: Option[Channel] = None
   var connection: Option[Connection] = None
@@ -56,11 +60,11 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   var vhost: String = ""
   var username: String = ""
   var password: String = ""
-  var rabbitmquri: String =  play.api.Play.configuration.getString("clowder.rabbitmq.uri").getOrElse("amqp://guest:guest@localhost:5672/%2f")
-  var exchange: String =  play.api.Play.configuration.getString("clowder.rabbitmq.exchange").getOrElse("clowder")
-  var mgmtPort: String = play.api.Play.configuration.getString("clowder.rabbitmq.managmentPort").getOrElse("15672")
+  var rabbitmquri: String =  appConfig.getProperty[String]("clowder.rabbitmq.uri").getOrElse("amqp://guest:guest@localhost:5672/%2f")
+  var exchange: String =  appConfig.getProperty[String]("clowder.rabbitmq.exchange").getOrElse("clowder")
+  var mgmtPort: String = appConfig.getProperty[String]("clowder.rabbitmq.managmentPort").getOrElse("15672")
 
-  var globalAPIKey = play.api.Play.configuration.getString("commKey").getOrElse("")
+  var globalAPIKey = appConfig.getProperty[String]("commKey").getOrElse("")
 
   try {
     val uri = new URI(rabbitmquri)
@@ -152,6 +156,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   def connect: Boolean = {
     if (channel.isDefined) return true
     if (!factory.isDefined) return true
+
 
     try {
       val protocol = if (factory.get.isSSL) "https://" else "http://"
@@ -774,7 +779,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   /**
     * Get the exchange list for a given host
     */
-  def getExchanges : Future[Response] = {
+  def getExchanges : Future[WSResponse] = {
     connect
     getRestEndPoint("/api/exchanges/" + vhost )
   }
@@ -782,7 +787,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   /**
     * get list of queues attached to an exchange
     */
-  def getQueuesNamesForAnExchange(exchange: String): Future[Response] = {
+  def getQueuesNamesForAnExchange(exchange: String): Future[WSResponse] = {
     connect
     getRestEndPoint("/api/exchanges/"+ vhost +"/"+ exchange +"/bindings/source")
   }
@@ -790,21 +795,21 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   /**
     * Get the binding lists (lists of routing keys) from the rabbitmq broker
     */
-  def getBindings: Future[Response] = {
+  def getBindings: Future[WSResponse] = {
     getRestEndPoint("/api/bindings")
   }
 
   /**
     * Get Channel list from rabbitmq broker
     */
-  def getChannelsList: Future[Response] = {
+  def getChannelsList: Future[WSResponse] = {
     getRestEndPoint("/api/channels")
   }
 
   /**
     * Get queue details for a given queue
     */
-  def getQueueDetails(qname: String): Future[Response] = {
+  def getQueueDetails(qname: String): Future[WSResponse] = {
     connect
     getRestEndPoint("/api/queues/" + vhost + "/" + qname)
   }
@@ -813,7 +818,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   /**
     * Get queue bindings for a given host and queue from rabbitmq broker
     */
-  def getQueueBindings(qname: String): Future[Response] = {
+  def getQueueBindings(qname: String): Future[WSResponse] = {
     connect
     getRestEndPoint("/api/queues/" + vhost + "/" + qname + "/bindings")
   }
@@ -821,7 +826,7 @@ class RabbitmqPlugin(application: Application) extends Plugin {
   /**
     * Get Channel information from rabbitmq broker for given channel id 'cid'
     */
-  def getChannelInfo(cid: String): Future[Response] = {
+  def getChannelInfo(cid: String): Future[WSResponse] = {
     getRestEndPoint("/api/channels/" + cid)
   }
 
@@ -1031,12 +1036,12 @@ class PendingRequestCancellationActor @Inject() (exchange: String, connection: O
   * Send message on specified channel directly to a queue and tells receiver to reply
   * on specified queue.
   */
-class PublishDirectActor @Inject() (channel: Channel, replyQueueName: String) extends Actor {
-  val appHttpPort = play.api.Play.configuration.getString("http.port").getOrElse("")
-  val appHttpsPort = play.api.Play.configuration.getString("https.port").getOrElse("")
-  val clowderurl = play.api.Play.configuration.getString("clowder.rabbitmq.clowderurl")
+class PublishDirectActor @Inject() (channel: Channel, replyQueueName: String, appConfig: AppConfigurationService) extends Actor {
+  val appHttpPort = appConfig.getProperty[String]("http.port").getOrElse("")
+  val appHttpsPort = appConfig.getProperty[String]("https.port").getOrElse("")
+  val clowderurl = appConfig.getProperty[String]("clowder.rabbitmq.clowderurl")
 
-  val rabbitmqService: ExtractionBusService = DI.injector.getInstance(classOf[ExtractionBusService])
+  val rabbitmqService: ExtractionBusService = DI.injector.instanceOf(classOf[ExtractionBusService])
 
 
   def receive = {
@@ -1164,8 +1169,8 @@ class EventFilter(channel: Channel, queue: String) extends Actor {
   * @param queue
   */
 class ExtractorsHeartbeats(channel: Channel, queue: String) extends Actor {
-  val extractions: ExtractionService = DI.injector.getInstance(classOf[ExtractionService])
-  val extractorsService: ExtractorService = DI.injector.getInstance(classOf[ExtractorService])
+  val extractions: ExtractionService = DI.injector.instanceOf(classOf[ExtractionService])
+  val extractorsService: ExtractorService = DI.injector.instanceOf(classOf[ExtractorService])
 
   def receive = {
     case statusBody: String =>
