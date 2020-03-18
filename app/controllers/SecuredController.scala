@@ -3,11 +3,7 @@ package controllers
 import api.Permission.Permission
 import api.{Permission, UserRequest}
 import securesocial.core._
-import securesocial.core.providers.UsernamePasswordProvider
-import securesocial.core.providers.utils.{ Mailer, RoutesHelper}
-import securesocial.controllers.{ProviderController, Registration, TemplatesPlugin}
 import models.{ClowderUser, RequestResource, ResourceRef, User, UserStatus}
-import org.apache.commons.lang.StringEscapeUtils._
 import play.api.i18n.{I18nSupport, Messages}
 import play.api.mvc._
 import services._
