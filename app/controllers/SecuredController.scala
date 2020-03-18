@@ -2,6 +2,10 @@ package controllers
 
 import api.Permission.Permission
 import api.{Permission, UserRequest}
+import securesocial.core._
+import securesocial.core.providers.UsernamePasswordProvider
+import securesocial.core.providers.utils.{ Mailer, RoutesHelper}
+import securesocial.controllers.{ProviderController, Registration, TemplatesPlugin}
 import models.{ClowderUser, RequestResource, ResourceRef, User, UserStatus}
 import org.apache.commons.lang.StringEscapeUtils._
 import play.api.i18n.{I18nSupport, Messages}
@@ -23,7 +27,7 @@ import scala.concurrent.{ExecutionContext, Future}
  */
 trait SecuredController extends BaseController with I18nSupport {
 
-  val userservice = DI.injector.getInstance(classOf[services.UserService])
+  val userservice = DI.injector.instanceOf(classOf[services.UserService])
 
   /** get user if logged in */
   def UserAction(needActive: Boolean) = new ActionBuilder[UserRequest, String] {
@@ -218,7 +222,7 @@ trait SecuredController extends BaseController with I18nSupport {
       identity <- UserService.find(authenticator.identityId)
     ) yield {
       Authenticator.save(authenticator.touch)
-      val user = DI.injector.getInstance(classOf[services.UserService]).findByIdentity(identity) match {
+      val user = DI.injector.instanceOf(classOf[services.UserService]).findByIdentity(identity) match {
         case Some(u: ClowderUser) if Permission.checkServerAdmin(Some(u)) => Some(u.copy(superAdminMode=superAdmin))
         case Some(u) => Some(u)
         case None => None
