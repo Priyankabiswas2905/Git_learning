@@ -1,4 +1,4 @@
-import com.typesafe.sbt.packager.Keys.{bashScriptExtraDefines, batScriptExtraDefines, scriptClasspath}
+
 
 name := """clowder"""
 
@@ -63,7 +63,9 @@ libraryDependencies += "org.codeartisans" % "org.json" % "20131017"
 
 libraryDependencies += "org.irods.jargon" % "jargon-core" % "3.3.3-beta1"
 
-libraryDependencies += ws
+libraryDependencies += "ws.securesocial" %% "securesocial" % "2.1.4-for-play24"
+
+resolvers += Resolver.sonatypeRepo("snapshots")
 
 libraryDependencies += "com.typesafe.play" %% "play-iteratees" % "2.6.1"
 
