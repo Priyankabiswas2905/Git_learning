@@ -634,6 +634,9 @@ class MongoDBUserService @Inject() (
 trait SecureSocialUserService
 
 class MongoDBSecureSocialUserService @Inject() (lifecycle: ApplicationLifecycle) extends SecureSocialUserService {
+
+  val appConfig = DI.injector.instanceOf(classOf[services.AppConfigurationService])
+
   def find(id: IdentityId): Option[User] = {
     // Convert userpass to lowercase so emails aren't case sensitive
     if (id.providerId == "userpass")
@@ -669,8 +672,8 @@ class MongoDBSecureSocialUserService @Inject() (lifecycle: ApplicationLifecycle)
 
     // If account does not exist, add enabled option
     if (UserDAO.count(query) == 0) {
-      val register = play.Play.application().configuration().getBoolean("registerThroughAdmins", true)
-      val admins = configuration.get[String]("initialAdmins").split("\\s*,\\s*")
+      val register = appConfig.getProperty[Boolean]("registerThroughAdmins", true)
+      val admins = appConfig.getProperty[String]("initialAdmins").getOrElse("").split("\\s*,\\s*")
       // enable account. Admins are always enabled.
       user.email match {
         case Some(e) if admins.contains(e) => {

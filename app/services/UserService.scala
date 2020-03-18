@@ -1,6 +1,7 @@
 package services
 
 import models._
+import securesocial.core.{Identity, IdentityId}
 import util.Direction
 import util.Direction.Direction
 
