@@ -515,7 +515,7 @@ class Files @Inject() (
               appConfig.incrementCount('files, 1)
               appConfig.incrementCount('bytes, f.length)
 
-              val option_user = users.findByIdentity(identity)
+              val option_user = users.findById(identity.id)
               events.addObjectEvent(option_user, f.id, f.filename, "upload_file")
               if (showPreviews.equals("FileLevel"))
                 flags = flags + "+filelevelshowpreviews"

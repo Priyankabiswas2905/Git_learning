@@ -159,7 +159,7 @@ object Permission extends Enumeration {
       case ResourceRef(ResourceRef.curationObject, id) => curations.get(id).exists(x => users.findById(x.author.id).exists(_.id == user.id))
       case ResourceRef(ResourceRef.curationFile, id) => curations.getCurationFiles(List(id)).exists(x => users.findById(x.author.id).exists(_.id == user.id))
       case ResourceRef(ResourceRef.metadata, id) => metadatas.getMetadataById(id).exists(_.creator.id == user.id)
-      case ResourceRef(ResourceRef.vocabulary, id) => vocabularies.get(id).exists(vocab => users.findByIdentity(vocab.author.get).exists(_.id == user.id))
+      case ResourceRef(ResourceRef.vocabulary, id) => vocabularies.get(id).exists(vocab => users.findById(vocab.author.get).exists(_.id == user.id))
       case ResourceRef(_, _) => false
     }
   }
@@ -214,7 +214,7 @@ object Permission extends Enumeration {
           case ResourceRef(ResourceRef.curationObject, id) => curations.get(id).exists(x => users.findById(x.author.id).exists(_.id == user.id))
           case ResourceRef(ResourceRef.curationFile, id) => curations.getCurationFiles(List(id)).exists(x => users.findById(x.author.id).exists(_.id == user.id))
           case ResourceRef(ResourceRef.metadata, id) => metadatas.getMetadataById(id).exists(_.creator.id == user.id)
-          case ResourceRef(ResourceRef.vocabulary, id) => vocabularies.get(id).exists(x => users.findByIdentity(x.author.get).exists(_.id == user.id))
+          case ResourceRef(ResourceRef.vocabulary, id) => vocabularies.get(id).exists(x => users.findById(x.author.get).exists(_.id == user.id))
           case ResourceRef(_, _) => false
         }))
       }
