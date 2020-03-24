@@ -426,7 +426,7 @@ object Permission extends Enumeration {
     // check if user is owner, in that case they can do what they want.
     if (checkOwner(users.findByIdentity("userId", "providerId"), resourceRef)) return true
     if (user.superAdminMode) return true
-    if (checkOwner(users.findByIdentity(user), resourceRef)) return true
+    if (checkOwner(users.findById(user.id), resourceRef)) return true
 
     resourceRef match {
       case ResourceRef(ResourceRef.preview, id) => {
@@ -659,7 +659,7 @@ object Permission extends Enumeration {
     if (user.superAdminMode)
       generatePermissionsList(resourceRefs, true)
 
-    var results = checkOwners(users.findByIdentity(user), resourceRefs)
+    var results = checkOwners(users.findById(user.id), resourceRefs)
     val leftover_results = results.filter(_._2 == false).map(_._1).toList
     if (leftover_results.length == 0)
       return generatePermissionsList(results)
