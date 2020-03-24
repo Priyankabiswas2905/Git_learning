@@ -65,6 +65,11 @@ trait UserService  {
   def findById(id: UUID): Option[User]
 
   /**
+   * Return a specific user based on the identityId provided.
+   */
+  def findByIdentityId(identityId: IdentityId): Option[User]
+
+  /**
    * Return a specific user based on an Identity
    */
   def findByIdentity(identity: Identity): Option[User]
