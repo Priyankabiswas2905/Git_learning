@@ -11,7 +11,6 @@ import models._
 import org.bson.types.ObjectId
 import securesocial.core.{AuthenticationMethod, Identity, IdentityId, UserServicePlugin}
 import play.api.{Application, Logger}
-import play.api.Play.current
 import com.mongodb.casbah.commons.MongoDBObject
 import com.mongodb.casbah.Imports._
 import models.Role
@@ -43,7 +42,8 @@ class MongoDBUserService @Inject() (
   events: EventService,
   folders: FolderService,
   metadata: MetadataService,
-  curations: CurationService) extends services.UserService {
+  curations: CurationService,
+  appConfiguration: AppConfigurationService) extends services.UserService {
   // ----------------------------------------------------------------------
   // Code to implement the common CRUD services
   // ----------------------------------------------------------------------
@@ -56,7 +56,7 @@ class MongoDBUserService @Inject() (
     // If account does not exist, add enabled option
     if (UserDAO.count(query) == 0) {
       val register = play.Play.application().configuration().getBoolean("registerThroughAdmins", true)
-      val admins = configuration.get[String]("initialAdmins").split("\\s*,\\s*")
+      val admins = appConfiguration.getProperty[String]("initialAdmins").getOrElse("").split("\\s*,\\s*")
       // enable account. Admins are always enabled.
       model.email match {
         case Some(e) if admins.contains(e) => {
