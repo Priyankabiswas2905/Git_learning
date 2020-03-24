@@ -407,7 +407,7 @@ class Spaces @Inject() (spaces: SpaceService, users: UserService, events: EventS
 
                       // insert space
                       spaces.insert(newSpace)
-                      val option_user = users.findByIdentity(identity)
+                      val option_user = users.findById(identity.id)
                       events.addObjectEvent(option_user, newSpace.id, newSpace.name, "create_space")
                       val role = Role.Admin
                       spaces.addUser(userId, role, newSpace.id)
@@ -449,7 +449,7 @@ class Spaces @Inject() (spaces: SpaceService, users: UserService, events: EventS
                                   homePage = formData.homePage, resourceTimeToLive = formData.resourceTimeToLive * 60 * 60 * 1000L, isTimeToLiveEnabled = formData.isTimeToLiveEnabled, affiliatedSpaces = formData.affSpace)
                             }
                           spaces.update(updated_space)
-                          val option_user = users.findByIdentity(identity)
+                          val option_user = users.findById(identity.id)
                           events.addObjectEvent(option_user, updated_space.id, updated_space.name, "update_space_information")
                           Redirect(routes.Spaces.getSpace(existing_space.id))
                         } else {
