@@ -16,8 +16,9 @@ import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json.Json._
 import play.api.libs.json._
 import play.api.libs.ws.{WSClient, WSResponse}
+import play.api.libs.ws.WSRequest
+import play.api.libs.ws._
 import play.api.libs.ws.ahc.AhcWSResponse
-import play.libs.ws.WS
 import services._
 
 import scala.collection.mutable.ListBuffer
@@ -286,7 +287,7 @@ class Extractions @Inject()(
     }
   }
 
-  def computeStatus(response: Response, file: models.File, l: scala.collection.mutable.Map[String, String]): String = {
+  def computeStatus(response: WSResponse, file: models.File, l: scala.collection.mutable.Map[String, String]): String = {
 
     var isActivity = "false"
     extractions.findIfBeingProcessed(file.id) match {
