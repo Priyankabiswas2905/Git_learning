@@ -3,11 +3,15 @@ package api
 import api.Permission.Permission
 import models.{ClowderUser, ResourceRef, User, UserStatus}
 import org.apache.commons.codec.binary.Base64
+import org.mindrot.jbcrypt.BCrypt
 import play.api.Logger
 import play.api.i18n.I18nSupport
 import play.api.libs.json.JsValue
 import play.api.mvc.{ControllerComponents, _}
 import services.{AppConfiguration, DI, UserService}
+import securesocial.controllers.Registration._
+import securesocial.core._
+import securesocial.core.providers.UsernamePasswordProvider
 
 import scala.concurrent.{ExecutionContext, Future}
 
