@@ -1,17 +1,16 @@
 package api
 
 import api.Permission.Permission
-import models.{ClowderUser, ResourceRef, UUID, User, UserStatus}
+import models.{ClowderUser, ResourceRef, User, UserStatus}
 import org.apache.commons.codec.binary.Base64
 import org.mindrot.jbcrypt.BCrypt
 import play.api.Logger
 import play.api.i18n.I18nSupport
 import play.api.libs.json.JsValue
-import play.api.mvc.{ControllerComponents, _}
-import services.{AppConfiguration, DI, UserService}
-import securesocial.controllers.Registration._
+import play.api.mvc._
 import securesocial.core._
 import securesocial.core.providers.UsernamePasswordProvider
+import services.{AppConfiguration, DI}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -144,7 +143,7 @@ trait ApiController extends BaseController with I18nSupport {
     // 1) secure social, this allows the web app to make calls to the API and use the secure social user
     for (
       authenticator <- SecureSocial.authenticatorFromRequest(request);
-      identity <- userService.findByIdentityId(authenticator.identityId)
+      identity <- UserService.find(authenticator.identityId)
     ) yield {
       Authenticator.save(authenticator.touch)
       val user = userService.findByIdentity(identity) match {
@@ -156,7 +155,7 @@ trait ApiController extends BaseController with I18nSupport {
       // find or create an api key for extractor submissions
       user match {
         case Some(u) =>
-          val apiKey = userService.getExtractionApiKey(u.identityId)
+          val apiKey = userService.getExtractionApiKey(identity.identityId)
           return UserRequest(user, request, Some(apiKey.key))
         case None =>
           return UserRequest(None, request, None)
@@ -179,13 +178,13 @@ trait ApiController extends BaseController with I18nSupport {
           // find or create an api key for extractor submissions
           user match {
             case Some(u) =>
-              val apiKey = userService.getExtractionApiKey(u.identityId)
+              val apiKey = userService.getExtractionApiKey(identity.identityId)
               return UserRequest(user, request, Some(apiKey.key))
             case None =>
               return UserRequest(None, request, None)
           }
         }
-        return UserRequest(user, request)
+        return UserRequest(user, request, None)
       }
     }
 
