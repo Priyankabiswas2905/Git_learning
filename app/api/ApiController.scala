@@ -1,7 +1,7 @@
 package api
 
 import api.Permission.Permission
-import models.{ClowderUser, ResourceRef, User, UserStatus}
+import models.{ClowderUser, ResourceRef, UUID, User, UserStatus}
 import org.apache.commons.codec.binary.Base64
 import org.mindrot.jbcrypt.BCrypt
 import play.api.Logger
@@ -143,7 +143,7 @@ trait ApiController extends BaseController with I18nSupport {
     // 1) secure social, this allows the web app to make calls to the API and use the secure social user
     for (
       authenticator <- SecureSocial.authenticatorFromRequest(request);
-      identity <- userService.findById(authenticator.identityId)
+      identity <- userService.findById(UUID(authenticator.identityId.toString))
     ) yield {
       Authenticator.save(authenticator.touch)
       val user = userService.findByIdentity(identity) match {
@@ -184,7 +184,7 @@ trait ApiController extends BaseController with I18nSupport {
               return UserRequest(None, request, None)
           }
         }
-        return UserRequest(user, request)
+        return UserRequest(user, request, None)
       }
     }
 

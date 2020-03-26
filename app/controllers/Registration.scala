@@ -12,7 +12,6 @@ import play.api.mvc.{Action, Result}
 import securesocial.core.providers.utils.{ Mailer, RoutesHelper}
 import securesocial.controllers.{ProviderController, Registration, TemplatesPlugin}
 import play.api.Logger
-import com.typesafe.plugin.use
 import securesocial.core.providers.Token
 import util.GravatarUtils
 
