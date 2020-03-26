@@ -10,7 +10,7 @@ import play.api.inject.ApplicationLifecycle
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.ws._
 import play.api.mvc.MultipartFormData.FilePart
-import play.api.{Configuration, Logger}
+import play.api.{Application, Configuration, Logger}
 import play.libs.Akka
 
 import scala.concurrent._
@@ -27,12 +27,12 @@ trait PolyglotService {
  * File Convert Service
  *
  */
-class FileConvertService(application: Application) {
+class FileConvertService(application: Application, appConfig: AppConfigurationService) {
 
-  val fileConvertUser: Option[String] = configuration.getString("fileconvert.username")
-  val fileConvertPassword: Option[String] = configuration.getString("fileconvert.password")
-  val fileConvertConvertURL: Option[String] = configuration.getString("fileconvert.convertURL")
-  val fileConvertInputsURL: Option[String] = configuration.getString("fileconvert.inputsURL")
+  val fileConvertUser: Option[String] = appConfig.getProperty[String]("fileconvert.username")
+  val fileConvertPassword: Option[String] = appConfig.getProperty[String]("fileconvert.password")
+  val fileConvertConvertURL: Option[String] = appConfig.getProperty[String]("fileconvert.convertURL")
+  val fileConvertInputsURL: Option[String] = appConfig.getProperty[String]("fileconvert.inputsURL")
 
   //table to store output formats for each input format
   //store them in memory to avoind making a request to Polyglot each time
