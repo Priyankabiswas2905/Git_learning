@@ -62,10 +62,10 @@ object SearchResult {
       (json \ "size").as[Int],
       (json \ "scanned_size").as[Int],
       (json \ "total_size").as[Long],
-      (json \ "first").as[Option[String]],
-      (json \ "last").as[Option[String]],
-      (json \ "prev").as[Option[String]],
-      (json \ "next").as[Option[String]]
+      (json \ "first").asOpt[String],
+      (json \ "last").asOpt[String],
+      (json \ "prev").asOpt[String],
+      (json \ "next").asOpt[String]
     ))
   }
 }
