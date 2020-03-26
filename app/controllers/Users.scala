@@ -2,33 +2,33 @@ package controllers
 
 import java.util.UUID
 
-import models.{Token, User}
+import api.ApiController
+import javax.inject.Inject
 import org.joda.time.DateTime
-import play.api.Play.current
 import play.api.data.Form
 import play.api.data.Forms._
 import play.api.data.validation.{Constraint, Invalid, Valid, ValidationError}
-import play.api.i18n.Messages
-import play.api.Play
+import play.api.mvc.{ControllerComponents, Results}
 import play.twirl.api.Html
-import services.{AppConfiguration, AppConfigurationService, UserService}
-import javax.inject.Inject
-
-import play.api.http.Status._
-import play.api.mvc.{Action, Results}
-import util.{Direction, Formatters, Mail}
+import securesocial.core.providers.Token
+import services.{AppConfigurationService, UserService}
+import util.Mail
 
 /**
  * Manage users.
  */
-class Users @Inject() (users: UserService, appConfig: AppConfigurationService) extends SecuredController {
+class Users @Inject() (users: UserService, appConfig: AppConfigurationService) extends ApiController {
   //Custom signup initiation code, to be used if config is set to send signup link emails to admins to forward to users
 
-  val TokenDuration = Play.current.configuration.getInt("securesocial.userpass.tokenDuration").getOrElse(60)
+  val TokenDuration = appConfig.getProperty[Int]("securesocial.userpass.tokenDuration").getOrElse(60)
 
   val RegistrationEnabled = "securesocial.registrationEnabled"
-  lazy val registrationEnabled = current.configuration.getBoolean(RegistrationEnabled).getOrElse(true)
+  lazy val registrationEnabled = appConfig.getProperty[Boolean](RegistrationEnabled).getOrElse(true)
   
+  val onHandleStartSignUpGoTo = securesocial.controllers.Registration.onHandleStartSignUpGoTo
+  val Success = securesocial.controllers.Registration.Success
+  val ThankYouCheckEmail = securesocial.core.providers.utils.Mailer.SignUpEmailSubject
+
   val SignUpEmailSubject = "mails.sendSignUpEmail.subject"
   
   val Email = "email"
@@ -53,7 +53,7 @@ class Users @Inject() (users: UserService, appConfig: AppConfigurationService) e
       now.plusMinutes(TokenDuration),
       isSignUp = isSignUp
     )
-//    securesocial.core.UserService.save(token)
+    securesocial.core.UserService.save(token)
     appConfig.incrementCount('users, 1)
     (uuid, token)
   }

@@ -2,14 +2,12 @@ package services
 
 import akka.actor.ActorSystem
 import javax.inject.Inject
+import play.api.Logger
 import play.api.inject.ApplicationLifecycle
-import play.api.{Application, Logger}
-import play.libs.Akka
-
-import scala.concurrent.duration._
 import play.api.libs.concurrent.Execution.Implicits._
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
 trait DatasetsMetadataAutodumpService
 
@@ -21,10 +19,11 @@ class DatasetsMetadataAutodumpServiceImpl @Inject() (lifecycle: ApplicationLifec
   actorSystem: ActorSystem) extends DatasetsMetadataAutodumpService {
 
   val datasets: DatasetService = DI.injector.instanceOf[DatasetService]
+  val appConfig : AppConfigurationService = DI.injector.instanceOf[AppConfigurationService]
 
   Logger.debug("Starting dataset metadata autodumper Plugin")
   //Dump metadata of all datasets periodically
-  val timeInterval = configuration.get[Int]("datasetmetadatadump.dumpEvery")
+  val timeInterval = appConfig.getProperty[Int]("datasetmetadatadump.dumpEvery").getOrElse(0)
   actorSystem.scheduler.schedule(0.days, timeInterval.intValue().days){
     dumpAllDatasetMetadata
   }

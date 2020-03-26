@@ -1,9 +1,8 @@
 package services
 
 import com.google.inject.AbstractModule
-import play.api.inject.{Binding, Module}
-import play.api.{Configuration, Environment, Play}
-import services.mongodb.{MongoService, SecureSocialUserService}
+import play.api.Play
+import services.mongodb.MongoService
 
 /**
   * Guide module configuration.
@@ -57,7 +56,8 @@ class ConfigurationModule extends AbstractModule {
   }
 
   protected def get[T](key: String, missing: String) : Class[T] = {
-    val name = current.configuration.getString(key).getOrElse(missing)
+    lazy val appConfig : AppConfigurationService = DI.injector.instanceOf[AppConfigurationService]
+    val name = appConfig.getProperty[String](key).getOrElse(missing)
     Class.forName(name).asInstanceOf[Class[T]]
   }
 }

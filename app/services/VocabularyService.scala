@@ -1,7 +1,7 @@
 package services
 
 
-import models.{Identity, UUID, User, Vocabulary}
+import models.{UUID, User, Vocabulary}
 
 import scala.util.Try
 
