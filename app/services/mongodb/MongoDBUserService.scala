@@ -189,13 +189,6 @@ class MongoDBUserService @Inject() (
   }
 
   /**
-   * Return a specific user based on the id provided.
-   */
-  override def findByIdentityId(identityId: IdentityId): Option[User] = {
-    get(UUID(identityId.toString))
-  }
-
-  /**
    * Return a specific user based on an Identity
    */
   override def findByIdentity(identity: Identity): Option[User] = {
