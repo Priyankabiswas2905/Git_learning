@@ -19,8 +19,12 @@ case class MetadataGroup (
 object MetadataGroup {
   implicit object MetadataGroupWrites extends Writes[MetadataGroup] {
     def writes(metadataGroup: MetadataGroup) = Json.obj(
-      "created_at" -> metadataGroup.createdAt.toString,
-      "creatorId" -> metadataGroup.creatorId.toString()
+      "id" -> metadataGroup.id.toString(),
+      "creatorId" -> metadataGroup.creatorId.toString,
+      "createdAt" -> metadataGroup.createdAt.toString,
+      "attachedTo" -> metadataGroup.attachedTo.getOrElse("").toString,
+      "content" -> metadataGroup.content.toString
+
     )
   }
 }
