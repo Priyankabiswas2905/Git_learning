@@ -289,9 +289,19 @@ function rubberbandAddText(tag, comment, sectionid, prNum) {
             })
         });
         request.done(function (response, textStatus, jqXHR) {
-            var url = window.jsRoutes.controllers.Tags.search(tag).url;
-            $('#tagList').append("<li><a href='" + url + "'>" + tag + "</a></li>");
-            $('#tagField').val("");
+            var tagsAdded = response.tags;
+            if (tagsAdded.length == 1) {
+                var tagAdded = tagsAdded[0];
+                console.log(tagAdded);
+                console.log(typeof(tagAdded));
+                // var url = window.jsRoutes.controllers.Search.search("tag:"+tag.name).url;
+
+                var tagId = tagAdded["id"];
+                var tagName = tagAdded["name"];
+                $('#tagListSections').append("<li><a href='" + url + "'>" + tag + "</a></li>");
+                $('#tagList').append("<li><a href='#'>" + tag + "</a></li>");
+                $('#tagField').val("");
+            }
         });
         request.fail(function (jqXHR, textStatus, errorThrown) {
             console.log("Could not add tag/comment: " + textStatus, errorThrown);
