@@ -292,16 +292,37 @@ function rubberbandAddText(tag, comment, sectionid, prNum) {
             var tagsAdded = response.tags;
             if (tagsAdded.length == 1) {
                 var tagAdded = tagsAdded[0];
-                console.log(tagAdded);
-                console.log(typeof(tagAdded));
-                var url = window.jsRoutes.controllers.Search.search("tag:"+tag.name).url;
 
-                var tagId = tagAdded["id"];
-
-                // TODO add the tag properly to tagListSections
                 var tagName = tagAdded["name"];
+                var tagId = tagAdded["id"];
+                var url = window.jsRoutes.controllers.Search.search("tag:"+tagName).url;
+
+                var newSectionTag = document.createElement('li');
+                newSectionTag.setAttribute('class', 'tag');
+
+                var firstPart =  document.createElement('a');
+                firstPart.setAttribute('href', url);
+
+                firstPart.setAttribute('id', tagName);
+                firstPart.setAttribute('data-id', tagId)
+
+                var text = document.createTextNode(tagName);
+                firstPart.appendChild(text);
+
+                var secondPart = document.createElement('a')
+                secondPart.setAttribute('href','#');
+                var deletePart = document.createElement('span')
+                deletePart.setAttribute('id', tagName);
+                deletePart.setAttribute('data-id', tagId);
+                deletePart.setAttribute('class', 'glyphicon glyphicon-remove tag-delete')
+                secondPart.appendChild(deletePart);
+                newSectionTag.appendChild(firstPart)
+                newSectionTag.appendChild(secondPart);
+                console.log(newSectionTag)
+
+
                 // $('#tagList').append("<li><a href='" + url + "'>" + tag + "</a></li>");
-                $('#tagListSections').append("<li><a href='" + url + "'>" + tagName + "</a></li>" + "<a href='#'><span  class = 'glyphicon glyphicon-remove tag-delete' id=" + tagName + " data-id ="+ tagId + "></span></a>");
+                $('#tagListSections').append(newSectionTag);
                 $('#tagField').val("");
             }
         });
