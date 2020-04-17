@@ -294,12 +294,14 @@ function rubberbandAddText(tag, comment, sectionid, prNum) {
                 var tagAdded = tagsAdded[0];
                 console.log(tagAdded);
                 console.log(typeof(tagAdded));
-                // var url = window.jsRoutes.controllers.Search.search("tag:"+tag.name).url;
+                var url = window.jsRoutes.controllers.Search.search("tag:"+tag.name).url;
 
                 var tagId = tagAdded["id"];
+
+                // TODO add the tag properly to tagListSections
                 var tagName = tagAdded["name"];
-                $('#tagListSections').append("<li><a href='" + url + "'>" + tag + "</a></li>");
-                $('#tagList').append("<li><a href='#'>" + tag + "</a></li>");
+                // $('#tagList').append("<li><a href='" + url + "'>" + tag + "</a></li>");
+                $('#tagListSections').append("<li><a href='" + url + "'>" + tagName + "</a></li>" + "<a href='#'><span  class = 'glyphicon glyphicon-remove tag-delete' id=" + tagName + " data-id ="+ tagId + "></span></a>");
                 $('#tagField').val("");
             }
         });
