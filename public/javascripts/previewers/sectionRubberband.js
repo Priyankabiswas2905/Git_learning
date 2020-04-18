@@ -311,10 +311,13 @@ function rubberbandAddText(tag, comment, sectionid, prNum) {
 
                 var secondPart = document.createElement('a')
                 secondPart.setAttribute('href','#');
+
                 var deletePart = document.createElement('span')
                 deletePart.setAttribute('id', tagName);
                 deletePart.setAttribute('data-id', tagId);
                 deletePart.setAttribute('class', 'glyphicon glyphicon-remove tag-delete')
+                deletePart.setAttribute('onclick','removeTagSection('+ '"' + sectionid + '"' + ',' + '"' + tagId + '"'+ ')');
+
                 secondPart.appendChild(deletePart);
                 newSectionTag.appendChild(firstPart)
                 newSectionTag.appendChild(secondPart);
