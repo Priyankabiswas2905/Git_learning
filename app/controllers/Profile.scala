@@ -1,16 +1,21 @@
 package controllers
 
+import java.text.SimpleDateFormat
+
+import api.Permission
 import services._
 import play.api.data.Form
 import play.api.data.Forms._
 import models._
-import javax.inject.Inject
+import java.util.Calendar
 
+import javax.inject.Inject
 import play.api.Logger
 import play.api.data.Form
 import play.api.data.Forms._
 import securesocial.core.IdentityId
 import services.mongodb.{MongoDBInstitutionService, MongoDBProjectService}
+import util.SortingUtils
 
 // TODO CATS-66 remove MongoDBInstitutionService, make part of UserService?
 class Profile @Inject() (users: UserService, files: FileService, datasets: DatasetService, collections: CollectionService,
@@ -52,22 +57,45 @@ class Profile @Inject() (users: UserService, files: FileService, datasets: Datas
     implicit val user = request.user
     val viewerUser = request.user
     val muser = users.findById(uuid)
-
-    muser match {
-      case Some(existingUser) => {
-        val (ownProfile, keys) = viewerUser match {
-          case Some(loggedInUser) if loggedInUser.id == existingUser.id => {
-            (true, users.getUserKeys(loggedInUser.identityId))
-          }
-          case _ => (false, List.empty[UserApiKey])
-        }
-
-        Ok(views.html.profile(existingUser, keys, ownProfile))
-
-      }
+    viewerUser match {
       case None => {
-        Logger.error("no user model exists for " + uuid.stringify)
-        BadRequest(views.html.notFound("User does not exist in this " + AppConfiguration.getDisplayName +  " instance."))
+        BadRequest("No viewer found.. something went horribly wrong.")
+      }
+      case Some(viewer) => {
+        muser match {
+          case Some(existingUser) => {
+            val (ownProfile, keys) = viewerUser match {
+              case Some(loggedInUser) if loggedInUser.id == existingUser.id => {
+                (true, users.getUserKeys(loggedInUser.identityId))
+              }
+              case _ => (false, List.empty[UserApiKey])
+            }
+            // FIXME: These might be wrong?
+            val offset = 0
+            val size = 12
+            val sortOrder: String = request.cookies.get("sort-order") match {
+                case Some(cookie) => cookie.value
+                case None => "dateN" //a default
+              }
+
+            // Fetch dataset parameters
+            val userDatasets = SortingUtils.sortDatasets(datasets.listUser(muser), sortOrder).drop(offset).take(size)
+
+            val iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSX")
+            val now = iso8601.format(Calendar.getInstance.getTime)
+
+            // TODO: Consistent sorting
+            // FIXME: Duplicate IDs prevent these views from showing
+            val userCollections = collections.listUser(size, muser, true, viewer)
+            val userSpaces = spaces.listUser(size, muser, true, viewer)
+            Ok(views.html.profile(existingUser, keys, userDatasets, userCollections, userSpaces, now, iso8601, ownProfile))
+
+          }
+          case None => {
+            Logger.error("no user model exists for " + uuid.stringify)
+            BadRequest(views.html.notFound("User does not exist in this " + AppConfiguration.getDisplayName +  " instance."))
+          }
+        }
       }
     }
   }

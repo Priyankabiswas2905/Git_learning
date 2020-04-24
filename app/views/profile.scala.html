@@ -1,4 +1,5 @@
-@(profile: User, keys: List[UserApiKey], ownProfile: Boolean)(implicit user: Option[models.User] = None)
+@(profile: User, keys: List[UserApiKey], datasets: List[models.Dataset], collections: List[models.Collection], spaces: List[models.ProjectSpace], now: String, dateFormatter: java.text.SimpleDateFormat, ownProfile: Boolean)(implicit flash: play.api.mvc.Flash, user: Option[models.User] = None)
+@import java.util.Calendar
 @main("Profile") {
     <script src="@routes.Application.javascriptRoutes" type="text/javascript"></script>
     <script src="@routes.Assets.at("javascripts/recommendation.js")" type="text/javascript"></script>
@@ -143,37 +144,121 @@
             @if(ownProfile && play.api.Play.current.plugin[services.StagingAreaPlugin].isDefined) {
                 <div class="profile-disclaimer small">@play.api.i18n.Messages("profile.disclaimer")</div>
             }
-            @if(ownProfile) {
-                <h4 id="userkeys">User API Keys</h4>
-                <span>Create your personal API keys by providing a name for the key and clicking the Add button. Key names have to be unique per user.</span>
-                <div class="row wrapped" id="key-">
-                    <div class="col-md-1"></div>
-                    <div class="col-md-2">Name</div>
-                    <div class="col-md-9">Key</div>
-                </div>
-                @keys.map{key =>
-                    <div class="row wrapped" id="key-@key.name">
-                        <div class="col-md-1">
-                            @if(key.name.startsWith("_")) {
-                                <span class="glyphicon glyphicon-trash"
-                                  title="System API keys start with and underscore and connot be deleted from the user interface"></span>
-                            } else {
-                                <a href='javascript:deleteUserKey("@key.name");' title="Delete this user API key">
-                                    <span class="glyphicon glyphicon-trash"></span></a>
-                            }
-                        </div>
-                        <div class="col-md-2">@key.name</div>
-                        <div class="col-md-9">@key.key</div>
-                    </div>
-                }
-                <div class="row wrapped">
-                    <div class="col-md-1"><a href='javascript:addUserKey();'><span class="glyphicon glyphicon-plus"></span> Add</a></div>
-                    <div class="col-md-2"><input type="text" id="userkeyname" class="form-control"></div>
-                </div>
-            }
         </div>
 
+    <div class="margin-bottom-20"></div>
+
+        <div class="col-md-9 col-lg-9 col-sm-7">
+        <!--<div class="col-lg-12 col-md-12 col-sm-12">-->
+
+            <div class="tabbable" id="bottomDatasetTabbable"> <!-- Only required for left/right tabs -->
+                <ul class="nav nav-tabs margin-bottom-20" >
+                    <li role="presentation" class="active"><a href="#tab-datasets" role="tab" data-toggle="tab">Datasets</a></li>
+                    <li role="presentation"><a href="#tab-spaces" role="tab" data-toggle="tab">Spaces</a></li>
+                    <li role="presentation"><a href="#tab-collections" role="tab" data-toggle="tab">Collections </a></li>
+                    @if(ownProfile) {
+                        <li role="presentation"><a href="#tab-apikeys" role="tab" data-toggle="tab">API Keys</a></li>
+                    }
+                </ul>
+                <div class="tab-content">
+
+                        <!-- Datasets tab -->
+                    <div role="tabpanel" class="tab-pane fade in active" id="tab-datasets">
+                        @{
+                            val dsPrev = if (datasets.size > 0) {
+                                dateFormatter.format(datasets.head.created)
+                            } else {
+                            dateFormatter.format(Calendar.getInstance.getTime)
+                            }
+
+                            val dsNext = if (datasets.size > 0) {
+                                dateFormatter.format(datasets.last.created)
+                            } else {
+                            dateFormatter.format(Calendar.getInstance.getTime)
+                            }
+
+                            views.html.datasets.list(datasets, dsPrev, dsNext, 12, Some("list"), None, None, Some("publicAll"), Some(""), Some(profile.id.toString), Some(profile.firstName + " " + profile.lastName), "a", now, List.empty)
+                        }
+                    </div>
+
+                        <!-- Spaces tab -->
+                    <div role="tabpanel" class="tab-pane fade" id="tab-spaces">
+                        @{
+                            val spacePrev = if (spaces.size > 0) {
+                                dateFormatter.format(spaces.head.created)
+                            } else {
+                            dateFormatter.format(Calendar.getInstance.getTime)
+                            }
+
+                            val spaceNext = if (spaces.size > 0) {
+                                dateFormatter.format(spaces.last.created)
+                            } else {
+                            dateFormatter.format(Calendar.getInstance.getTime)
+                            }
+
+                            views.html.spaces.list(spaces, "a", "date", 12, Some(profile.id.toString), Some(profile.firstName + " " + profile.lastName), false, Some("list"), spacePrev, spaceNext, Some(""), true, false)
+                        }
+                    </div>
+
+                        <!-- Collections tab -->
+                    <div role="tabpanel" class="tab-pane fade" id="tab-collections">
+                        @{
+                            val colPrev = if (collections.size > 0) {
+                                dateFormatter.format(collections.head.created)
+                            } else {
+                                dateFormatter.format(Calendar.getInstance.getTime)
+                            }
+
+                            val colNext = if (collections.size > 0) {
+                                dateFormatter.format(collections.last.created)
+                            } else {
+                                dateFormatter.format(Calendar.getInstance.getTime)
+                            }
+
+                            views.html.collections.list(collections, colPrev, colNext, 12, Some("list"), None, None, Some(""), Some(profile.id.toString), Some(profile.firstName + " " + profile.lastName), "a", now, false)
+                        }
+                    </div>
+
+                        <!-- API Keys tab -->
+                    <div role="tabpanel" class="tab-pane fade" id="tab-apikeys">
+                        <h4 id="userkeys">User API Keys</h4>
+                        <span>Create your personal API keys by providing a name for the key and clicking the Add button. Key names have to be unique per user.</span>
+                        <div class="row wrapped" id="key-">
+                            <div class="col-md-1"></div>
+                            <div class="col-md-2">Name</div>
+                            <div class="col-md-9">Key</div>
+                        </div>
+                        @keys.map{key =>
+                            <div class="row wrapped" id="key-@key.name">
+                                <div class="col-md-1">
+                                @if(key.name.startsWith("_")) {
+                                    <span class="glyphicon glyphicon-trash"
+                                    title="System API keys start with and underscore and connot be deleted from the user interface"></span>
+                                } else {
+                                    <a href='javascript:deleteUserKey("@key.name");' title="Delete this user API key">
+                                        <span class="glyphicon glyphicon-trash"></span></a>
+                                }
+                                </div>
+                                <div class="col-md-2">@key.name</div>
+                                <div class="col-md-9">@key.key</div>
+                            </div>
+                        }
+                        <div class="row wrapped">
+                            <div class="col-md-1"><a href='javascript:addUserKey();'><span class="glyphicon glyphicon-plus"></span> Add</a></div>
+                            <div class="col-md-2"><input type="text" id="userkeyname" class="form-control"></div>
+                        </div>
+                    </div>
+                    <div class="row bottom-padding">
+                        <div class="col-md-12">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
     </div>
+
+
 
     <script language="javascript">
             var profileMail = "@profile.email.getOrElse("")";

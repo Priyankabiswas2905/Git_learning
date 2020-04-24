@@ -600,7 +600,7 @@ class Spaces @Inject() (spaces: SpaceService, users: UserService, events: EventS
       title = Some(Messages("you.title", Messages("spaces.title")))
     }
 
-    Ok(views.html.spaces.listSpaces(decodedSpaceList, when, date, limit, owner, ownerName, showAll, viewMode, prev, next, title, showPublic, onlyTrial))
+    Ok(views.html.listSpaces(decodedSpaceList, when, date, limit, owner, ownerName, showAll, viewMode, prev, next, title, showPublic, onlyTrial))
   }
 
   def stagingArea(id: UUID, index: Int, limit: Int) = PermissionAction(Permission.EditStagingArea, Some(ResourceRef(ResourceRef.space, id))) {
