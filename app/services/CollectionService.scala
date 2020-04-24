@@ -243,10 +243,10 @@ trait CollectionService {
   def syncUpRootSpaces(collectionId: UUID, initialParents: List[UUID])
 
   /** Queue all collections to be indexed in Elasticsearch. */
-  def indexAll(idx: Option[String] = None)
+  def indexAll()
 
   /** Queue a collection to be indexed in Elasticsearch. */
-  def index(id: UUID, idx: Option[String] = None)
+  def index(id: UUID)
 
   def incrementViews(id: UUID, user: Option[User]): (Int, Date)
 

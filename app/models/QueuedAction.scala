@@ -12,15 +12,13 @@ import play.api.libs.json._
  */
 // ElasticsearchQueue service action parameters
 case class ElasticsearchParameters(
-                                    recursive: Boolean = false,
-                                    index: Option[String] = None
+                                    recursive: Boolean = false
                                   ) {}
 
 object ElasticsearchParameters {
   implicit val elasticParamsWrites = new Writes[ElasticsearchParameters] {
     def writes(params: ElasticsearchParameters): JsValue = Json.obj(
-      "recursive" -> params.recursive.toString,
-      "index" -> params.index.getOrElse("").toString
+      "recursive" -> params.recursive.toString
     )
   }
 }

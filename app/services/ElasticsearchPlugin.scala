@@ -6,11 +6,10 @@ import org.elasticsearch.common.xcontent.XContentBuilder
 import org.elasticsearch.search.aggregations.AggregationBuilders
 import org.elasticsearch.search.aggregations.bucket.terms.StringTerms.Bucket
 import play.api.libs.json.Json._
-
 import scala.util.Try
-import scala.collection.mutable.{ListBuffer, MutableList}
+import scala.collection.mutable.{MutableList, ListBuffer}
 import scala.collection.immutable.List
-import play.api.{Application, Logger, Plugin}
+import play.api.{Plugin, Logger, Application}
 import org.elasticsearch.common.settings.Settings
 import org.elasticsearch.client.transport.TransportClient
 import org.elasticsearch.common.transport.InetSocketTransportAddress
@@ -18,16 +17,15 @@ import java.net.InetAddress
 import java.util.regex.Pattern
 
 import org.elasticsearch.common.xcontent.XContentFactory._
-import org.elasticsearch.action.search.{SearchPhaseExecutionException, SearchResponse, SearchType}
+import org.elasticsearch.action.search.{SearchPhaseExecutionException, SearchType, SearchResponse}
 import org.elasticsearch.client.transport.NoNodeAvailableException
 import org.elasticsearch.ElasticsearchException
 import org.elasticsearch.indices.IndexAlreadyExistsException
-import org.elasticsearch.index.reindex.{ReindexAction, ReindexPlugin, ReindexRequestBuilder}
-import models.{Collection, Dataset, ElasticsearchResult, File, Folder, ResourceRef, Section, UUID, User}
+
+import models.{Collection, Dataset, File, Folder, UUID, ResourceRef, Section, ElasticsearchResult, User}
 import play.api.Play.current
 import play.api.libs.json._
 import _root_.util.SearchUtils
-import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsRequest
 
 
 /**
@@ -69,7 +67,7 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
       } else {
         Settings.settingsBuilder().build()
       }
-      client = Some(TransportClient.builder().settings(settings).addPlugin(classOf[ReindexPlugin]).build()
+      client = Some(TransportClient.builder().settings(settings).build()
         .addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(serverAddress), serverPort)))
       Logger.debug("--- Elasticsearch Client is being created----")
       client match {
@@ -326,29 +324,16 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
       }
       case None =>
     }
+
   }
 
-  def swapIndex(idx: String): Unit = {
-    client match {
-      case Some(x) => {
-        // Check if swap index exists before swapping
-        if (x.admin.indices.exists(new IndicesExistsRequest(idx)).get().isExists()) {
-          deleteAll(nameOfIndex)
-          ReindexAction.INSTANCE.newRequestBuilder(x).source(idx).destination(nameOfIndex).get()
-          deleteAll(idx)
-        }
-      }
-      case None =>
-    }
-  }
-
-  /** Delete all documents in default index */
-  def deleteAll(idx: String = nameOfIndex) {
+  /** Delete all indices */
+  def deleteAll {
     connect()
     client match {
       case Some(x) => {
         try {
-          val response = x.admin().indices().prepareDelete(idx).get()
+          val response = x.admin().indices().prepareDelete(nameOfIndex).get()
           if (!response.isAcknowledged())
             Logger.error("Did not delete all data from elasticsearch.")
         } catch {
@@ -413,51 +398,51 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
    * Reindex the given collection, if recursive is set to true it will
    * also reindex all datasets and files.
    */
-  def index(collection: Collection, recursive: Boolean, idx: Option[String]) {
+  def index(collection: Collection, recursive: Boolean) {
     connect()
     // Perform recursion first if necessary
     if (recursive) {
       for (dataset <- datasets.listCollection(collection.id.toString)) {
-        index(dataset, recursive, idx)
+        index(dataset, recursive)
       }
     }
-    index(SearchUtils.getElasticsearchObject(collection), idx.getOrElse(nameOfIndex))
+    index(SearchUtils.getElasticsearchObject(collection))
   }
 
   /**
    * Reindex the given dataset, if recursive is set to true it will
    * also reindex all files.
    */
-  def index(dataset: Dataset, recursive: Boolean, idx: Option[String]) {
+  def index(dataset: Dataset, recursive: Boolean) {
     connect()
     // Perform recursion first if necessary
     if (recursive) {
-      files.get(dataset.files).found.foreach(f => index(f, idx))
+      files.get(dataset.files).found.foreach(f => index(f))
       for (folderid <- dataset.folders) {
         folders.get(folderid) match {
           case Some(f) => {
-            files.get(f.files).found.foreach(fi => index(fi, idx))
+            files.get(f.files).found.foreach(fi => index(fi))
           }
           case None => Logger.error(s"Error getting file $folderid for recursive indexing")
         }
       }
     }
-    index(SearchUtils.getElasticsearchObject(dataset), idx.getOrElse(nameOfIndex))
+    index(SearchUtils.getElasticsearchObject(dataset))
   }
 
   /** Reindex the given file. */
-  def index(file: File, idx: Option[String]) {
+  def index(file: File) {
     connect()
     // Index sections first so they register for tag counts
     for (section <- file.sections) {
-      index(section, idx)
+      index(section)
     }
-    index(SearchUtils.getElasticsearchObject(file), idx.getOrElse(nameOfIndex))
+    index(SearchUtils.getElasticsearchObject(file))
   }
 
-  def index(section: Section, idx: Option[String]) {
+  def index(section: Section) {
     connect()
-    index(SearchUtils.getElasticsearchObject(section), idx.getOrElse(nameOfIndex))
+    index(SearchUtils.getElasticsearchObject(section))
   }
 
   /** Index document using an arbitrary map of fields. */
