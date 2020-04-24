@@ -692,13 +692,7 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
      * be removed, but only once the Search API better supports those data types (e.g. Date).
      */
     """{"clowder_object": {
-          |"dynamic_templates": [{
-            |"metadata_interpreter": {
-              |"match": "*",
-              |"match_mapping_type": "*",
-              |"mapping": {"type": "string"}
-            |}
-          |}],
+          |"date_detection": false,
           |"properties": {
             |"name": {"type": "string"},
             |"description": {"type": "string"},
