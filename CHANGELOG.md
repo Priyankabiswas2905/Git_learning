@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## 1.8.3 - 2020-03-12
 
 ### Changed
-- Elasticsearch indexer will new add new metadata fields as strings to avoid unexpected behavior on date fields.
+- Elasticsearch indexer will add date metadata fields as strings to avoid unexpected behavior.
 
 ### Fixed
 - Ability to delete tags from sections on file [CATS-1042](https://opensource.ncsa.illinois.edu/jira/browse/CATS-1046)

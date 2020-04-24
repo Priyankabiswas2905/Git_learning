@@ -687,9 +687,9 @@ class ElasticsearchPlugin(application: Application) extends Plugin {
 
   /** Return string-encoded JSON object describing field types */
   def getElasticsearchObjectMappings(): String = {
-    /** The dynamic template will restrict all dynamic metadata fields to be indexed
-     * as strings, regardless of interpreted data type. In the future, this could
-     * be removed, but only once the Search API better supports those data types (e.g. Date).
+    /** The date_detection flag will restrict all date metadata fields to be indexed
+     * as strings. In the future, this could be removed, but only once the Search GUI & API
+     * better supports dates.
      */
     """{"clowder_object": {
           |"date_detection": false,
