@@ -11,14 +11,15 @@ class MetadataGroup @Inject() (
   metadata: MetadataService) extends ApiController {
 
   def get(id: UUID) = AuthenticatedAction {
+
     Ok(toJson("Not Implemented"))
   }
 
-  def create() = AuthenticatedAction{
+  def create() = AuthenticatedAction  (parse.json) { implicit request =>
     Ok(toJson("Not implemented"))
   }
 
-  def attachToFile(fileId: UUID) = AuthenticatedAction {
+  def attachToFile(groupId: UUID, fileId: UUID) = AuthenticatedAction {
     Ok(toJson("Not implemented"))
   }
 
