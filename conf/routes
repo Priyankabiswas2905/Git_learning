@@ -892,5 +892,5 @@ POST       /api/metadataGroup                                                   
 GET        /api/metadataGroup/:id                                                          @api.MetadataGroup.get(id: UUID)
 POST       /api/metadataGroup/:datasetId/attachToDataset                                   @api.MetadataGroup.attachToDataset(datasetId: UUID)
 POST       /api/metadataGroup/:groupId/attachToFile/:fileId                                @api.MetadataGroup.attachToFile(groupId: UUID, fileId: UUID)
-#GET        /api/metadataGroup/getByFile/:fileId                                            @api.MetadataGroup.getAttachedToFile(fileId: UUID)
-#GET        /api/metadataGroup/getByDataset/:datasetId                                      @api.MetadataGroup.getAttachedToDataset(datasetId: UUID)
+GET        /api/metadataGroup/getByFile/:fileId                                            @api.MetadataGroup.getAttachedToFile(fileId: UUID)
+GET        /api/metadataGroup/getByDataset/:datasetId                                      @api.MetadataGroup.getAttachedToDataset(datasetId: UUID)

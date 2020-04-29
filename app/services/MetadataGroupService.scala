@@ -4,7 +4,7 @@ import models.{MetadataGroup, UUID}
 
 trait MetadataGroupService {
 
-  def save(mdGroup: MetadataGroup)
+  def save(mdGroup: MetadataGroup) : Option[String]
 
   def delete(mdGroupId: UUID)
 
