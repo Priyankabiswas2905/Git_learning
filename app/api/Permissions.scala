@@ -166,7 +166,7 @@ object Permission extends Enumeration {
       case ResourceRef(ResourceRef.curationFile, id) => curations.getCurationFiles(List(id)).exists(x => users.findById(x.author.id).exists(_.id == user.id))
       case ResourceRef(ResourceRef.metadata, id) => metadatas.getMetadataById(id).exists(_.creator.id == user.id)
       case ResourceRef(ResourceRef.vocabulary, id) => vocabularies.get(id).exists(x => users.findByIdentity(x.author.get).exists(_.id == user.id))
-      case ResourceRef(ResourceRef.metadataGroup, id) => metadataGroups.get(id).exists( x => x.creatorId == user.id)
+      case ResourceRef(ResourceRef.metadataGroup, id) => metadataGroups.get(id).exists(_.creatorId == user.id)
       case ResourceRef(_, _) => false
     }
   }

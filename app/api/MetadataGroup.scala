@@ -15,9 +15,19 @@ class MetadataGroup @Inject() (
   metadata: MetadataService,
   mdGroups: MetadataGroupService) extends ApiController {
 
-  def get(id: UUID) = AuthenticatedAction {
-
-    Ok(toJson("Not Implemented"))
+  def get(id: UUID) = PermissionAction(Permission.ViewMetadaGroup, Some(ResourceRef(ResourceRef.metadataGroup, id))) { implicit request =>
+    val user = request.user
+    user match {
+      case Some(u) => {
+        mdGroups.get(id) match {
+          case Some(mdgroup) => {
+            Ok(toJson(mdgroup.id))
+          }
+          case None => BadRequest("No metadatagroup with id")
+        }
+      }
+      case None => BadRequest("No user supplied")
+    }
   }
 
   def create() = PermissionAction(Permission.CreateMetadataGroup)  (parse.json) { implicit request =>

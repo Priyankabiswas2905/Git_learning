@@ -1,9 +1,9 @@
 package services.mongodb
 
-import com.mongodb.casbah.commons.TypeImports.ObjectId
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import javax.inject.{Inject, Singleton}
 import models._
+import org.bson.types.ObjectId
 import play.api.Play.current
 import services._
 import services.mongodb.MongoContext.context
@@ -20,7 +20,10 @@ class MongoDBMetadataGroupService @Inject() () extends MetadataGroupService {
 
   def delete(mdGroupId: UUID): Unit = ???
 
-  def get(id: UUID): Option[MetadataGroup] = ???
+  def get(id: UUID): Option[MetadataGroup] = {
+    val group = MetadataGroupDAO.findOneById(new ObjectId(id.stringify))
+    group
+  }
 }
 
 
