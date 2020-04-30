@@ -109,7 +109,7 @@ object Permission extends Enumeration {
     EditUser = Value
 
   var READONLY = Set[Permission](ViewCollection, ViewComments, ViewDataset, ViewFile, ViewSensor, ViewGeoStream,
-    ViewMetadata, ViewSection, ViewSpace, ViewTags, ViewUser , ViewVocabulary, ViewVocabularyTerm)
+    ViewMetadata, ViewSection, ViewSpace, ViewTags, ViewUser , ViewVocabulary, ViewVocabularyTerm, ViewMetadaGroup)
 
   if( play.Play.application().configuration().getBoolean("allowAnonymousDownload")) {
      READONLY += DownloadFiles
@@ -125,7 +125,8 @@ object Permission extends Enumeration {
     CreateSensor, DeleteSensor, AddGeoStream, DeleteGeoStream, AddDatapoints,
     CreateRelation, ViewRelation, DeleteRelation,
     CreateVocabulary, DeleteVocabulary, EditVocabulary,
-    CreateVocabularyTerm, DeleteVocabularyTerm, EditVocabularyTerm
+    CreateVocabularyTerm, DeleteVocabularyTerm, EditVocabularyTerm,
+    CreateMetadataGroup, EditMetadataGroup, DeleteMetadataGroup, ViewMetadaGroup
   )
 
   lazy val files: FileService = DI.injector.getInstance(classOf[FileService])
