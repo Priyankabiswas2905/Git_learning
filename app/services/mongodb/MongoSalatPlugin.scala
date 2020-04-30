@@ -1670,6 +1670,11 @@ class MongoSalatPlugin(app: Application) extends Plugin {
   }
 
   private def updateRolesMetadataGroup(): Unit = {
+
+    val query = MongoDBObject("name" -> "Admin")
+    val operation = MongoDBObject("$addToSet" -> MongoDBObject("permissions" -> Permission.ArchiveFile.toString))
+    collection("roles").update(query, operation)
+
     val editorQuery = MongoDBObject("name" -> "Editor")
     collection("roles").find(editorQuery).foreach {role =>
       role.put("permissions", Permission.EDITOR_PERMISSIONS.map(_.toString).toSet)
@@ -1688,7 +1693,7 @@ class MongoSalatPlugin(app: Application) extends Plugin {
       collection("social.users").save(user, WriteConcern.Safe)
     }
 
-    val viewerQuery = MongoDBObject("name" -> "Editor")
+    val viewerQuery = MongoDBObject("name" -> "Viewer")
     collection("roles").find(viewerQuery).foreach {role =>
       role.put("permissions", Permission.READONLY.map(_.toString).toSet)
       collection("roles").save(role, WriteConcern.Safe)
