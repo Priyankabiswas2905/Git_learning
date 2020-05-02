@@ -39,7 +39,7 @@ class MetadataGroup @Inject() (
         val groupName = (request.body \ "name").asOpt[String].getOrElse("")
         val groupContent = (request.body \ "content").asOpt[JsValue].get
         val mdGroup = new models.MetadataGroup(creatorId = groupCreator, name = groupName, attachedObjectOwner = None,
-          createdAt = new Date(), timeAttachedToObject = None, attachedTo = None, content = groupContent)
+          createdAt = new Date(), lastModifiedDate = new Date(), spaces = List.empty, timeAttachedToObject = None, attachedTo = None, content = groupContent)
         mdGroups.save(mdGroup)
         Ok(toJson("added"))
       }

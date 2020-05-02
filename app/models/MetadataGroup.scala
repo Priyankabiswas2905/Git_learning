@@ -10,6 +10,8 @@ case class MetadataGroup (
                          name: String,
                          attachedObjectOwner: Option[UUID],
                          createdAt: Date = new Date(),
+                         lastModifiedDate: Date = new Date(),
+                         spaces: List[UUID] = List.empty,
                          timeAttachedToObject: Option[Date],
                          attachedTo: Option[ResourceRef],
                          content: JsValue
