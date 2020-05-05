@@ -49,6 +49,13 @@ case class UserAgent(id: UUID, var typeOfAgent: String = "cat:user", user: MiniU
   def url: Option[URL] = userId
 }
 
+// User through GUI, metadata group
+case class UserAgentMetadataGroup(id: UUID, var typeOfAgent: String = "cat:user:metadatagroup", user: MiniUser, userId: Option[URL]) extends Agent {
+  def operation: String = "Added"
+  def displayName: String = user.fullName
+  def url: Option[URL] = userId
+}
+
 // Automatic extraction
 case class ExtractorAgent(id: UUID, var typeOfAgent: String = "cat:extractor", name: Option[String] = None,  extractorId: Option[URL]) extends Agent {
   def operation: String = "Extracted"

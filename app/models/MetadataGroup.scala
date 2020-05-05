@@ -25,7 +25,9 @@ object MetadataGroup {
       "id" -> metadataGroup.id.toString(),
       "name" -> metadataGroup.name,
       "creatorId" -> metadataGroup.creatorId.toString,
+      "attachedObjectOwner" -> metadataGroup.attachedObjectOwner.getOrElse("").toString,
       "createdAt" -> metadataGroup.createdAt.toString,
+      "spaces" -> metadataGroup.spaces.toString,
       "attachedTo" -> metadataGroup.attachedTo.getOrElse("").toString,
       "content" -> metadataGroup.content.toString
 

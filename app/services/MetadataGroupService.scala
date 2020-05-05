@@ -9,4 +9,16 @@ trait MetadataGroupService {
   def delete(mdGroupId: UUID)
 
   def get(id: UUID) : Option[MetadataGroup]
+
+  def addToSpace(mdGroup: MetadataGroup, spaceId: UUID)
+
+  def removeFromSpace(mdGroup: MetadataGroup, spaceId: UUID)
+
+  def attachToFile(mdGroup: MetadataGroup, fileId: UUID)
+
+  def attachToDatast(mdGroup: MetadataGroup, fileId: UUID)
+
+  def getAttachedToFile(fileId: UUID) : MetadataGroup
+
+  def getAttachedToDataset(datasetId: UUID) : MetadataGroup
 }

@@ -50,11 +50,44 @@ class MetadataGroup @Inject() (
     }
   }
 
-  def attachToFile(groupId: UUID, fileId: UUID) = PermissionAction(Permission.EditFile, Some(ResourceRef(ResourceRef.file, fileId))) {
-    Ok(toJson("Not implemented"))
+  def attachToFile(groupId: UUID, fileId: UUID) = PermissionAction(Permission.EditFile, Some(ResourceRef(ResourceRef.file, fileId))) { implicit request =>
+    val user = request.user
+    user match {
+      case Some(user) => {
+        mdGroups.get(groupId) match {
+          case Some(mdg) => {
+            files.get(fileId) match {
+              case Some(file) => {
+                mdGroups.attachToFile(mdg, file.id)
+                val metadataContent = mdg.content
+                files.addMetadata(fileId, metadataContent)
+                // TODO add this as metadata
+                Ok(toJson("Not implemented"))
+              }
+              case None => {
+                BadRequest("No file with id : " + fileId)
+              }
+            }
+          }
+          case None => {
+            BadRequest("No MetadataGroup with id : " + groupId)
+          }
+        }
+      }
+      case None => {
+        BadRequest("No user supplied")
+      }
+    }
   }
 
-  def getAttachedToFile(fileId: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, fileId))) {
+  def getAttachedToFile(fileId: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, fileId))) { implicit request =>
+    request.user match {
+      case Some(user) => {
+
+      }
+      case None => BadRequest("No user supplied")
+    }
+
     Ok(toJson("Not implemented"))
   }
 

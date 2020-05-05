@@ -14,6 +14,8 @@ import services.mongodb.MongoContext.context
 @Singleton
 class MongoDBMetadataGroupService @Inject() () extends MetadataGroupService {
 
+
+
   def save(mdGroup: MetadataGroup): Option[String] = {
     MetadataGroupDAO.insert(mdGroup).map(_.toString)
   }
@@ -24,6 +26,18 @@ class MongoDBMetadataGroupService @Inject() () extends MetadataGroupService {
     val group = MetadataGroupDAO.findOneById(new ObjectId(id.stringify))
     group
   }
+
+  def addToSpace(mdGroup: MetadataGroup, spaceId: UUID): Unit = ???
+
+  def removeFromSpace(mdGroup: MetadataGroup, spaceId: UUID): Unit = ???
+
+  def attachToFile(mdGroup: MetadataGroup, fileId: UUID): Unit = ???
+
+  def attachToDatast(mdGroup: MetadataGroup, fileId: UUID): Unit = ???
+
+  def getAttachedToFile(fileId: UUID): MetadataGroup = ???
+
+  def getAttachedToDataset(datasetId: UUID): MetadataGroup = ???
 }
 
 
