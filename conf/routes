@@ -889,6 +889,7 @@ GET         /api/tree/getChildrenOfNode                                         
 # ----------------------------------------------------------------------
 
 POST       /api/metadataGroup                                                              @api.MetadataGroup.create()
+GET        /api/metadataGroup/list                                                         @api.MetadataGroup.listGroups()
 GET        /api/metadataGroup/:id                                                          @api.MetadataGroup.get(id: UUID)
 POST       /api/metadataGroup/:datasetId/attachToDataset                                   @api.MetadataGroup.attachToDataset(datasetId: UUID)
 POST       /api/metadataGroup/:groupId/attachToFile/:fileId                                @api.MetadataGroup.attachToFile(groupId: UUID, fileId: UUID)

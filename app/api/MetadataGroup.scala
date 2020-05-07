@@ -5,8 +5,8 @@ import java.util.Date
 import javax.inject.Inject
 import models.{ResourceRef, UUID}
 import play.api.Logger
-import play.api.libs.json.JsValue
 import play.api.libs.json.Json.toJson
+import play.api.libs.json.{JsArray, JsObject, JsString, JsValue}
 import services.{DatasetService, FileService, MetadataGroupService, MetadataService}
 
 class MetadataGroup @Inject() (
@@ -27,6 +27,19 @@ class MetadataGroup @Inject() (
         }
       }
       case None => BadRequest("No user supplied")
+    }
+  }
+
+  def listGroups() = PrivateServerAction{ implicit request =>
+    request.user match {
+      case Some(user) => {
+        val mdgroups = mdGroups.list(user.id)
+        Ok(toJson(mdgroups))
+      }
+      case None => {
+        BadRequest("No user supplied")
+      }
+
     }
   }
 
@@ -60,6 +73,11 @@ class MetadataGroup @Inject() (
               case Some(file) => {
                 mdGroups.attachToFile(mdg, file.id)
                 val metadataContent = mdg.content
+                val context_url = "https://clowderframework.org/contexts/metadatagroup.jsonld"
+                val groupDerivedFrom: JsObject = JsObject(Seq("groupDerivedFromId"->JsString("0000")))
+                var context : JsArray = new JsArray()
+                context :+ groupDerivedFrom
+                context :+ JsString(context_url)
                 files.addMetadata(fileId, metadataContent)
                 // TODO add this as metadata
                 Ok(toJson("Not implemented"))

@@ -1,5 +1,6 @@
 package services.mongodb
 
+import com.mongodb.casbah.commons.MongoDBObject
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import javax.inject.{Inject, Singleton}
 import models._
@@ -38,6 +39,12 @@ class MongoDBMetadataGroupService @Inject() () extends MetadataGroupService {
   def getAttachedToFile(fileId: UUID): MetadataGroup = ???
 
   def getAttachedToDataset(datasetId: UUID): MetadataGroup = ???
+
+  def list(userId: UUID): List[MetadataGroup] = {
+    var mdGroups = List.empty[MetadataGroup]
+    mdGroups = MetadataGroupDAO.find(MongoDBObject("creatorId" -> new ObjectId(userId.stringify))).toList
+    mdGroups
+  }
 }
 
 

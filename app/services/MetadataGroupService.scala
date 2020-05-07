@@ -10,6 +10,8 @@ trait MetadataGroupService {
 
   def get(id: UUID) : Option[MetadataGroup]
 
+  def list(userId: UUID): List[MetadataGroup]
+
   def addToSpace(mdGroup: MetadataGroup, spaceId: UUID)
 
   def removeFromSpace(mdGroup: MetadataGroup, spaceId: UUID)
