@@ -39,7 +39,6 @@ class MetadataGroup @Inject() (
       case None => {
         BadRequest("No user supplied")
       }
-
     }
   }
 
@@ -71,14 +70,14 @@ class MetadataGroup @Inject() (
           case Some(mdg) => {
             files.get(fileId) match {
               case Some(file) => {
-                mdGroups.attachToFile(mdg, file.id)
+                // mdGroups.attachToFile(mdg, file.id)
                 val metadataContent = mdg.content
                 val context_url = "https://clowderframework.org/contexts/metadatagroup.jsonld"
                 val groupDerivedFrom: JsObject = JsObject(Seq("groupDerivedFromId"->JsString("0000")))
                 var context : JsArray = new JsArray()
-                context :+ groupDerivedFrom
-                context :+ JsString(context_url)
-                files.addMetadata(fileId, metadataContent)
+                context = context :+ groupDerivedFrom
+                context = context :+ JsString(context_url)
+                // files.addMetadata(fileId, metadataContent)
                 // TODO add this as metadata
                 Ok(toJson("Not implemented"))
               }
