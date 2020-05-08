@@ -1,9 +1,10 @@
 package api
 
+import java.net.URL
 import java.util.Date
 
 import javax.inject.Inject
-import models.{ResourceRef, UUID}
+import models.{MiniUser, ResourceRef, UUID, UserAgentMetadataGroup}
 import play.api.Logger
 import play.api.libs.json.Json.toJson
 import play.api.libs.json.{JsArray, JsObject, JsString, JsValue}
@@ -71,12 +72,22 @@ class MetadataGroup @Inject() (
             files.get(fileId) match {
               case Some(file) => {
                 // mdGroups.attachToFile(mdg, file.id)
+
+                // TODO what we need for metadata
+                val attachedTo = Some(ResourceRef.file, file.id.toString)
+                val userURI = controllers.routes.Application.index().absoluteURL() + "api/users/" + user.id
+                val creator = UserAgentMetadataGroup(user.id, "cat:user:metadatagroup", MiniUser(user.id, user.fullName, user.avatarUrl.getOrElse(""), user.email), Some(new URL(userURI)))
+
+                // TODO CONTEXT FOR NOW ?
+
                 val metadataContent = mdg.content
                 val context_url = "https://clowderframework.org/contexts/metadatagroup.jsonld"
                 val groupDerivedFrom: JsObject = JsObject(Seq("groupDerivedFromId"->JsString("0000")))
                 var context : JsArray = new JsArray()
                 context = context :+ groupDerivedFrom
                 context = context :+ JsString(context_url)
+
+                // TODO add using metadataservice
                 // files.addMetadata(fileId, metadataContent)
                 // TODO add this as metadata
                 Ok(toJson("Not implemented"))
