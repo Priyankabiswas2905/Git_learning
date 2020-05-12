@@ -8,12 +8,13 @@ import models.{MiniUser, ResourceRef, UUID, UserAgentMetadataGroup}
 import play.api.Logger
 import play.api.libs.json.Json.toJson
 import play.api.libs.json.{JsArray, JsObject, JsString, JsValue}
-import services.{DatasetService, FileService, MetadataGroupService, MetadataService}
+import services.{ContextLDService, DatasetService, FileService, MetadataGroupService, MetadataService}
 
 class MetadataGroup @Inject() (
   files: FileService,
   datasets: DatasetService,
   metadata: MetadataService,
+  contextService: ContextLDService,
   mdGroups: MetadataGroupService) extends ApiController {
 
   def get(id: UUID) = PermissionAction(Permission.ViewMetadaGroup, Some(ResourceRef(ResourceRef.metadataGroup, id))) { implicit request =>
@@ -74,7 +75,7 @@ class MetadataGroup @Inject() (
                 // mdGroups.attachToFile(mdg, file.id)
 
                 // TODO what we need for metadata
-                val attachedTo = Some(ResourceRef.file, file.id.toString)
+                val attachedTo = ResourceRef(ResourceRef.file, file.id)
                 val userURI = controllers.routes.Application.index().absoluteURL() + "api/users/" + user.id
                 val creator = UserAgentMetadataGroup(user.id, "cat:user:metadatagroup", MiniUser(user.id, user.fullName, user.avatarUrl.getOrElse(""), user.email), Some(new URL(userURI)))
 
@@ -87,9 +88,20 @@ class MetadataGroup @Inject() (
                 context = context :+ groupDerivedFrom
                 context = context :+ JsString(context_url)
 
+                var contextId = contextService.addContext(context.asOpt[JsString].get, context)
+
+
+                // TODO add context
+
+                // TODO create metadata
+                //val metadata = models.Metadata(UUID.generate, attachedTo.get, contextID, contextURL, createdAt, creator,
+                //              content, version)
+
+                val metadata = models.Metadata(UUID.generate, attachedTo, Some(contextId), Some(new URL(context_url)),new Date(), creator,
+                  metadataContent, None)
+
                 // TODO add using metadataservice
-                // files.addMetadata(fileId, metadataContent)
-                // TODO add this as metadata
+
                 Ok(toJson("Not implemented"))
               }
               case None => {
