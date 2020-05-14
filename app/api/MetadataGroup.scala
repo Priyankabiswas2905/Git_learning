@@ -4,11 +4,11 @@ import java.net.URL
 import java.util.Date
 
 import javax.inject.Inject
-import models.{EventType, MiniUser, ResourceRef, UUID, UserAgentMetadataGroup}
+import models._
 import play.api.Logger
 import play.api.libs.json.Json.toJson
 import play.api.libs.json.{JsArray, JsObject, JsString, JsValue}
-import services.{ContextLDService, DatasetService, EventService, FileService, MetadataGroupService, MetadataService}
+import services._
 
 class MetadataGroup @Inject() (
   files: FileService,
@@ -78,7 +78,7 @@ class MetadataGroup @Inject() (
                 // TODO what we need for metadata
                 val attachedTo = ResourceRef(ResourceRef.file, file.id)
                 val userURI = controllers.routes.Application.index().absoluteURL() + "api/users/" + user.id
-                val creator = UserAgentMetadataGroup(user.id, "cat:user:metadatagroup", MiniUser(user.id, user.fullName, user.avatarUrl.getOrElse(""), user.email), Some(new URL(userURI)))
+                val creator = UserAgent(user.id, "cat:user:metadatagroup", MiniUser(user.id, user.fullName, user.avatarUrl.getOrElse(""), user.email), Some(new URL(userURI)))
 
                 // TODO CONTEXT FOR NOW ?
 
