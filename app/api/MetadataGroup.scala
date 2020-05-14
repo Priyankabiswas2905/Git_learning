@@ -4,17 +4,18 @@ import java.net.URL
 import java.util.Date
 
 import javax.inject.Inject
-import models.{MiniUser, ResourceRef, UUID, UserAgentMetadataGroup}
+import models.{EventType, MiniUser, ResourceRef, UUID, UserAgentMetadataGroup}
 import play.api.Logger
 import play.api.libs.json.Json.toJson
 import play.api.libs.json.{JsArray, JsObject, JsString, JsValue}
-import services.{ContextLDService, DatasetService, FileService, MetadataGroupService, MetadataService}
+import services.{ContextLDService, DatasetService, EventService, FileService, MetadataGroupService, MetadataService}
 
 class MetadataGroup @Inject() (
   files: FileService,
   datasets: DatasetService,
-  metadata: MetadataService,
+  metadataService: MetadataService,
   contextService: ContextLDService,
+  events: EventService,
   mdGroups: MetadataGroupService) extends ApiController {
 
   def get(id: UUID) = PermissionAction(Permission.ViewMetadaGroup, Some(ResourceRef(ResourceRef.metadataGroup, id))) { implicit request =>
@@ -88,7 +89,7 @@ class MetadataGroup @Inject() (
                 context = context :+ groupDerivedFrom
                 context = context :+ JsString(context_url)
 
-                var contextId = contextService.addContext(context.asOpt[JsString].get, context)
+                var contextId = contextService.addContext(new JsString("context name"), context)
 
 
                 // TODO add context
@@ -101,6 +102,9 @@ class MetadataGroup @Inject() (
                   metadataContent, None)
 
                 // TODO add using metadataservice
+                metadataService.addMetadata(metadata)
+                events.addObjectEvent(Some(user), file.id, file.filename, EventType.ADD_METADATA_FILE.toString)
+
 
                 Ok(toJson("Not implemented"))
               }
