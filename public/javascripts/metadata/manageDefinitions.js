@@ -218,3 +218,7 @@ function deleteVocabulary(id) {
         });
     });
 }
+
+function test() {
+  console.log("test");
+}
