@@ -223,12 +223,14 @@ function deleteVocabulary(id) {
 }
 
 function addKeyField() {
+  metadataGroupKeys +=1;
   var newKeyId = "key"+metadataGroupKeys.toString();
   var newKey = document.createElement("div");
   newKey.className = "row";
+  newKey.id = newKeyId;
 
   var newTextArea = document.createElement("textarea")
-  newTextArea.id = newKeyId;
+  newTextArea.id = "textarea"+metadataGroupKeys.toString();
   newTextArea.class = "form-control";
   newTextArea.rows = "1";
   newTextArea.placeholder = "Key";
@@ -244,13 +246,23 @@ function addKeyField() {
   keys.appendChild(newKey);
   console.log(keys);
 
-  metadataGroupKeys +=1;
+
   console.log(newKeyId);
   console.log("test");
 }
 
 function addGroup() {
-  var keys = document.getElementById("keys")
+  var keys = document.getElementById("keys");
   console.log('clicked add group');
+  console.log(typeof(keys));
+  // console.log(keys);
+  var children = keys.children;
+  for (i = 0; i < childrenOfKeys.length; i++) {
+    // var childId = childNodes[i].id;
+    // var childNode = document.getElementById(childId);
+    var childNode = document.getElementById("textarea"+i.toString())
+    //console.log(childNode);
+    //console.log(typeof(childNode));
+  }
 
 }
