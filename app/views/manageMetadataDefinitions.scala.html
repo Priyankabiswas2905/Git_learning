@@ -425,19 +425,17 @@
                             </div>
                         </div>
                         <div class="form-group has-feedback">
-                            <div class="row">
-                                <div class="col-md-3">
-                                    <label for="description">Keys </label>
-                                    <a tabindex="0" role="button" aria-hidden="true" data-toggle="popover" title="Key (Required)"
-                                    data-content="A key.">
-                                        <span class="glyphicon glyphicon-info-sign"></span></a></div>
-                                <div class="col-sm-6">
-                                    <textarea rows="1" class="form-control" id="key0" placeholder="Key" required></textarea>
-                                    <span class="glyphicon form-control-feedback" aria-hidden="true"></span>
-                                </div>
+                            <div class="col-md-3">
+                                <label for="description">Keys </label>
+                                <a tabindex="0" role="button" aria-hidden="true" data-toggle="popover" title="Key (Required)"
+                                data-content="A key.">
+                                    <span class="glyphicon glyphicon-info-sign"></span></a></div>
+                            <div class="col-sm-6">
+                                <textarea rows="1" class="form-control" id="key0" placeholder="Key" required></textarea>
+                                <span class="glyphicon form-control-feedback" aria-hidden="true"></span>
                             </div>
                             <div class="row">
-                                <button type="submit" class="btn btn-primary pull-right"><span class="glyphicon glyphicon-plus"></span><span class="definitionActionButton"> Add Key</span></button>
+                                <button type="submit" class="btn btn-primary pull-right"><span class="glyphicon glyphicon-plus"></span><span class="addKeyButton" onclick="test()"> Add Key</span></button>
                             </div>
                         </div>
                         <a href="#" class="btn btn-default pull-left" id="cancelButton" onclick="reset(this)" style="display:none;"><span class="glyphicon glyphicon-remove"></span> Cancel</a>

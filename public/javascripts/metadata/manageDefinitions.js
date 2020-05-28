@@ -223,6 +223,7 @@ function deleteVocabulary(id) {
 
 function test() {
   // var container = document.getElementById("container");
+  metadataGroupKeys +=1;
   console.log(metadataGroupKeys);
   console.log("test");
 }
