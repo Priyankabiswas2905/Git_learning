@@ -1,4 +1,5 @@
 var metadataGroupKeys = 0;
+var metadataGroupKeyValues = [];
 
 function addDefinition(data, pageURL, spaceId){
   var url = jsRoutes.api.Metadata.addDefinition()
@@ -221,7 +222,7 @@ function deleteVocabulary(id) {
     });
 }
 
-function test() {
+function addKeyField() {
   var newKeyId = "key"+metadataGroupKeys.toString();
   var newKey = document.createElement("div");
   newKey.className = "row";
@@ -246,4 +247,10 @@ function test() {
   metadataGroupKeys +=1;
   console.log(newKeyId);
   console.log("test");
+}
+
+function addGroup() {
+  var keys = document.getElementById("keys")
+  console.log('clicked add group');
+
 }
