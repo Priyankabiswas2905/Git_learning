@@ -222,8 +222,28 @@ function deleteVocabulary(id) {
 }
 
 function test() {
-  // var container = document.getElementById("container");
+  var newKeyId = "key"+metadataGroupKeys.toString();
+  var newKey = document.createElement("div");
+  newKey.className = "row";
+
+  var newTextArea = document.createElement("textarea")
+  newTextArea.id = newKeyId;
+  newTextArea.class = "form-control";
+  newTextArea.rows = "1";
+  newTextArea.placeholder = "Key";
+  newTextArea.required=true;
+
+  var newSpan = document.createElement("span");
+  newSpan.class = "glyphicon form-control-feedback";
+  newKey.appendChild(newTextArea);
+  newKey.appendChild(newSpan);
+
+
+  var keys = document.getElementById("keys");
+  keys.appendChild(newKey);
+  console.log(keys);
+
   metadataGroupKeys +=1;
-  console.log(metadataGroupKeys);
+  console.log(newKeyId);
   console.log("test");
 }
