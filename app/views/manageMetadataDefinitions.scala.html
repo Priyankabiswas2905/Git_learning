@@ -113,6 +113,18 @@
                 }
             });
 
+            $("#addDefinition2").submit(function(e){
+                e.preventDefault();
+                var data = {};
+                $(this.elements).each(function(index, element){
+                    var value = $(element).val();
+                    if (value) {
+                        data[$(element).attr('id')] = value;
+                    }
+                });
+                addMetadataGroup(data, "@spaceId")
+            });
+
             $("#addDefinition").submit(function(e){
                 e.preventDefault();
                 var data = {};
@@ -431,8 +443,8 @@
                                 data-content="A key.">
                                     <span class="glyphicon glyphicon-info-sign"></span></a></div>
                             <div class="col-sm-6" id="keys">
-                                <div class="row" id="key0">
-                                    <textarea id="textarea0" rows="1" class="form-control" placeholder="Key" required></textarea>
+                                <div class="row">
+                                    <textarea id="key0" rows="1" class="form-control" placeholder="Key" required></textarea>
                                     <span class="glyphicon form-control-feedback" aria-hidden="true"></span>
                                 </div>
                             </div>
@@ -440,7 +452,7 @@
                                 <button class="btn btn-primary pull-right"><span class="glyphicon glyphicon-plus"></span><span class="addKeyButton" onclick="addKeyField()"> Add Key</span></button>
                             </div>
                         </div>
-                        <button class="btn btn-primary pull-right"><span class="glyphicon glyphicon-plus"></span><span class="groupDefinitionActionButton" onclick="addGroup()"> Add Group</span></button>
+                        <button class="btn btn-primary pull-right"><span class="glyphicon glyphicon-plus"></span><span class="groupDefinitionActionButton"> Add Group</span></button>
                     </form>
                 </div>
             </div>
