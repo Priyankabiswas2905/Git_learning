@@ -1,3 +1,5 @@
+var metadataGroupKeys = 0;
+
 function addDefinition(data, pageURL, spaceId){
   var url = jsRoutes.api.Metadata.addDefinition()
   if(spaceId != "") {
@@ -220,5 +222,7 @@ function deleteVocabulary(id) {
 }
 
 function test() {
+  // var container = document.getElementById("container");
+  console.log(metadataGroupKeys);
   console.log("test");
 }
