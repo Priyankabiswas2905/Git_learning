@@ -230,19 +230,24 @@ function addKeyField() {
 
   var newTextArea = document.createElement("textarea")
   newTextArea.id = "key"+metadataGroupKeys.toString();
-  newTextArea.class = "form-control";
+  newTextArea.className = "form-control";
   newTextArea.rows = "1";
   newTextArea.placeholder = "Key";
   newTextArea.required=true;
 
   var newSpan = document.createElement("span");
-  newSpan.class = "glyphicon form-control-feedback";
+  newSpan.className= "glyphicon form-control-feedback"
+  newSpan.setAttribute("aria-hidden", true);
+  var newSpan2 = '<span class="glyphicon form-control-feedback" aria-hidden="true"></span>'
   newKey.appendChild(newTextArea);
   newKey.appendChild(newSpan);
+  console.log(newSpan);
+  console.log(newKey);
 
 
   var keys = document.getElementById("keys");
   keys.appendChild(newKey);
+  console.log(keys);
 }
 
 function addMetadataGroup(data,spaceId) {
