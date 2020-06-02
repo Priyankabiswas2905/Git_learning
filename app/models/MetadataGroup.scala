@@ -2,19 +2,20 @@ package models
 
 import java.util.Date
 
-import play.api.libs.json.{JsValue, Json, Writes}
+import play.api.libs.json.{Json, Writes}
 
 case class MetadataGroup (
                          id: UUID = UUID.generate(),
                          creatorId: UUID,
                          label: String,
+                         description: String,
                          attachedObjectOwner: Option[UUID],
                          createdAt: Date = new Date(),
                          lastModifiedDate: Date = new Date(),
                          spaces: List[UUID] = List.empty,
                          timeAttachedToObject: Option[Date],
                          attachedTo: Option[ResourceRef],
-                         keys: JsValue
+                         keys: List[String]
                          ) {
 
 }

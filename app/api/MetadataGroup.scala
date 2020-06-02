@@ -36,7 +36,7 @@ class MetadataGroup @Inject() (
   def listGroups() = PrivateServerAction{ implicit request =>
     request.user match {
       case Some(user) => {
-        val mdgroups = mdGroups.list(user.id)
+        val mdgroups = mdGroups.list(user.id).map(jsonMetadataGroup(_))
         Ok(toJson(mdgroups))
       }
       case None => {
@@ -52,8 +52,9 @@ class MetadataGroup @Inject() (
       case Some(user) => {
         val groupCreator = user.id
         val groupLabel = (request.body \ "label").asOpt[String].getOrElse("")
-        val groupKeys = (request.body \ "keys").asOpt[JsValue].get
-        val mdGroup = new models.MetadataGroup(creatorId = groupCreator, label = groupLabel, attachedObjectOwner = None,
+        val description = (request.body \"description").asOpt[String].getOrElse("")
+        val groupKeys = (request.body \ "keys").asOpt[List[String]].get
+        val mdGroup = new models.MetadataGroup(creatorId = groupCreator, label = groupLabel, description = description, attachedObjectOwner = None,
           createdAt = new Date(), lastModifiedDate = new Date(), spaces = List.empty, timeAttachedToObject = None, attachedTo = None, keys = groupKeys)
         mdGroups.save(mdGroup)
         Ok(toJson("added"))
@@ -65,7 +66,7 @@ class MetadataGroup @Inject() (
     }
   }
 
-  def attachToFile(groupId: UUID, fileId: UUID) = PermissionAction(Permission.EditFile, Some(ResourceRef(ResourceRef.file, fileId))) { implicit request =>
+  def attachToFile(groupId: UUID, fileId: UUID) = PermissionAction(Permission.EditFile, Some(ResourceRef(ResourceRef.file, fileId))) (parse.json) { implicit request =>
     val user = request.user
     user match {
       case Some(user) => {
@@ -74,7 +75,7 @@ class MetadataGroup @Inject() (
             files.get(fileId) match {
               case Some(file) => {
                 // mdGroups.attachToFile(mdg, file.id)
-
+                val mdata = (request.body \ "metadata").asOpt[JsValue].get
                 // TODO what we need for metadata
                 val attachedTo = ResourceRef(ResourceRef.file, file.id)
                 val userURI = controllers.routes.Application.index().absoluteURL() + "api/users/" + user.id
@@ -82,7 +83,7 @@ class MetadataGroup @Inject() (
 
                 // TODO CONTEXT FOR NOW ?
 
-                val metadataContent = mdg.keys
+                val metadataContent = mdata
                 val context_url = "https://clowderframework.org/contexts/metadatagroup.jsonld"
                 val groupDerivedFrom: JsObject = JsObject(Seq("groupDerivedFromId"->JsString("0000")))
                 var context : JsArray = new JsArray()
@@ -143,6 +144,14 @@ class MetadataGroup @Inject() (
     Ok(toJson("Not implemented"))
   }
 
+  def jsonMetadataGroup(mdGroup: models.MetadataGroup) : JsValue = {
+    toJson(Map(
+      "id"->mdGroup.id.toString,
+      "label" -> mdGroup.label,
+      "description"-> mdGroup.description,
+      "keys"-> mdGroup.keys.toString
 
+    ))
+  }
 
 }
