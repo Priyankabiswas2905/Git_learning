@@ -247,16 +247,39 @@ function addKeyField() {
 }
 
 function addMetadataGroup(data,spaceId) {
-  var request = {}
-  request["label"] = data["label"];
-  request["description"] = data["description"];
+  var params = {}
+  params["label"] = data["label"];
+  params["description"] = data["description"];
   var groupKeys = [];
   for (i = 0; i < metadataGroupKeys+1; i++){
     var current_key_id = 'key'+i.toString();
     var current_key = data[current_key_id];
     groupKeys.push(current_key)
   }
-  request["keys"] = groupKeys
+  params["keys"] = groupKeys;
   // TODO api call here
+  console.log('before call');
+  var url = jsRoutes.api.MetadataGroup.create();
+  console.log('url',url);
+
+  return new Promise(function (resolve, reject) {
+    var request = url.ajax({
+      type: 'POST',
+      data: JSON.stringify(params),
+      contentType: "application/json"
+    });
+
+    request.done(function (response, textStatus, jqXHR) {
+      if (textStatus == "success") {
+        console.log(response)
+        resolve(response)
+      }
+    });
+
+    request.fail(function (jqXHR, textStatus, errorThrown) {
+      notify("ERROR: " + jqXHR.responseJSON + " Metadata Group  not created.", "error");
+      reject(errorThrown)
+    });
+  });
 
 }
