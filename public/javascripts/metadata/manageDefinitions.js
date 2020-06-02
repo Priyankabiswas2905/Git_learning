@@ -224,7 +224,6 @@ function deleteVocabulary(id) {
 
 function addKeyField() {
   metadataGroupKeys +=1;
-  var newKeyId = "key"+metadataGroupKeys.toString();
   var newKey = document.createElement("div");
   newKey.className = "row";
 
@@ -241,9 +240,6 @@ function addKeyField() {
   var newSpan2 = '<span class="glyphicon form-control-feedback" aria-hidden="true"></span>'
   newKey.appendChild(newTextArea);
   newKey.appendChild(newSpan);
-  console.log(newSpan);
-  console.log(newKey);
-
 
   var keys = document.getElementById("keys");
   keys.appendChild(newKey);
@@ -251,7 +247,16 @@ function addKeyField() {
 }
 
 function addMetadataGroup(data,spaceId) {
-  console.log(data);
-  console.log('clicked add group');
+  var request = {}
+  request["label"] = data["label"];
+  request["description"] = data["description"];
+  var groupKeys = [];
+  for (i = 0; i < metadataGroupKeys+1; i++){
+    var current_key_id = 'key'+i.toString();
+    var current_key = data[current_key_id];
+    groupKeys.push(current_key)
+  }
+  request["keys"] = groupKeys
+  // TODO api call here
 
 }
