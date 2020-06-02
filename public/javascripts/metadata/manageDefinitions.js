@@ -247,6 +247,7 @@ function addKeyField() {
 }
 
 function addMetadataGroup(data,spaceId) {
+  console.log('adding metadata group');
   var params = {}
   params["label"] = data["label"];
   params["description"] = data["description"];
