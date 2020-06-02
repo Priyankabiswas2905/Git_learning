@@ -51,10 +51,10 @@ class MetadataGroup @Inject() (
     user match {
       case Some(user) => {
         val groupCreator = user.id
-        val groupName = (request.body \ "name").asOpt[String].getOrElse("")
-        val groupContent = (request.body \ "content").asOpt[JsValue].get
-        val mdGroup = new models.MetadataGroup(creatorId = groupCreator, name = groupName, attachedObjectOwner = None,
-          createdAt = new Date(), lastModifiedDate = new Date(), spaces = List.empty, timeAttachedToObject = None, attachedTo = None, content = groupContent)
+        val groupLabel = (request.body \ "label").asOpt[String].getOrElse("")
+        val groupKeys = (request.body \ "keys").asOpt[JsValue].get
+        val mdGroup = new models.MetadataGroup(creatorId = groupCreator, label = groupLabel, attachedObjectOwner = None,
+          createdAt = new Date(), lastModifiedDate = new Date(), spaces = List.empty, timeAttachedToObject = None, attachedTo = None, keys = groupKeys)
         mdGroups.save(mdGroup)
         Ok(toJson("added"))
       }
@@ -82,7 +82,7 @@ class MetadataGroup @Inject() (
 
                 // TODO CONTEXT FOR NOW ?
 
-                val metadataContent = mdg.content
+                val metadataContent = mdg.keys
                 val context_url = "https://clowderframework.org/contexts/metadatagroup.jsonld"
                 val groupDerivedFrom: JsObject = JsObject(Seq("groupDerivedFromId"->JsString("0000")))
                 var context : JsArray = new JsArray()

@@ -7,14 +7,14 @@ import play.api.libs.json.{JsValue, Json, Writes}
 case class MetadataGroup (
                          id: UUID = UUID.generate(),
                          creatorId: UUID,
-                         name: String,
+                         label: String,
                          attachedObjectOwner: Option[UUID],
                          createdAt: Date = new Date(),
                          lastModifiedDate: Date = new Date(),
                          spaces: List[UUID] = List.empty,
                          timeAttachedToObject: Option[Date],
                          attachedTo: Option[ResourceRef],
-                         content: JsValue
+                         keys: JsValue
                          ) {
 
 }
@@ -23,13 +23,13 @@ object MetadataGroup {
   implicit object MetadataGroupWrites extends Writes[MetadataGroup] {
     def writes(metadataGroup: MetadataGroup) = Json.obj(
       "id" -> metadataGroup.id.toString(),
-      "name" -> metadataGroup.name,
+      "name" -> metadataGroup.label,
       "creatorId" -> metadataGroup.creatorId.toString,
       "attachedObjectOwner" -> metadataGroup.attachedObjectOwner.getOrElse("").toString,
       "createdAt" -> metadataGroup.createdAt.toString,
       "spaces" -> metadataGroup.spaces.toString,
       "attachedTo" -> metadataGroup.attachedTo.getOrElse("").toString,
-      "content" -> metadataGroup.content.toString
+      "keys" -> metadataGroup.keys.toString
 
     )
   }
