@@ -247,6 +247,7 @@ function addKeyField() {
 }
 
 function addMetadataGroup(data,spaceId) {
+  console.log('spaceId is', spaceId);
   console.log('adding metadata group');
   var params = {}
   params["label"] = data["label"];
@@ -258,6 +259,7 @@ function addMetadataGroup(data,spaceId) {
     groupKeys.push(current_key)
   }
   params["keys"] = groupKeys;
+  params["space"] = spaceId;
   // TODO api call here
   console.log('before call');
   var url = jsRoutes.api.MetadataGroup.create();

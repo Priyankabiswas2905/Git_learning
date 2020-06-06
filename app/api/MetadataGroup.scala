@@ -10,6 +10,8 @@ import play.api.libs.json.Json.toJson
 import play.api.libs.json.{JsArray, JsObject, JsString, JsValue}
 import services._
 
+import scala.collection.mutable.ListBuffer
+
 class MetadataGroup @Inject() (
   files: FileService,
   datasets: DatasetService,
@@ -54,8 +56,13 @@ class MetadataGroup @Inject() (
         val groupLabel = (request.body \ "label").asOpt[String].getOrElse("")
         val description = (request.body \"description").asOpt[String].getOrElse("")
         val groupKeys = (request.body \ "keys").asOpt[List[String]].get
+        val spaceId = (request.body \ "space").asOpt[String].getOrElse("")
+        val spaces : ListBuffer[UUID] = ListBuffer.empty[UUID]
+        if (spaceId !="") {
+          spaces += UUID(spaceId)
+        }
         val mdGroup = new models.MetadataGroup(creatorId = groupCreator, label = groupLabel, description = description, attachedObjectOwner = None,
-          createdAt = new Date(), lastModifiedDate = new Date(), spaces = List.empty, timeAttachedToObject = None, attachedTo = None, keys = groupKeys)
+          createdAt = new Date(), lastModifiedDate = new Date(), spaces = spaces.toList, timeAttachedToObject = None, attachedTo = None, keys = groupKeys)
         mdGroups.save(mdGroup)
         Ok(toJson("added"))
       }
