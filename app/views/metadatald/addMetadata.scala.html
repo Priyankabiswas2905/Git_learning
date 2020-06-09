@@ -12,6 +12,7 @@
                     <div class="pull-right">
                         <div class="btn-group btn-group-xs" role="group" aria-label="metadataEntryMode">
                             <button id="basicRadioBtn" type="button" class="btn btn-primary">Basic</button>
+                            <button id="groupRadioBtn" type="button" class="btn btn-link">Group</button>
                             <button id="advancedRadioBtn" type="button" class="btn btn-link">Advanced</button>
                         </div>
                     </div>
@@ -30,6 +31,20 @@
                         <div class="row">
                             <div class="col-sm-12">
                                 <button id="add-metadata-button" type="submit" class="btn btn-default pull-right"><span class="glyphicon glyphicon-saved"></span> Submit</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="addMetadataGroup" hidden>
+                        <form id="group-metadata-form" class="form-horizontal form-md">
+                            <select id="add-metadata-group-select">
+                                <option value=""></option>
+                            </select>
+                        </form>
+
+                        <div id="selected_group_field" class="row"></div>
+                        <div class="row">
+                            <div class="col-sm-12">
+                                <button id="group-metadata-button" type="submit" class="btn btn-default pull-right"><span class="glyphicon glyphicon-saved"></span> Submit</button>
                             </div>
                         </div>
                     </div>
@@ -402,19 +417,35 @@ line-height: 1.5;
             $('#basicRadioBtn').click(function () {
                 // Hide "Advanced", show "Basic"
                 $('#addMetadataAdvanced').hide();
+                $('#addMetadataGroup').hide();
                 $('#addMetadataBasic').show();
                 $('#selected_field').show();
 
                 // Toggle 'Basic' to active, 'Advanced' to inactive
                 $('#basicRadioBtn').addClass('btn-primary');
                 $('#basicRadioBtn').removeClass('btn-link');
+                $('#groupRadioBtn').addClass('btn-link');
+                $('#groupRadioBtn').removeClass('btn-primary');
                 $('#advancedRadioBtn').addClass('btn-link');
                 $('#advancedRadioBtn').removeClass('btn-primary');
+            });
+            $('#groupRadioBtn').click(function () {
+                $('#addMetadataBasic').hide();
+                $('#addMetadataGroup').show();
+                $('#selected_field').hide();
+                $('#addMetadataAdvanced').hide();
+
+                // Toggle 'Group' to active, 'Basic' and 'Advanced' to inactive
+                $('#advancedRadioBtn').addClass('btn-link');
+                $('#advancedRadioBtn').removeClass('btn-primary');
+                $('#basicRadioBtn').addClass('btn-link');
+                $('#basicRadioBtn').removeClass('btn-primary');
             });
             // Enable button group toggle functionality
             $('#advancedRadioBtn').click(function () {
                 // Hide "Basic", show "Advanced"
                 $('#addMetadataBasic').hide();
+                $('#addMetadataGroup').hide();
                 $('#selected_field').hide();
                 $('#addMetadataAdvanced').show();
 
