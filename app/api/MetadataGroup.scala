@@ -27,7 +27,7 @@ class MetadataGroup @Inject() (
       case Some(u) => {
         mdGroups.get(id) match {
           case Some(mdgroup) => {
-            Ok(toJson(mdgroup.id))
+            Ok(jsonMetadataGroup(mdgroup))
           }
           case None => BadRequest("No metadatagroup with id")
         }
@@ -39,7 +39,7 @@ class MetadataGroup @Inject() (
   def listGroups() = PrivateServerAction{ implicit request =>
     request.user match {
       case Some(user) => {
-        val mdgroups = mdGroups.list(user.id).map(jsonMetadataGroup(_))
+        val mdgroups = mdGroups.list(user.id)
         Ok(toJson(mdgroups))
       }
       case None => {
@@ -171,7 +171,7 @@ class MetadataGroup @Inject() (
       "id"->mdGroup.id.toString,
       "label" -> mdGroup.label,
       "description"-> mdGroup.description,
-      "keys"-> mdGroup.keys.toString
+      "keys"-> mdGroup.keys.toList.toString
 
     ))
   }
