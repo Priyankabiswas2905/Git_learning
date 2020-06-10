@@ -45,6 +45,13 @@ class MongoDBMetadataGroupService @Inject() () extends MetadataGroupService {
     mdGroups = MetadataGroupDAO.find(MongoDBObject("creatorId" -> new ObjectId(userId.stringify))).toList
     mdGroups
   }
+
+  def listSpace(spaceId: UUID) : List[MetadataGroup] = {
+    var mdGroups = List.empty[MetadataGroup]
+    val filter = MongoDBObject("spaces" -> new ObjectId(spaceId.stringify))
+    mdGroups = MetadataGroupDAO.find(filter).toList
+    mdGroups
+  }
 }
 
 

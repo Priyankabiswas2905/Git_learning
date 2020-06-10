@@ -12,6 +12,8 @@ trait MetadataGroupService {
 
   def list(userId: UUID): List[MetadataGroup]
 
+  def listSpace(spaceId: UUID) : List[MetadataGroup]
+
   def addToSpace(mdGroup: MetadataGroup, spaceId: UUID)
 
   def removeFromSpace(mdGroup: MetadataGroup, spaceId: UUID)

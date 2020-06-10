@@ -15,6 +15,7 @@ import scala.collection.mutable.ListBuffer
 class MetadataGroup @Inject() (
   files: FileService,
   datasets: DatasetService,
+  spaces: SpaceService,
   metadataService: MetadataService,
   contextService: ContextLDService,
   events: EventService,
@@ -44,6 +45,21 @@ class MetadataGroup @Inject() (
       case None => {
         BadRequest("No user supplied")
       }
+    }
+  }
+
+  def listGroupsSpace(spaceId: UUID) = PrivateServerAction {implicit request =>
+    request.user match {
+      case Some(user) => {
+        spaces.get(spaceId) match {
+          case Some(space) => {
+            val groups = mdGroups.listSpace(spaceId)
+            Ok(toJson(groups))
+          }
+          case None => BadRequest("No space with id : " + spaceId)
+        }
+      }
+      case None => BadRequest("No user supplied")
     }
   }
 
@@ -135,7 +151,6 @@ class MetadataGroup @Inject() (
   def getAttachedToFile(fileId: UUID) = PermissionAction(Permission.ViewFile, Some(ResourceRef(ResourceRef.file, fileId))) { implicit request =>
     request.user match {
       case Some(user) => {
-
       }
       case None => BadRequest("No user supplied")
     }
