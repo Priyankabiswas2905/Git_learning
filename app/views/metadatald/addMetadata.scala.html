@@ -516,8 +516,11 @@ line-height: 1.5;
         });
 
         groupRequest.done(function (response, textStatus, jqXHR) {
-            groupRespose = response;
-            console.log('response', response)
+            var groupFields = response;
+            for (var i =0; i < groupFields.length;  i++) {
+                console.log('!',groupFields[i]);
+                var elem = $("<option></option>");
+            }
         });
 
         // register basic submit listener

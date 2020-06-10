@@ -24,7 +24,7 @@ object MetadataGroup {
   implicit object MetadataGroupWrites extends Writes[MetadataGroup] {
     def writes(metadataGroup: MetadataGroup) = Json.obj(
       "id" -> metadataGroup.id.toString(),
-      "name" -> metadataGroup.label,
+      "label" -> metadataGroup.label,
       "creatorId" -> metadataGroup.creatorId.toString,
       "attachedObjectOwner" -> metadataGroup.attachedObjectOwner.getOrElse("").toString,
       "createdAt" -> metadataGroup.createdAt.toString,
