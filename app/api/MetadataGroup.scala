@@ -27,7 +27,7 @@ class MetadataGroup @Inject() (
       case Some(u) => {
         mdGroups.get(id) match {
           case Some(mdgroup) => {
-            Ok(jsonMetadataGroup(mdgroup))
+            Ok(toJson(mdgroup))
           }
           case None => BadRequest("No metadatagroup with id")
         }
@@ -80,7 +80,7 @@ class MetadataGroup @Inject() (
         val mdGroup = new models.MetadataGroup(creatorId = groupCreator, label = groupLabel, description = description, attachedObjectOwner = None,
           createdAt = new Date(), lastModifiedDate = new Date(), spaces = spaces.toList, timeAttachedToObject = None, attachedTo = None, keys = groupKeys)
         mdGroups.save(mdGroup)
-        Ok(toJson("added"))
+        Ok(toJson(mdGroup))
       }
       case None => {
         Logger.error("No user supplied")
