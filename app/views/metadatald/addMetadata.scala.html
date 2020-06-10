@@ -44,7 +44,7 @@
                         <div id="selected_group_field" class="row"></div>
                         <div class="row">
                             <div class="col-sm-12">
-                                <button id="group-metadata-button" type="submit" class="btn btn-default pull-right"><span class="glyphicon glyphicon-saved"></span> Submit</button>
+                                <button id="group-metadata-button" type="button" onclick="showGroups()" class="btn btn-default pull-right"><span class="glyphicon glyphicon-saved"></span> Submit</button>
                             </div>
                         </div>
                     </div>
@@ -146,6 +146,7 @@ line-height: 1.5;
 </script>
 
 <script language="javascript">
+    var groupRespose = "";
     // submit metadata entry to server
     function submit_@id
     (event){
@@ -503,6 +504,20 @@ line-height: 1.5;
                         modalTemplate, footerTemplate, "@id",
                         "#advanced-metadata-form" );
                 });
+        });
+
+        var groupUrl = jsRoutes.api.MetadataGroup.listGroups();
+        console.log('the group URL')
+
+        // get metadata group definitions
+        var groupRequest = groupUrl.ajax({
+            type: 'GET',
+            contentType: "application/json"
+        });
+
+        groupRequest.done(function (response, textStatus, jqXHR) {
+            groupRespose = response;
+            console.log('response', response)
         });
 
         // register basic submit listener
