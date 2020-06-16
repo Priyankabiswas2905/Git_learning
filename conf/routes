@@ -884,3 +884,10 @@ POST        /extractors                                                         
 # ----------------------------------------------------------------------
 
 GET         /api/tree/getChildrenOfNode                                                     @api.Tree.getChildrenOfNode(nodeType : String ?= "root", nodeId : Option[String] ?= None, mine : Boolean ?= false)
+
+# ----------------------------------------------------------------------
+# GROUP API
+# ----------------------------------------------------------------------
+
+POST       /api/groups/create                                                               @api.Groups.createGroup()
+GET        /api/groups/list                                                                 @api.Groups.listEveryGroup()
