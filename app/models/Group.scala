@@ -34,6 +34,7 @@ object Group {
       "description" -> group.description,
       "created" -> group.created.toString,
       "creator" -> group.creator.toString,
+      "userCount" -> group.userCount.toString,
       "userList" -> group.userList,
       "spaceandrole" -> group.spaceandrole.toString
     )

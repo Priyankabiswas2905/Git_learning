@@ -111,8 +111,7 @@ def listEveryGroup() = PrivateServerAction { implicit request =>
 def addUser(userId: UUID, groupId: UUID) = PrivateServerAction { implicit request =>
   groups.get(groupId) match {
     case Some(group) => {
-      val newList : List[UUID] = group.userList :+ userId
-      // TODO add method for adding new user to group
+      groups.addUserToGroup(userId, group)
       Ok(jsonGroup(group))
     }
     case None => BadRequest(toJson("Group Not Found"))
@@ -142,6 +141,7 @@ def jsonGroup(group: Group): JsValue = {
       "description" -> group.description,
       "created" -> group.created.toString,
       "creator" -> group.creator.toString,
+      "userCount" -> group.userCount.toString,
       "userList" -> group.userList.toString
     ))
 }

@@ -1,7 +1,9 @@
 package services.mongodb
 
 
-import com.mongodb.casbah.commons.MongoDBObject
+import com.mongodb.casbah.Imports._
+import com.mongodb.casbah.WriteConcern
+import com.mongodb.casbah.commons.{MongoDBList, MongoDBObject}
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import javax.inject.{Inject, Singleton}
 import models._
@@ -29,6 +31,15 @@ class MongoDBGroupService @Inject() (
 
   def insert(group : Group): Option[String] = {
     GroupDAO.insert(group).map(_.toString)
+  }
+
+  def addUserToGroup(userId: UUID, group: Group) = {
+    val result = GroupDAO.update(
+      MongoDBObject("_id" -> new ObjectId(group.id.stringify)),
+      $addToSet("userList" -> Some(new ObjectId(userId.stringify))),
+      false, false)
+    GroupDAO.update(MongoDBObject("_id" -> new ObjectId(group.id.stringify)), $inc("userCount" -> 1), upsert=false, multi=false, WriteConcern.Safe)
+
   }
 
   def count() : Long = {

@@ -1,18 +1,14 @@
 package services
 
-import api.Permission.Permission
 import models._
-import models.Collection
-import models.Dataset
-import models.User
-import models.Role
-import scala.collection.mutable.ListBuffer
 
 trait GroupService{
 
   def get(id: UUID): Option[Group]
 
   def insert(group: Group): Option[String]
+
+  def addUserToGroup(userId: UUID, group: Group)
 
   def count() : Long
 
