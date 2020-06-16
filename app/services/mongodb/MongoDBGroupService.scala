@@ -1,32 +1,16 @@
 package services.mongodb
 
 
-import javax.inject.{Inject, Singleton}
-import api.Permission
-import api.Permission.Permission
-import com.mongodb.casbah.Imports._
-import com.mongodb.casbah.WriteConcern
 import com.mongodb.casbah.commons.MongoDBObject
-import com.mongodb.DBObject
-import com.novus.salat.dao.{SalatDAO, ModelCompanion}
+import com.novus.salat.dao.{ModelCompanion, SalatDAO}
+import javax.inject.{Inject, Singleton}
 import models._
 import org.bson.types.ObjectId
-import play.api.Logger
-import play.api.i18n.Messages
-import play.{Logger => log}
 import play.api.Play._
-import securesocial.controllers.Registration
-import securesocial.controllers.Registration._
-import securesocial.core.providers.utils.RoutesHelper
 import services._
-import MongoContext.context
-import models.Collection
-import models.Dataset
-import models.Role
-import models.User
-import util.Formatters
+import services.mongodb.MongoContext.context
+
 import scala.collection.mutable.ListBuffer
-import scala.util.control._
 
 @Singleton
 class MongoDBGroupService @Inject() (
@@ -72,11 +56,10 @@ class MongoDBGroupService @Inject() (
   	var GroupsInSpace = new ListBuffer[Group]()
   	for (group <- GroupList) {
   		var SpaceRole = group.spaceandrole
-  		val result = SpaceRole.exists(_.spaceId == spaceID)
+  		val result = SpaceRole.exists(_.spaceID == spaceId)
   		if(result == true) GroupsInSpace += group
   	}
-  	SpaceRoleList = SpaceRole.toList
-  	SpaceRoleList
+  	GroupsInSpace.toList
   }
 
  def listGroupsByUser(userId: UUID) : List[Group] = {
@@ -85,8 +68,7 @@ class MongoDBGroupService @Inject() (
  	for (group <- GroupList if group.userList.contains(userId)) {
  		GroupsWithUser += group
  	}
- 	GroupsWithUserList = GroupsWithUser.toList
- 	GroupsWithUserList
+ 	GroupsWithUser.toList
  }
 
   object GroupDAO extends ModelCompanion[Group, ObjectId] {

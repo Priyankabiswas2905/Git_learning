@@ -1,8 +1,8 @@
 package models
 
-import java.net.URL
 import java.util.Date
-import play.api.libs.json.{Json, JsObject, Writes, Reads, JsValue}
+
+import play.api.libs.json.{Json, Writes}
 
 
 case class Group(
@@ -26,14 +26,16 @@ case class GroupInvite(
   expirationTime: java.util.Date
 )
 
-implicit val groupWrites = new Writes[Group]{
-  def writes(group: Group) = Json.obj(
+object Group {
+  implicit val groupWrites = new Writes[Group] {
+    def writes(group: Group) = Json.obj(
       "id" -> group.id.toString,
       "name" -> group.name,
       "description" -> group.description,
       "created" -> group.created.toString,
       "creator" -> group.creator.toString,
       "userList" -> group.userList,
-      "spaceandrole" -> group.spaceandrole
+      "spaceandrole" -> group.spaceandrole.toString
     )
+  }
 }

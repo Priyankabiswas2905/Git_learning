@@ -44,30 +44,14 @@
 
 
 package api 
-import java.io.{ByteArrayInputStream, InputStream, ByteArrayOutputStream}
-import java.security.{DigestInputStream, MessageDigest}
-import java.text.SimpleDateFormat
-import java.util.zip.{ZipEntry, ZipOutputStream, Deflater}
-import Iterators.RootCollectionIterator
-import _root_.util.JSONLD
-import api.Permission.Permission
-import org.apache.commons.codec.binary.Hex
-import play.api.Logger
-import play.api.Play.current
+import java.util.Date
+
+import javax.inject.Inject
 import models._
-import play.api.libs.iteratee.Enumerator
-import services._
-import play.api.libs.json._
-import play.api.libs.json.{JsObject, JsValue}
+import play.api.Logger
+import play.api.libs.json.JsValue
 import play.api.libs.json.Json.toJson
-import javax.inject.{ Singleton, Inject}
-import scala.collection.mutable.ListBuffer
-import scala.concurrent.{Future, ExecutionContext}
-import play.api.libs.concurrent.Execution.Implicits._
-import scala.util.parsing.json.JSONArray
-import scala.util.{Try, Success, Failure}
-import java.util.{Calendar, Date}
-import controllers.Utils
+import services._
 
 import scala.collection.immutable.List
 
@@ -77,7 +61,7 @@ class Groups @Inject()(spaces: SpaceService,
                        collectionService: CollectionService,
                        events: EventService,
                        datasets: DatasetService,
-                       appConfig: AppConfigurationService
+                       appConfig: AppConfigurationService,
                        groups: GroupService) extends ApiController {
 
 //What defines what is located in the request's body?
@@ -128,8 +112,7 @@ def addUser(userId: UUID, groupId: UUID) = PrivateServerAction { implicit reques
   groups.get(groupId) match {
     case Some(group) => {
       val newList : List[UUID] = group.userList :+ userId
-      group.userList = newList
-      group.userCount += 1
+      // TODO add method for adding new user to group
       Ok(jsonGroup(group))
     }
     case None => BadRequest(toJson("Group Not Found"))
@@ -144,8 +127,8 @@ def removeUser(userId: UUID, groupId: UUID) = PrivateServerAction {implicit requ
     case Some(group) => {
       //Add another case statement whether user even exists, if exists then user count goes down
       // If user does not exist, filterNot is fine but usercount cannot change
-      group.userList = group.userList.filterNot(elm => elm == userId)
-      group.userCount -= 1
+      // TODO add method for removing user once created
+      Ok(toJson(group))
     }
     case None => BadRequest(toJson("Group Not Found"))
   }
@@ -158,10 +141,9 @@ def jsonGroup(group: Group): JsValue = {
       "name" -> group.name,
       "description" -> group.description,
       "created" -> group.created.toString,
-      "creator" -> group.creator.toString
-      "userList" -> group.userList,
-      "spaceandrole" -> group.spaceandrole
-    )
+      "creator" -> group.creator.toString,
+      "userList" -> group.userList.toString
+    ))
 }
 
 
