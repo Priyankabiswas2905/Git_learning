@@ -42,7 +42,7 @@ class MongoDBMetadataGroupService @Inject() () extends MetadataGroupService {
 
   def list(userId: UUID): List[MetadataGroup] = {
     var mdGroups = List.empty[MetadataGroup]
-    mdGroups = MetadataGroupDAO.find(MongoDBObject("creatorId" -> new ObjectId(userId.stringify))).toList
+    mdGroups = MetadataGroupDAO.find(MongoDBObject()).toList
     mdGroups
   }
 
