@@ -42,6 +42,17 @@ class MongoDBGroupService @Inject() (
 
   }
 
+  //Do not know how to do the last part. When removing a user, need to remove each of their entries in the spaecandrole's RoleList.
+  // However, not sure of the syntax on how to accomplish this, as MongoDb does not support tuples.  
+  def removeUserFromGroup(userId:UUID, group:Group) = {
+    val result = GroupDAO.update(
+      MongoDBObject("_id" -> new ObjectId(group.id.stringify)),
+      $pull("userList" -> Some(new ObjectId(userId.stringify))),
+      false, false, WriteConcern.Safe)
+    GroupDAO.update(MongoDBObject("_id" -> new ObjectId(group.id.stringify)), $inc("userCount" -> -1), false, false, WriteConcern.Safe)
+    GroupDAO.update(MongoDBObject("_id" -> new ObjectId(group.id.stringify)), $pull("spaceandrole.$[].RoleList" -> ?)
+  }
+
   def count() : Long = {
   	GroupDAO.count(MongoDBObject())
   }

@@ -10,6 +10,8 @@ trait GroupService{
 
   def addUserToGroup(userId: UUID, group: Group)
 
+  def removeUserFromGroup(userId: UUID, group: Group)
+
   def count() : Long
 
   def list() : List[Group]

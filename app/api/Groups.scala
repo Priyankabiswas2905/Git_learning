@@ -124,10 +124,12 @@ def addUser(userId: UUID, groupId: UUID) = PrivateServerAction { implicit reques
 def removeUser(userId: UUID, groupId: UUID) = PrivateServerAction {implicit request =>
   groups.get(groupId) match{
     case Some(group) => {
-      //Add another case statement whether user even exists, if exists then user count goes down
-      // If user does not exist, filterNot is fine but usercount cannot change
       // TODO add method for removing user once created
-      Ok(toJson(group))
+      if(group.userList.contains(userId) && group.creator != userId) {
+        groups.removeUserFromGroup(userId, groupId)
+        Ok(jsonGroup(group))
+      }
+      BadRequest(toJson("Invalid User Selected"))
     }
     case None => BadRequest(toJson("Group Not Found"))
   }
