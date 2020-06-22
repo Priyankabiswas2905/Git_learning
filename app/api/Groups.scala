@@ -126,7 +126,7 @@ def removeUser(userId: UUID, groupId: UUID) = PrivateServerAction {implicit requ
     case Some(group) => {
       // TODO add method for removing user once created
       if(group.userList.contains(userId) && group.creator != userId) {
-        groups.removeUserFromGroup(userId, groupId)
+        groups.removeUserFromGroup(userId, group)
         Ok(jsonGroup(group))
       }
       BadRequest(toJson("Invalid User Selected"))
