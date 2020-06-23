@@ -12,6 +12,8 @@ trait GroupService{
 
   def removeUserFromGroup(userId: UUID, group: Group)
 
+  def addUserInGroupToSpaceWithRole(userId: UUID, group: Group, role: Role, spaceId: UUID)
+
   def count() : Long
 
   def list() : List[Group]

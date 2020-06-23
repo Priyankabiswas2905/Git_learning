@@ -3,6 +3,9 @@ package services.mongodb
 
 import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.WriteConcern
+import com.mongodb.DBObject
+import com.novus.salat._
+import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import com.mongodb.casbah.commons.{MongoDBList, MongoDBObject}
 import com.novus.salat.dao.{ModelCompanion, SalatDAO}
 import javax.inject.{Inject, Singleton}
@@ -39,7 +42,6 @@ class MongoDBGroupService @Inject() (
       $addToSet("userList" -> Some(new ObjectId(userId.stringify))),
       false, false)
     GroupDAO.update(MongoDBObject("_id" -> new ObjectId(group.id.stringify)), $inc("userCount" -> 1), upsert=false, multi=false, WriteConcern.Safe)
-
   }
 
   //Do not know how to do the last part. When removing a user, need to remove each of their entries in the spaecandrole's RoleList.
@@ -53,6 +55,12 @@ class MongoDBGroupService @Inject() (
     // TODO - remove user from space and role list
     GroupDAO.update(MongoDBObject("_id" -> new ObjectId(group.id.stringify)),
       $pull("spaceandroole" ->  MongoDBObject( "userId" -> new ObjectId(userId.stringify))), false, false, WriteConcern.Safe)  }
+
+  def addUserInGroupToSpaceWithRole(userId: UUID, group: Group, role: Role, spaceId: UUID): Unit = {
+    val spaceData = GroupSpaceAndRole(UUID.generate(),spaceId, userId, role)
+    val result = GroupDAO.dao.update(MongoDBObject("_id" -> new ObjectId(group.id.stringify)), $push("spaceandrole" -> GroupSpaceAndRoleData.toDBObject(spaceData)));
+
+  }
 
   def count() : Long = {
   	GroupDAO.count(MongoDBObject())
@@ -98,6 +106,13 @@ class MongoDBGroupService @Inject() (
     val dao = current.plugin[MongoSalatPlugin] match {
       case None => throw new RuntimeException("No MongoSalatPlugin");
       case Some(x) => new SalatDAO[Group, ObjectId](collection = x.collection("groups")) {}
+    }
+  }
+
+  object GroupSpaceAndRoleData extends ModelCompanion[GroupSpaceAndRole, ObjectId] {
+    val dao = current.plugin[MongoSalatPlugin] match {
+      case None => throw new RuntimeException("No MongoSalatPlugin");
+      case Some(x) => new SalatDAO[GroupSpaceAndRole, ObjectId](collection = x.collection("spaceandrole")) {}
     }
   }
 
