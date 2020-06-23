@@ -4,8 +4,10 @@ import play.api.libs.json.{Json, Writes}
 
 
 case class GroupSpaceAndRole(
+  id: UUID,
   spaceID: UUID = null,
-  roleList: List[(UUID, Role)] = List.empty
+  userId: UUID,
+  role: Role
 )
 
 object GroupSpaceAndRole {

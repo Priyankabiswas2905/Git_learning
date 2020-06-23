@@ -128,8 +128,9 @@ def removeUser(userId: UUID, groupId: UUID) = PrivateServerAction {implicit requ
       if(group.userList.contains(userId) && group.creator != userId) {
         groups.removeUserFromGroup(userId, group)
         Ok(jsonGroup(group))
+      } else {
+        BadRequest("Invalid User selection")
       }
-      BadRequest(toJson("Invalid User Selected"))
     }
     case None => BadRequest(toJson("Group Not Found"))
   }

@@ -892,3 +892,4 @@ GET         /api/tree/getChildrenOfNode                                         
 POST       /api/groups/create                                                               @api.Groups.createGroup()
 GET        /api/groups/list                                                                 @api.Groups.listEveryGroup()
 POST       /api/groups/:groupId/addUser/:userId                                             @api.Groups.addUser(userId: UUID, groupId: UUID)
+POST       /api/groups/:groupId/removeUser/:userId                                          @api.Groups.removeUser(userId: UUID, groupId: UUID)

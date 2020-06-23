@@ -51,8 +51,8 @@ class MongoDBGroupService @Inject() (
       false, false, WriteConcern.Safe)
     GroupDAO.update(MongoDBObject("_id" -> new ObjectId(group.id.stringify)), $inc("userCount" -> -1), false, false, WriteConcern.Safe)
     // TODO - remove user from space and role list
-    //GroupDAO.update(MongoDBObject("_id" -> new ObjectId(group.id.stringify)), $pull("spaceandrole.$[].RoleList" -> ?)
-  }
+    GroupDAO.update(MongoDBObject("_id" -> new ObjectId(group.id.stringify)),
+      $pull("spaceandroole" ->  MongoDBObject( "userId" -> new ObjectId(userId.stringify))), false, false, WriteConcern.Safe)  }
 
   def count() : Long = {
   	GroupDAO.count(MongoDBObject())
