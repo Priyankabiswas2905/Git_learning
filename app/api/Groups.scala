@@ -165,6 +165,30 @@ class Groups @Inject()(spaces: SpaceService,
     }
   }
 
+  def removeGroupFromSpace(groupId: UUID, spaceId: UUID) = PermissionAction(Permission.EditSpace, Some(ResourceRef(ResourceRef.space, spaceId))) (parse.json) { implicit request =>
+    request.user match {
+      case Some(user) => {
+        groups.get(groupId) match {
+          case Some(group) => {
+            val usersInGroup = group.userList
+            for(userId <- group.userList) {
+              userService.get(userId) match {
+                case Some(user) => {
+                  groups.removeUserInGroupFromSpace(userId, group, spaceId)
+                }
+                case None =>
+              }
+            }
+            Ok(toJson("removed group from space"))
+          }
+          case None => BadRequest("No group with that id")
+        }
+      }
+      case None => BadRequest("No user supplied")  
+    }
+  }
+
+
   def jsonGroup(group: Group): JsValue = {
   toJson(Map(
       "id" -> group.id.toString,
