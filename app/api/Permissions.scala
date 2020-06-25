@@ -1,10 +1,9 @@
 package api
 
-import api.Permission.getUserByIdentity
-import models.{UUID, ResourceRef, User, UserStatus}
+import models.{ResourceRef, User, UserStatus}
 import play.api.Logger
-import play.api.mvc._
 import play.api.Play.configuration
+import play.api.mvc._
 import services._
 
 /**
@@ -98,6 +97,11 @@ object Permission extends Enumeration {
     CreateVocabularyTerm,
     DeleteVocabularyTerm,
     EditVocabularyTerm,
+
+    //GROUPS
+    CreateGroup,
+    EditGroup,
+    DeleteGroup,
 
     // users
     ViewUser,
