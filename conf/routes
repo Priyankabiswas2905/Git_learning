@@ -895,3 +895,10 @@ POST       /api/groups/:groupId/addUser/:userId                                 
 POST       /api/groups/:groupId/removeUser/:userId                                          @api.Groups.removeUser(userId: UUID, groupId: UUID)
 POST       /api/groups/:groupId/addToSpace/:spaceId                                         @api.Groups.addGroupToSpace(groupId: UUID, spaceId: UUID)
 POST       /api/groups/:groupId/removeFromSpace/:spaceId                                    @api.Groups.removeGroupFromSpace(groupId: UUID, spaceId: UUID)
+
+# ----------------------------------------------------------------------
+# GROUP Controlers
+# ----------------------------------------------------------------------
+
+GET       /groups/list                                                                 @controllers.Groups.list()
+GET       /groups/listUser                                                             @controllers.Groups.listUser()

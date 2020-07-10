@@ -1,0 +1,33 @@
+@(groups: List[Group])(implicit flash: play.api.mvc.Flash, user: Option[models.User])
+
+@import api.Permission
+@import play.api.Play.current
+@import _root_.util.Formatters._
+@import play.api.i18n.Messages._
+
+
+@main( Messages("groups.title")) {
+@util.masonry()
+    <script src="@routes.Assets.at("javascripts/errorRedirect.js")" type="text/javascript"></script>
+    <script src="@routes.Assets.at("javascripts/deleteUtils.js")" type="text/javascript"></script>
+    <script src="@routes.Assets.at("javascripts/spaceModify.js")" type="text/javascript"></script>
+    <script src="@routes.Assets.at("javascripts/jquery.cookie.js")" type="text/javascript"></script>
+    <script src="@routes.Assets.at("javascripts/follow-button.js")" type="text/javascript"></script>
+    <script src="@routes.Assets.at("javascripts/displayPanels.js")" type="text/javascript"></script>
+
+    <div class="row">
+        <ol class="breadcrumb">
+            <li><span class="glyphicon glyphicon-briefcase"> </span> Groups</li>
+        </ol>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            <h1>@Html("Groups")</h1>
+            <p>
+                The groups are not here yet.
+            </p>
+        </div>
+    </div>
+
+
+}

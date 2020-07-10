@@ -1,17 +1,13 @@
 package controllers
 
 import java.net.URL
-import javax.inject.{Inject, Singleton}
 
-import api.Permission
-import api.Permission._
-import play.api.{Logger, Play, Routes}
-import play.api.mvc.Action
-import services._
-import models.{Event, UUID, User, UserStatus}
-import play.api.Logger
-import play.api.libs.concurrent.Execution.Implicits._
+import javax.inject.{Inject, Singleton}
+import models.{Event, UUID, UserStatus}
 import play.api.Play.current
+import play.api.mvc.Action
+import play.api.{Logger, Play, Routes}
+import services._
 
 import scala.collection.immutable.List
 import scala.collection.mutable.ListBuffer
@@ -496,6 +492,8 @@ class Application @Inject() (files: FileService, collections: CollectionService,
         controllers.routes.javascript.Datasets.dataset,
         controllers.routes.javascript.Datasets.newDataset,
         controllers.routes.javascript.Datasets.createStep2,
+        controllers.routes.javascript.Groups.list,
+        controllers.routes.javascript.Groups.listUser,
         controllers.routes.javascript.ToolManager.launchTool,
         controllers.routes.javascript.ToolManager.getLaunchableTools,
         controllers.routes.javascript.ToolManager.uploadDatasetToTool,
