@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 
-## 2.0.0-alpha
+## 2.0.0-alpha.1
 
 ### Changed
 - Rabbitmq Plugin replaced with ExtractionBusService, implemented by RabbitmqExtractionBusService
