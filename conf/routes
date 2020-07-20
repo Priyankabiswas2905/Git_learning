@@ -904,3 +904,5 @@ POST       /api/groups/:groupId/removeFromSpace/:spaceId                        
 
 GET       /groups/list                                                                 @controllers.Groups.list()
 GET       /groups/listUser                                                             @controllers.Groups.listUser()
+GET       /groups/newGroup                                                             @controllers.Groups.newGroup()
+GET       /groups/getGroup/:id                                                         @controllers.Groups.getGroup(id: UUID)
