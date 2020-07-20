@@ -43,6 +43,7 @@ dataset.trash.message=These {0} are in the trash. You can restore them or delete
 collection.list.message=Use {0} to bring together multiple {1} and their associated files in an almost unlimited number of ways.
 collection.trash.message=These {0} are in the trash. You can restore them or delete them.
 space.list.message=Use {0} to collaboratively work with your team to manage and annotate data.
+group.list.message=Create a {0} to collaborate with your peers with ease. {1} allow users that would like to work together to join workspaces more easily. 
 home.empty.message=This area will show all {0}  you''ve created.
 profile.empty.message=This area will show all {0}  this user has created.
 recent.message=Viewing most recent {0}
