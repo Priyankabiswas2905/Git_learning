@@ -18,7 +18,7 @@
 
                 @if(user.isDefined) {
                     <!--If user can delete, the button is enabled, otherwise the button is present but disabled to provide consistent UE.-->
-                    @if(Permission.checkPermission(Permission.DeleteGroup, ResourceRef(ResourceRef.group, group.id)) || user.get.identityId.userId.equals(group.creator)){
+                    @if(true){
                         <button onclick="confirmDeleteResource('group','@Messages("group.title")','@(group.id)','@(group.name.replace("'","&#39;"))',false, '@route')" class="btn btn-link" title="Delete the @Messages("group.title")">
                             <span class="glyphicon glyphicon-trash"></span>
                         </button>

@@ -118,12 +118,11 @@ class Groups @Inject()(
 //  }
 
   def list() = UserAction(needActive = false) { implicit request =>
-    implicit val user = request.user
     request.user match {
       case Some(user) => {
-        val groupList = groups.listGroupsByUser(user.id)
-        Ok(views.html.groups.listgroups(groupList,10, Some(user.id.toString), Some(user.fullName), Some("tile"), false, false, Some("title")))
-
+        val groupList : List[Group] = groups.listGroupsByUser(user.id)
+        Ok(views.html.blank())
+        // Ok(views.html.groups.listgroups(groupList,10, Some(user.id.toString), Some(user.fullName), Some("tile"), false, false, Some("title")))
       }
       case None=> BadRequest("No user")
     }
@@ -153,7 +152,8 @@ class Groups @Inject()(
       case Some(u) => {
         val appConfig: AppConfigurationService = DI.injector.getInstance(classOf[AppConfigurationService])
         val groupList : List[Group] = groups.listByCreator(u.id)
-        Ok(views.html.groups.listgroups(groupList, 10,Some(u.id.toString),Some(""),Some("tile"),false,false,Some("title") ))
+        Ok(views.html.blank())
+        // Ok(views.html.groups.listgroups(groupList, 10,Some(u.id.toString),Some(""),Some("tile"),false,false,Some("title") ))
 
       }
       case None => {
