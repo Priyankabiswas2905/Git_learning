@@ -31,11 +31,11 @@
             @(user, owner) match {
                 case (Some(u), Some(o)) => {
                     @if(o.equalsIgnoreCase(u.id.stringify)) {
-                        <a class="btn btn-primary btn-sm" id="create-group" href="@routes.Groups.newGroup" title="Create a new @Messages("group.title")"><span class="glyphicon glyphicon-ok"></span> @Messages("create.title", "")</a>
+                        <a class="btn btn-primary btn-sm" id="create-group" href="@routes.Groups.newGroup()" title="Create a new @Messages("group.title")"><span class="glyphicon glyphicon-ok"></span> @Messages("create.title", "")</a>
                     }
                 }
                 case (Some(u), _) => {
-                    <a class="btn btn-primary btn-sm" id="create-group" href="@routes.Groups.newGroup" title="Create a new @Messages("group.title")"><span class="glyphicon glyphicon-ok"></span> @Messages("create.title", "")</a>
+                    <a class="btn btn-primary btn-sm" id="create-group" href="@routes.Groups.newGroup()" title="Create a new @Messages("group.title")"><span class="glyphicon glyphicon-ok"></span> @Messages("create.title", "")</a>
                 }
                 case (_,_) => {}
             }

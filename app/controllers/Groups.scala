@@ -49,7 +49,7 @@ class Groups @Inject()(
   users: UserService,
   groups: GroupService,
   appConfig: AppConfigurationService) extends SecuredController {
-
+/*
   val groupForm = Form(
     mapping(
       "name" -> nonEmptyText,
@@ -63,12 +63,10 @@ class Groups @Inject()(
 
   val groupInviteForm = Form(
     mapping(
-      "addresses" -> play.api.Forms.list(nonEmptyText),
+      "addresses" -> play.api.data.Forms.list(nonEmptyText),
       "role" -> nonEmptyText,
       "message" -> optional(text))((addresses, role, message) => groupInviteData(addresses = addresses, role = role, message = message))((d: groupInviteData) => Some(d.addresses, d.role, d.message)))
-    )
-  )
-
+*/
   def list(numPage : Int, limit: Int, mode:String, owner: Option[String]) = UserAction(needActive = false) { implicit request =>
     implicit val user = request.user
     val nextExist = false
@@ -130,23 +128,23 @@ class Groups @Inject()(
     Ok(views.html.groups.listgroups(decodedGroupList,limit, owner, ownerName, viewMode, prevExist, nextExist, title))
   }
 
-  def newGroup = AuthenticatedAction { implicit request =>
+
+  def newGroup() = AuthenticatedAction { implicit request =>
     implicit val user = request.user
-    Ok(views.html.groups.newGroup(groupForm))
+    //Ok(views.html.groups.newGroup(groupForm))O
+    Ok(views.html.blank())
   }
 
-  /*
-  def getGroup(id:UUID, size: Int, direction:String): Unit = {implicit request =>
-    implicit val user = request.user
-    groups.get(id) match {
-      case Some(g) => {
-        val creator = users.findById(g.creator)
-        var creatorActual : User = null
 
-      }
+/*The controller for the getGroup main page */
+
+  def getGroup(id:UUID) = AuthenticatedAction{implicit request =>
+    implicit val user = request.user
+    Ok(views.html.blank())
     }
-  }
-*/
+
+
+
 
   def listUser() = PrivateServerAction { implicit request =>
     implicit val user = request.user

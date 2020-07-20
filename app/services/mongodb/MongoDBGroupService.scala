@@ -66,29 +66,13 @@ class MongoDBGroupService @Inject() (
       MongoDBObject("_id" -> new ObjectId(group.id.stringify)), 
       $pull("spaceandrole" -> MongoDBObject("spaceID" -> spaceId, "userId" -> userId)),
       false, false, WriteConcern.Safe)
-
-
-    //When should I use GroupDAO.update or GroupDAO.dao.update?
-
-    //Other implementations added to clarify some things:
-
-    //This implementation would not work because UUID.generate() creates a new ID? How would I find the unique ID in order to use
-    //the pull request with GroupSpaceAndRoleData.toDBObject method?
-
-    //Implementation 1:
-    //val spaceData = GroupSpaceAndRole(UUID.generate(),spaceId, userId, role)
-    //val result = GroupDAO.dao.update(MongoDBObject("_id" -> new ObjectId(group.id.stringify)), $pull("spaceandrole" -> GroupSpaceAndRoleData.toDBObject(spaceData)))
-
-    //This second implementation also looks good to me. However, I am not completely certain regarding defined collections, etc. 
-    //Implementation 2:
-    //val result =  GroupSpaceAndRoleData.remove(GroupSpaceAndRoleData.find((MongoDBObject("spaceID" -> spaceId, "userId" -> userId, "role" -> role)))
   }
 
   def count() : Long = {
   	GroupDAO.count(MongoDBObject())
   }
 
-  //Probably not a great idea?
+  //Lists all groups possible
   def list() : List[Group] = {
   	var GroupList = List.empty[Group]
   	GroupList = GroupDAO.findAll().toList
