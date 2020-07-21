@@ -902,7 +902,7 @@ POST       /api/groups/:groupId/removeFromSpace/:spaceId                        
 # GROUP Controlers
 # ----------------------------------------------------------------------
 
-GET       /groups/list                                                                 @controllers.Groups.list()
+GET       /groups/list                                                                 @controllers.Groups.list(numPage : Int, limit: Int, mode:String, owner: Option[String], nextPage : Int, prevPage :Int)
 GET       /groups/listUser                                                             @controllers.Groups.listUser()
 GET       /groups/newGroup                                                             @controllers.Groups.newGroup()
 GET       /groups/getGroup/:id                                                         @controllers.Groups.getGroup(id: UUID)
