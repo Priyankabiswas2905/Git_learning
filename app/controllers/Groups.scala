@@ -110,7 +110,7 @@ class Groups @Inject()(
       Some(mode)
     }
 
-    Ok(views.html.groups.listgroups(groupList, numPage, limit, owner, ownerName, viewMode, prevExist, nextExist, title, next, prev))
+    Ok(views.html.groups.listgroups(tempList, numPage, limit, owner, ownerName, viewMode, prevExist, nextExist, title, next, prev))
   }
 
 
