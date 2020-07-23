@@ -15,14 +15,22 @@
     <script src="@routes.Assets.at("javascripts/follow-button.js")" type="text/javascript"></script>
     <script src="@routes.Assets.at("javascripts/displayPanels.js")" type="text/javascript"></script>
 
+
     <div class="row">
         <ol class="breadcrumb">
-            <li><span class="glyphicon glyphicon-briefcase"> </span> Groups</li>
+            @(owner, ownerName) match {
+                case (Some(o), Some(n)) => {
+                    <li> <span class="glyphicon glyphicon-user"></span> <a href="@routes.Profile.viewProfileUUID(UUID(o))"> @n</a></li>
+                }
+                case (_, _) => {}
+            }
+
+            <li><span class="glyphicon glyphicon-equalizer"> </span> @Messages("groups.title")</li>
         </ol>
     </div>
     <div class="row">
         <div class="col-md-12">
-            <h1>@Html("Groups")</h1>
+            <h1>@title</h1>
             <p> @Messages("group.list.message", Messages("group.title"), Messages("groups.title"))</p>
         </div>
     </div>
@@ -124,9 +132,9 @@
 
     <div class="row hidden" id="list-view">
         <div  class="col-md-12">
-        @groupsList.map { group =>
-            @groups.listitem(group, (routes.Groups.list(numPage, limit, "", owner, nextPage, prevPage)))
-        }
+           @groupsList.map { group =>
+                 @groups.listitem(group, routes.Groups.list(numPage, limit, "", owner, nextPage, prevPage))
+           }
         </div>
     </div>
 

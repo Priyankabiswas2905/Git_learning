@@ -31,7 +31,7 @@ import org.apache.commons.lang.StringEscapeUtils.escapeJava
 case class groupFormData(
   name: String,
   description: String,
-  groupId: Option[String],
+  groupId: Option[UUID],
   submitButtonValue : String)
 
 
@@ -49,7 +49,8 @@ class Groups @Inject()(
   users: UserService,
   groups: GroupService,
   appConfig: AppConfigurationService) extends SecuredController {
-/*
+
+
   val groupForm = Form(
     mapping(
       "name" -> nonEmptyText,
@@ -57,7 +58,7 @@ class Groups @Inject()(
       "group_id" -> optional(Utils.CustomMappings.uuidType),
       "submitValue" -> text
     )(
-      (name, description, groupId, submitValue) => groupFormData(name = name, description = description, group_id, bvalue))(
+      (name, description, group_id, bvalue) => groupFormData(name = name, description = description, group_id, bvalue))(
       (d: groupFormData) => Some(d.name, d.description, d.groupId, d.submitButtonValue))
   )
 
@@ -66,7 +67,7 @@ class Groups @Inject()(
       "addresses" -> play.api.data.Forms.list(nonEmptyText),
       "role" -> nonEmptyText,
       "message" -> optional(text))((addresses, role, message) => groupInviteData(addresses = addresses, role = role, message = message))((d: groupInviteData) => Some(d.addresses, d.role, d.message)))
-*/
+
   def list(numPage : Int, limit: Int, mode:String, owner: Option[String], nextPage : Int, prevPage :Int) = UserAction(needActive = false) { implicit request =>
     implicit val requestUser = request.user
     var nextExist = false
@@ -88,20 +89,20 @@ class Groups @Inject()(
     }
     val next = numPage + 1
     val prev = numPage - 1
-    if(numPage < 1){
-      nextExist = false
-      prevExist = false
-    }
     if(numPage < maxPage)
       nextExist = true
     if(numPage > 1)
       prevExist = true
+    if(numPage < 1 || numPage > maxPage) {
+      nextExist = false
+      prevExist = false
+    }
+    val startIndex = limit * (numPage - 1)
+    val endIndex = startIndex + (limit - 1)
     val groupList : List[models.Group] = person match {
       case(Some(p)) => {
         title = Some(Messages("owner.title", p.fullName, Messages("groups.title")))
         if((numPage < maxPage) || (numPage == maxPage && rem == 0)){
-          val startIndex = limit * (numPage - 1)
-          val endIndex = startIndex + (limit - 1)
           tempList.slice(startIndex, endIndex + 1)
         }
         else if(numPage == maxPage && rem != 0){
@@ -129,26 +130,52 @@ class Groups @Inject()(
     } else {
       Some(mode)
     }
-
     Ok(views.html.groups.listgroups(groupList, numPage, limit, owner, ownerName, viewMode, prevExist, nextExist, title, next, prev))
   }
 
 
-  def newGroup() = AuthenticatedAction { implicit request =>
-    implicit val user = request.user
-    //Ok(views.html.groups.newGroup(groupForm))O
-    Ok(views.html.blank())
+  def newGroup() = UserAction(needActive = false) { implicit request =>
+    implicit val requestUser = request.user
+    Ok(views.html.groups.newGroup(groupForm))
   }
+
 
 
 /*The controller for the getGroup main page */
 
   def getGroup(id:UUID) = AuthenticatedAction{implicit request =>
-    implicit val user = request.user
+    implicit val requestUser = request.user
     Ok(views.html.groups.blank())
     }
 
-
+  def submitNewGroup() = AuthenticatedAction { implicit request =>
+    implicit val requestUser = request.user
+    requestUser match{
+      case Some(identity) => {
+        val userId = request.user.get.id
+        request.body.asMultipartFormData.get.dataParts.get("submitValue").headOption match {
+          case Some(x) => {
+            x(0) match {
+              case ("Create") => {
+                groupForm.bindFromRequest.fold(
+                  formWithErrors => BadRequest(views.html.groups.newGroup(formWithErrors)),
+                  formData => {
+                    val newGroup = Group(name = formData.name, description = formData.description,
+                      created = new Date, creator = userId, userCount = 0)
+                    groups.insert(newGroup)
+                    groups.addUserToGroup(userId, newGroup)
+                    Redirect(routes.Groups.getGroup(newGroup.id))
+                  })
+              }
+              case _ => { BadRequest("Do not recognize the submit button value.") }
+            }
+          }
+          case None => { BadRequest("Did not get any submit button value.") }
+        }
+      }
+      case None => Redirect(routes.Groups.list()).flashing("error" -> "You are not authorized to create groups.")
+    }
+  }
 
 
   def listUser() = PrivateServerAction { implicit request =>

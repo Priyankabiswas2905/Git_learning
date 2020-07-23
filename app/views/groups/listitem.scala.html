@@ -1,4 +1,4 @@
-@(group: models.Group, collectionId: Option[String], redirect: Call, selected: Boolean)(implicit  flash: play.api.mvc.Flash, user: Option[models.User])
+@(group: models.Group, redirect: Call)(implicit  flash: play.api.mvc.Flash, user: Option[models.User])
 @import api.Permission
 
 <div class = "panel panel-default dataset-panel" id="@group.id-listitem">

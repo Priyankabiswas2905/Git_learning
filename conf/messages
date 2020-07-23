@@ -38,6 +38,7 @@ dataset.create.message={0} are the primary way to organize files. Share the {1} 
 dataset.create.collection.message=This {0} will be added to {1}
 collection.create.message={0} allow you to bring together multiple {1} and their associated files in an almost unlimited number of ways. Share a {2} to a {3} to work with your team. Permissions will be applied according to the {3}''s settings.
 space.create.message={0} are collaborative workspaces that contain people (with designated permissions), branding, and {1}.
+group.create.message={0} allow you to join workspaces as a collective team, with each person in a group initially given the same permissions. 
 dataset.list.message=Create {0} to upload and publish data. Further organize your data using folders and assign metadata at both the file and {1} level.
 dataset.trash.message=These {0} are in the trash. You can restore them or delete them.
 collection.list.message=Use {0} to bring together multiple {1} and their associated files in an almost unlimited number of ways.

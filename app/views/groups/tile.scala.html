@@ -5,15 +5,21 @@
 
 <div class="post-box @classes" id="@group.id-tile">
     <div class="panel panel-default group-panel">
-        <div class="panel-body">
+
+         <div class="panel-body">
           <div class="caption break-word">
+
             <h4 class="no-overflow oneline"><a href="@routes.Groups.getGroup(group.id)">@group.name</a></h4>
+              <@*******
             <p class = 'abstractsummary'>@Html(group.description.replace("\n","<br>"))</p>
+              *****@>
+
           </div>
         </div>
             <!-- Group Info -->
+
         <ul class="list-group">
-            <li class="list-group-item space-panel-footer">
+            <li class="list-group-item group-panel-footer">
                 <span class="glyphicon glyphicon-user" title="@group.userCount users"></span> @group.userCount
 
                 @if(user.isDefined) {
@@ -28,7 +34,9 @@
                         </div>
                     }
                 }
+
             </li>
         </ul>
+
     </div>
 </div>

@@ -899,10 +899,11 @@ POST       /api/groups/:groupId/addToSpace/:spaceId                             
 POST       /api/groups/:groupId/removeFromSpace/:spaceId                                    @api.Groups.removeGroupFromSpace(groupId: UUID, spaceId: UUID)
 
 # ----------------------------------------------------------------------
-# GROUP Controlers
+# GROUP Controllers
 # ----------------------------------------------------------------------
 
-GET       /groups/list                                                                 @controllers.Groups.list()
+GET       /groups/list                                                                 @controllers.Groups.list(numPage : Int ?= 1, size: Int ?= 12, mode: String ?= "", owner: Option[String] ?= None, nextPage : Int ?= -1, prevPage : Int ?= -1)
 GET       /groups/listUser                                                             @controllers.Groups.listUser()
-GET       /groups/newGroup                                                             @controllers.Groups.newGroup()
+GET       /groups/new                                                                  @controllers.Groups.newGroup()
 GET       /groups/getGroup/:id                                                         @controllers.Groups.getGroup(id: UUID)
+POST      /groups/submitNewGroup                                                       @controllers.Groups.submitNewGroup

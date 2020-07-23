@@ -1,0 +1,58 @@
+@(myForm: Form[controllers.groupFormData], title:String, submitButton: Html, groupId: Option[UUID], groupName: Option[String])(implicit flash: play.api.mvc.Flash, user: Option[models.User])
+@import play.api.i18n.Messages
+@import helper._
+@import play.api.Play.current
+@import api.Permission
+@import _root_.util.Formatters._
+@implicitFieldConstructor = @{ FieldConstructor(twitterBootstrapInput.f)}
+
+
+@main(title) {
+    <div class="page-header">
+        <ol class="breadcrumb">
+        @(groupId, groupName) match {
+            case (Some(g), Some(name)) => {
+                <li> <span class="glyphicon glyphicon-equalizer"></span>  <a href="@routes.Groups.getGroup(g)" title="@name"> @Html(ellipsize(name, 18))</a></li>
+                <li> <span class="glyphicon glyphicon-edit"></span> @Html(title)</li>
+            }
+            case (_,_) => {
+                @user match {
+                    case Some(u) => {
+                        <li><span class="glyphicon glyphicon-user"></span> <a href= "@routes.Profile.viewProfileUUID(u.id)"> @Html(u.fullName) </a> </li>
+                        <li><span class="glyphicon glyphicon-equalizer"></span> @Html(title) </li>
+                    }
+                    case None => {}
+                }
+            }
+        }
+        </ol>
+        <h1>@title</h1>
+        <p>@Messages("group.create.message", Messages("groups.title"))</p>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            @if(myForm.hasErrors) {
+                <div class="alert alert-error error">
+                    <p>Please fix all errors</p>
+                </div>
+            }
+            @flash.get("error").map { message =>
+                <div class="alert alert-error">
+                    <p>@message</p>
+                </div>
+            }
+
+            @form(action = routes.Groups.submitNewGroup, 'enctype -> "multipart/form-data", 'class -> "form-horizontal", 'id -> "groupForm") {
+                <fieldset  id="nameDescrFieldSet">
+                    @inputText(myForm("name"), 'class -> "form-control", '_label -> "Name")
+                    @textarea(myForm("description"), 'class -> "form-control", '_label -> "Description")
+                    @helper.input(myForm("group_id"), 'class -> "form-control", '_label ->"") {(id, name, value, args) =>
+                        <input type="hidden" name="@id" value="@value">
+                    }
+                </fieldset>
+                @submitButton
+            }
+        </div>
+    </div>
+
+}
