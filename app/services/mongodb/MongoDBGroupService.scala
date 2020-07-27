@@ -14,6 +14,8 @@ import org.bson.types.ObjectId
 import play.api.Play._
 import services._
 import services.mongodb.MongoContext.context
+import play.api.Logger
+import play.{Logger => log}
 
 import scala.collection.mutable.ListBuffer
 
@@ -108,6 +110,47 @@ class MongoDBGroupService @Inject() (
  	GroupsWithUser.toList
  }
 
+  def addInvitationToGroup(invite: GroupInvite) {
+    GroupDAO.update(MongoDBObject("_id" -> new ObjectId(invite.group.stringify)),
+      $addToSet("invitations"-> MongoDBObject("_id" -> new ObjectId(invite.id.stringify))), false, false, WriteConcern.Safe)
+    GroupInviteDAO.insert(invite)
+  }
+
+  def removeInvitationFromGroup(inviteId: UUID, groupId: UUID) {
+    GroupDAO.update(MongoDBObject("_id" -> new ObjectId(groupId.stringify)),
+      $pull("invitations" -> MongoDBObject( "_id" -> new ObjectId(inviteId.stringify))), false, false, WriteConcern.Safe)
+    GroupInviteDAO.removeById(new ObjectId(inviteId.stringify))
+  }
+
+  def getInvitation(inviteId: String): Option[GroupInvite] = {
+    GroupInviteDAO.findOne(MongoDBObject("invite_id" -> inviteId))
+  }
+
+  def getInvitationByGroup(group: UUID): List[GroupInvite] = {
+    GroupInviteDAO.find(MongoDBObject("group" -> new ObjectId(group.stringify))).toList
+  }
+
+  def getInvitationByEmail(email: String): List[GroupInvite] = {
+    GroupInviteDAO.find(MongoDBObject("email" -> email)).toList
+  }
+
+  def processInvitation(email: String) = {
+    getInvitationByEmail(email).map { invite =>
+      users.findByEmail(invite.email) match {
+        case Some(user) => {
+          GroupDAO.findOneById(new ObjectId(invite.group.stringify)) match {
+            case Some(inviteGroup) => {
+              addUserToGroup(user.id, inviteGroup)
+              removeInvitationFromGroup(UUID(invite.invite_id), invite.group)
+            }
+            case None => Logger.error("No group found")
+          }
+        }
+        case None => Logger.error("No user found with email "+email)
+      }
+    }
+  }
+
   object GroupDAO extends ModelCompanion[Group, ObjectId] {
     val dao = current.plugin[MongoSalatPlugin] match {
       case None => throw new RuntimeException("No MongoSalatPlugin");
@@ -119,6 +162,12 @@ class MongoDBGroupService @Inject() (
     val dao = current.plugin[MongoSalatPlugin] match {
       case None => throw new RuntimeException("No MongoSalatPlugin");
       case Some(x) => new SalatDAO[GroupSpaceAndRole, ObjectId](collection = x.collection("spaceandrole")) {}
+    }
+  }
+  object GroupInviteDAO extends ModelCompanion[GroupInvite, ObjectId] {
+    val dao = current.plugin[MongoSalatPlugin] match {
+      case None => throw new RuntimeException("No mongoSalatPlugin");
+      case Some(x) => new SalatDAO[GroupInvite, ObjectId](collection = x.collection("groups.invites")) {}
     }
   }
 

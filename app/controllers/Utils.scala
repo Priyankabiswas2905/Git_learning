@@ -51,11 +51,6 @@ object Utils {
     val decodedDesc = StringEscapeUtils.unescapeHtml(space.description)
     space.copy(name = decodedName, description = decodedDesc)
   }
-  def decodeGroupElements(group: Group) : Group = {
-    val decodedName = StringEscapeUtils.unescapeHtml(group.name)
-    val decodedDesc = StringEscapeUtils.unescapeHtml(group.description)
-    group.copy(name = decodedName, description = decodedDesc)
-  }
 
   def decodeVocabularyTermElements(vocabularyTerm : VocabularyTerm) = {
     val decodedKey = StringEscapeUtils.unescapeHtml(vocabularyTerm.key)

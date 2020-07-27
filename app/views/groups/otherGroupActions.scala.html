@@ -1,0 +1,10 @@
+@(group: Group)(implicit user: Option[models.User])
+@import api.Permission
+@import play.api.i18n.Messages
+<div class="row ds-section-sm space-col-right">
+    <ul class="list-unstyled">
+            <li><a href="@routes.Groups.manageGroupUsers(group.id)" class="btn btn-link btn-xs btn-margins">
+                <span class = "glyphicon glyphicon-user" aria-hidden="true"></span> Manage Users
+            </a></li>
+    </ul>
+</div>

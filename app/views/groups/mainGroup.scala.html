@@ -1,0 +1,59 @@
+@(group: Group, users: List[UUID], spacesList:List[models.ProjectSpace])(implicit user: Option[models.User])
+@import play.api.libs.json._
+
+@import play.api.Play.current
+@import api.Permission
+@import play.api.i18n.Messages
+@main(group.name) {
+    <div class="row vertical-align">
+
+        <div class="col-md-12 col-lg-12 col-sm-12">
+            <h1 id="groupnamedisplay" class="group-title"><span class="glyphicon glyphicon-equalizer"></span> @group.name</h1>
+
+            <p><span id="groupdescdisplay" class='abstract'>@Html(group.description.replace("\n","<br>"))</span></p>
+
+
+            @if(user.isDefined) {
+                <hr/>
+                @if(true){
+                    <button id="deleteButton" onclick=""
+                    class="btn btn-link" title="Delete the @Messages("space.title") but not its contents">
+                        <span class="glyphicon glyphicon-trash"></span> Delete</button>
+                }
+            }
+
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-8 col-lg-8 col-sm-8">
+
+            <ul class="nav nav-tabs margin-bottom-20">
+            </ul>
+
+            <div class="tab-content">
+                <h3>@Messages("a.contains.b", Messages("spaces.title"), Messages("group.title"))</h3>
+                <div id="masonry">
+                @spacesList.map { space =>
+                    @groups.spaceTile(space, "col-lg-3 col-md-3 col-sm-3 col-xs-12",  /*routes.Spaces.list(when, date, limit, "", owner, showAll, showPublic, onlyTrial),*/ false)
+                }
+                </div>
+
+
+            </div>
+        </div>
+
+        <div class="col-md-4 col-lg-4 col-sm-4">
+            @if(user.isDefined) {
+                @groups.otherGroupActions(group)
+            }
+        </div>
+    </div>
+
+    <script src="@routes.Assets.at("javascripts/spaceListProcess.js")" type="text/javascript"></script>
+    <script src="@routes.Assets.at("javascripts/collectionListProcess.js")" type="text/javascript"></script>
+    <script src="@routes.Assets.at("javascripts/datasetListProcess.js")" type="text/javascript"></script>
+    <script src="@routes.Assets.at("javascripts/deleteUtils.js")" type="text/javascript"></script>
+    <script src="@routes.Assets.at("javascripts/spaceModify.js")" type="text/javascript"></script>
+    <script src="@routes.Assets.at("javascripts/errorRedirect.js")" language="javascript"></script>
+    <script src="@routes.Assets.at("javascripts/select.js")" type="text/javascript"></script>
+}

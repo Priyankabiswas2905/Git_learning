@@ -1,0 +1,52 @@
+@(myForm: Form[controllers.groupInviteData], group: Group, creator: Option[User], userList: List[User], invite:List[GroupInvite])(implicit flash: play.api.mvc.Flash, user: Option[models.User])
+@import play.api.i18n.Messages
+@import api.Permission
+@import _root_.util.Formatters._
+
+@main(group.name) {
+    <div class="row">
+        <div class="col-md-12">
+
+            <ol class="breadcrumb">
+                <li><span class="glyphicon glyphicon-equalizer"></span><a href= "@routes.Groups.getGroup(group.id)" title="@group.name"> @Html(ellipsize(group.name, 18))</a></li>
+                <li><span class="glyphicon glyphicon-user"></span> Manage Users</li>
+            </ol>
+
+            <div class="row">
+                <div class="col-md-12" id="s-title">
+                    <h1 id="group-title" class="inline">Manage Users of @Messages("group.title")
+                        <a href= "@routes.Groups.getGroup(group.id)" title="@group.name"> @group.name</a>
+                    </h1>
+                </div>
+            </div>
+
+            @if(true) {
+
+                <div class="col-md-12 box-white-space">
+                    <div class="tabbable" id="manage-access-tabbable"> <!-- Only required for left/right tabs -->
+                        <!-- Display the tabs with their titles, etc. -->
+                        <ul class="nav nav-tabs">
+                            <li role="presentation" class="active">
+                                <a href="#tab-home" role="tab" data-toggle="tab"> Users</a>
+                            </li>
+                            <li role="presentation">
+                                <a href="#tab-invite" role="tab" data-toggle="tab"> Invites</a>
+                            </li>
+                        </ul>
+                        <br /> <br />
+                            <!-- Define the tabs' contents. -->
+                        <div class="tab-content">
+                            <div role="tabpanel" class="tab-pane fade in active" id="tab-home">
+                                @groups.groupEditUsers(group, creator, userList)
+                            </div>
+                            <div role="tabpanel" class="tab-pane" id="tab-invite">
+                                @groups.groupInvitePage(myForm, group, invite)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            }
+        </div>
+    </div>
+}

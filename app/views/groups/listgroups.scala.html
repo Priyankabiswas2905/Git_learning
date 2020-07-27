@@ -133,7 +133,7 @@
     <div class="row hidden" id="list-view">
         <div  class="col-md-12">
            @groupsList.map { group =>
-                 @groups.listitem(group, routes.Groups.list(numPage, limit, "", owner, nextPage, prevPage))
+                 @groups.listitem(group, (routes.Groups.list(numPage, limit, "", owner, nextPage, prevPage)))
            }
         </div>
     </div>

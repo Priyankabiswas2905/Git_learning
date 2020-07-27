@@ -13,7 +13,7 @@ case class Group(
   creator: UUID, 
   userList: List[UUID] = List.empty,
   userCount: Integer,
-  invitations: List[(UUID, String)] = List.empty,
+  invitations: List[UUID] = List.empty,
   defaultRole : Role = Role.Viewer,
   spaceandrole: List[GroupSpaceAndRole] = List.empty
 )
@@ -22,6 +22,7 @@ case class GroupInvite(
   id: UUID = UUID.generate,
   invite_id: String,
   email: String,
+  group: UUID,
   creationTime: java.util.Date,
   expirationTime: java.util.Date
 )

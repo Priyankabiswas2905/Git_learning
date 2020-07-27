@@ -37,7 +37,6 @@ case class groupFormData(
 
 case class groupInviteData(
   addresses: List[String],
-  role: String,
   message: Option[String])
 
 
@@ -65,8 +64,7 @@ class Groups @Inject()(
   val groupInviteForm = Form(
     mapping(
       "addresses" -> play.api.data.Forms.list(nonEmptyText),
-      "role" -> nonEmptyText,
-      "message" -> optional(text))((addresses, role, message) => groupInviteData(addresses = addresses, role = role, message = message))((d: groupInviteData) => Some(d.addresses, d.role, d.message)))
+      "message" -> optional(text))((addresses, message) => groupInviteData(addresses = addresses, message = message))((d: groupInviteData) => Some(d.addresses, d.message)))
 
   def list(numPage : Int, limit: Int, mode:String, owner: Option[String], nextPage : Int, prevPage :Int) = UserAction(needActive = false) { implicit request =>
     implicit val requestUser = request.user
@@ -143,10 +141,41 @@ class Groups @Inject()(
 
 /*The controller for the getGroup main page */
 
-  def getGroup(id:UUID) = AuthenticatedAction{implicit request =>
+  def getGroup(id:UUID, size: Int) = AuthenticatedAction{implicit request =>
     implicit val requestUser = request.user
-    Ok(views.html.groups.blank())
+    groups.get(id) match {
+      case(Some(g)) => {
+        val group : Group = g
+        val creator = users.findById(g.creator)
+        var creatorActual : User = null
+        val usersInGroup = g.userList
+        val spacesWithGroup = new ListBuffer[ProjectSpace]()
+        for(groupRoleObject <- g.spaceandrole){
+          spaces.get(groupRoleObject.spaceID) match {
+            case(Some(space)) => {
+              if(spacesWithGroup.contains(space) == false)
+                spacesWithGroup += space
+            }
+            case None => {}
+          }
+        }
+        val spaceList =
+          if(spacesWithGroup.length < size) spacesWithGroup.toList
+          else spacesWithGroup.toList.takeRight(size).reverse
+        creator match{
+          case Some(theCreator) => {
+            creatorActual = theCreator
+          }
+          case None => Logger.error("No creator for group found.")
+        }
+        /*This is just a test list to try out the method. Remove after spaces getting groups is added */
+        val spaceList_two = spaces.list()
+        Ok(views.html.groups.mainGroup(group, usersInGroup, spaceList_two))
+      }
+      case None => BadRequest(views.html.notFound(Messages("group.title")))
     }
+    //Ok(views.html.groups.blank())
+  }
 
   def submitNewGroup() = AuthenticatedAction { implicit request =>
     implicit val requestUser = request.user
@@ -177,6 +206,75 @@ class Groups @Inject()(
     }
   }
 
+  def manageGroupUsers(id :UUID) = AuthenticatedAction { implicit request =>
+    implicit val requestUser = request.user
+    groups.get(id) match {
+      case Some(g) => {
+        val creator = users.findById(g.creator)
+        var creatorActual: User = null
+        val usersInGroup = new ListBuffer[User]()
+        val invitations = groups.getInvitationByGroup(g.id)
+        creator match {
+          case Some(theCreator) => {
+            creatorActual = theCreator
+          }
+          case None => Logger.error("No creator found for group.")
+        }
+        for(userId <- g.userList){
+          users.get(userId) match {
+            case Some(user) => usersInGroup += user
+            case None =>
+          }
+        }
+        val userList = usersInGroup.toList
+        Ok(views.html.groups.groupUsers(groupInviteForm, g, creator, userList, invitations))
+      }
+      case None => BadRequest(views.html.notFound(Messages("group.title")))
+    }
+    //Ok(views.html.groups.blank())
+  }
+
+  def inviteToGroup(id:UUID) = AuthenticatedAction {implicit request =>
+    implicit val requestUser = request.user
+    groups.get(id) match {
+      case Some(g) => {
+        groupInviteForm.bindFromRequest.fold(
+          formWithErrors => InternalServerError(formWithErrors.toString()),
+          formData => {
+            formData.addresses.map{
+              email =>
+                securesocial.core.UserService.findByEmailAndProvider(email, UsernamePasswordProvider.UsernamePassword) match {
+                  case Some(member) => {
+                   val user = users.findByEmail(email)
+                   groups.addUserToGroup(user.get.id, g)
+                    val groupTitle: String = Messages("group.title")
+                   val inviteHtml = views.html.groups.groupInviteEmail(id.stringify, g.name, requestUser.get.getMiniUser, user.get.fullName)
+                    Mail.sendEmail(s"[${AppConfiguration.getDisplayName}] - Added to $groupTitle", request.user, email, inviteHtml)
+                  }
+                  case None => {
+                    val uuid = UUID.generate()
+                    val TokenDurationKey = securesocial.controllers.Registration.TokenDurationKey
+                    val DefaultDuration = securesocial.controllers.Registration.DefaultDuration
+                    val TokenDuration = Play.current.configuration.getInt(TokenDurationKey).getOrElse(DefaultDuration)
+                    val token = new Token(uuid.stringify, email, DateTime.now(), DateTime.now().plusMinutes(TokenDuration), true)
+                    securesocial.core.UserService.save(token)
+                    val ONE_MINUTE_IN_MILLIS = 60000
+                    val date: Calendar = Calendar.getInstance()
+                    val t = date.getTimeInMillis()
+                    val afterAddingMins: Date = new Date(t + (TokenDuration * ONE_MINUTE_IN_MILLIS))
+                    val invite = GroupInvite(uuid, uuid.toString(), email, g.id, new Date(), afterAddingMins)
+                    val inviteHtml = views.html.groups.groupInviteThroughEmail(uuid.stringify, g.name, requestUser.get.getMiniUser.fullName, formData.message)
+                    Mail.sendEmail(Messages("mails.sendSignUpEmail.subject"), request.user, email, inviteHtml)
+                    groups.addInvitationToGroup(invite)
+                  }
+                }
+            }
+            Redirect(routes.Groups.getGroup(g.id))
+          })
+      }
+      case None => BadRequest(views.html.notFound(Messages("group.title")))
+    }
+  }
 
   def listUser() = PrivateServerAction { implicit request =>
     implicit val user = request.user

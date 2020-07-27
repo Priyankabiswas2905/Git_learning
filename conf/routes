@@ -905,5 +905,7 @@ POST       /api/groups/:groupId/removeFromSpace/:spaceId                        
 GET       /groups/list                                                                 @controllers.Groups.list(numPage : Int ?= 1, size: Int ?= 12, mode: String ?= "", owner: Option[String] ?= None, nextPage : Int ?= -1, prevPage : Int ?= -1)
 GET       /groups/listUser                                                             @controllers.Groups.listUser()
 GET       /groups/new                                                                  @controllers.Groups.newGroup()
-GET       /groups/getGroup/:id                                                         @controllers.Groups.getGroup(id: UUID)
+GET       /groups/getGroup/:id                                                         @controllers.Groups.getGroup(id: UUID, size : Int ?= 9)
 POST      /groups/submitNewGroup                                                       @controllers.Groups.submitNewGroup
+GET       /groups/:id/users                                                            @controllers.Groups.manageGroupUsers(id: UUID)
+POST      /groups/:id/invite                                                           @controllers.Groups.inviteToGroup(id: UUID)

@@ -1,0 +1,14 @@
+@(groupid: String, groupName: String, inviter: models.MiniUser, newmember: String)(implicit request: RequestHeader)
+@import securesocial.core.IdentityProvider
+@import play.api.i18n.Messages
+<html>
+    <body>
+
+        <p>Hello @newmember,</p>
+
+        <p>You have been added by <a href="@routes.Profile.viewProfileUUID(inviter.id).absoluteURL(IdentityProvider.sslEnabled)">@inviter.fullName</a>
+            to @Messages("group.title") <a href="@routes.Groups.getGroup(UUID(groupid)).absoluteURL(IdentityProvider.sslEnabled)">@groupName</a>
+            on <a href="@routes.Application.index().absoluteURL(IdentityProvider.sslEnabled)">@services.AppConfiguration.getDisplayName</a>.
+        </p>
+    </body>
+</html>

@@ -26,5 +26,16 @@ trait GroupService{
 
   def listGroupsByUser(userId: UUID) : List[Group]
 
+  def addInvitationToGroup(invite : GroupInvite)
+
+  def removeInvitationFromGroup(inviteId: UUID, groupId: UUID)
+
+  def getInvitation(inviteId : String) : Option[GroupInvite]
+
+  def getInvitationByGroup(group : UUID): List[GroupInvite]
+
+  def getInvitationByEmail(email: String): List[GroupInvite]
+
+  def processInvitation(email: String)
 
 }
